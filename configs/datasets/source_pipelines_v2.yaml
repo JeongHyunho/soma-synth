@@ -1,0 +1,399 @@
+# How each source is produced -- v2 (2026-09-25, ADR-0041).
+#
+# source_pipelines_v1.yaml stays as it was: a config a run has used is never edited in place, and
+# every run record names the registry it ran under. v2 is v1 plus what the soma-synth split
+# (ADR-0041) needs:
+#
+#   - generation_policy: the standing decision a run generates under when no owner record is
+#     handed in -- internal users make experimental_non_candidate / internal_only bundles on
+#     their own machines
+#     (research/decisions/2026-09-25_source_distribution_and_pipeline_split_decision.md section 4).
+#     It releases no hold; canonical and internal-candidate generation stay behind them.
+#   - per source: artifact_class (the runner refuses anything but experimental_non_candidate) and
+#     bundle_lineage (the runner's default output, paths.lineage_dir(<bundle_lineage>)).
+#   - corpus: hknu, gaitex and addbiomechanics are built from an SMPL-24 retarget corpus. The
+#     corpus used to be a given input; the runner now builds it from the extracted sources when
+#     its lineage directory is missing (or when asked to rebuild), records its fingerprint and
+#     hands it to the bundle entrypoint through `bundle_arg`.
+#   - prism writes through --out (the bundle directory) rather than --data-root, so its source
+#     comes from SOMA_SOURCE_ROOT like every other source's; and its insole-heading companion
+#     (heading_synth_reference.npz) is a declared post_step.
+#   - addbiomechanics no longer names addbio_smpl24_synth: the bundle generator never read it, and
+#     the cross-check it stood for is not part of generation.
+#   - reads_env names the variables the generators read through pipeline.paths: every corpus and
+#     bundle entrypoint resolves its defaults and guards its output through SOMA_DATA_ROOT,
+#     SOMA_SOURCE_ROOT and SOMA_BODY_MODEL_DIR; the runner hands its data root to them as
+#     SOMA_DATA_ROOT.
+#   - gaitex library_imports names soma_synthetic_imu.gaitex_retarget.native, the generation
+#     pipeline's own GAITEX reader, instead of source_parsing.adapters.gaitex.
+#   - body models: body_model_sets.smpl_clean is resolved through pipeline.paths.body_model_dir()
+#     -- SOMA_BODY_MODEL_DIR when set, else <data root>/body_models/smpl -- and the runner hashes
+#     the folder it resolved.
+#   - entrypoint.optional_args brought up to date with the generators' parsers (amass --groups,
+#     prism --out / --source-root, addbiomechanics --only, hknu --hknu-root). Descriptive only:
+#     the runner passes the output flag, the corpus flag and what the operator adds.
+#   - selection_args (entrypoint and corpus; required, may be empty): the flags that select part
+#     of the source. A run given one writes its INDEX / summary over the selection alone, so the
+#     runner refuses them when the output is a production lineage directory. Other flags the
+#     operator adds (--force, --compress, --resume) are passed through there.
+#   - no force flag, and nothing about resuming. The runner builds every bundle and every corpus
+#     into an empty directory and resumes none: a directory that holds anything is refused unless
+#     --replace-existing (a corpus: --rebuild-corpus --replace-existing) is given, and then the
+#     runner renames the whole directory aside to <dir>.replaced-<run>, keeps copies of its small
+#     evidence files in the run record, and builds the new generation fresh, so no old take can be
+#     skipped as done. On success the aside directory is deleted, except a production directory's
+#     (any directory directly under runs/experimental_generation_poc_demo), which is left for the
+#     owner's approved deletion (retention rule 1.5); on failure the fresh output becomes
+#     <dir>.failed-<run> and the aside directory is renamed back. A run that was killed is built
+#     again from the start. The `resume` predicates below describe the generators' own skip logic,
+#     which a fresh directory never exercises. An entrypoint's own --force (amass, prism,
+#     addbiomechanics) or --resume (addbio_smpl24) is the operator's to pass; the runner adds
+#     neither.
+#
+# Like v1, this file declares no tolerance, threshold or numeric band. Every value is an identity,
+# a path, a stage name, a flag or a boolean (DETERMINISTIC_EXECUTION_CONFIG_HOLD).
+# It describes the generators AS THEY ARE on 2026-09-25; no generator changed for v2.
+#
+# Corpus and bundle paths carry no version suffix (retention rules section 1): one directory per
+# lineage, regenerated under the same name (into an empty directory, the old one moved aside
+# first). A PC without the corpora gets them from the corpus stage, under the same names.
+
+schema: source_pipelines_v2
+spec_id: qmd_unified8_smpl18
+spec_version: faithful-v2
+
+# The decision a run generates under when no --authorized-by record is given. Copied into every
+# run record (manifest.json generation_decision and tracing). Checked at load: the class must be
+# experimental_non_candidate, the scope internal_only, and releases_holds false.
+generation_policy:
+  basis: standing_decision
+  adr: ADR-0041
+  adr_path: docs/adr/ADR-0041-soma-synth-split-and-teammate-generation.md
+  decision_record: research/decisions/2026-09-25_source_distribution_and_pipeline_split_decision.md
+  decision_section: "§4"
+  artifact_class: experimental_non_candidate
+  distribution_scope: internal_only
+  releases_holds: false
+  description: >-
+    Internal users generate experimental_non_candidate, internal_only bundles on their own
+    machines under this one decision, without an owner record per run. Bundles stay on the
+    machine that made them; sharing or publishing them needs a separate approval. Every run record
+    carries the source hash list, the code and smpl18 revisions and this decision's path, so a
+    licence withdrawal can be traced (PIPELINE_GOVERNANCE.md section 12). Per-source owner records
+    (--authorized-by) remain valid for experimental_non_candidate runs. Canonical and candidate
+    generation stays under the holds and their approved transitions (the parent project's hold
+    transitions); neither this
+    decision nor an owner record opens it.
+
+# The canonical stage sequence. The first seven names are PIPELINE_GOVERNANCE 5.1 verbatim; the
+# rest are the synthesis and emission that lineage adds after them.
+canonical_stages:
+  - register_asset
+  - inspect_native
+  - validate_license
+  - load_native
+  - validate_native
+  - convert_intermediate
+  - emit_source_qc_and_provenance
+  - fit_shape
+  - build_large
+  - build_anthro
+  - synthesise_small
+  - resample_100hz
+  - emit_take
+  - emit_bundle
+  - close_run
+
+# Resume predicates observed in the generators, weakest first. A runner that unifies them should
+# adopt `bundle_opens`, which is the only one that would notice a half-written take.
+resume_predicates:
+  none:
+    description: no skip logic; every take is rebuilt on every run
+  manifest_exists:
+    description: skips when manifest.json exists, even if the npz beside it are truncated
+  core_files_exist:
+    description: skips when every core deliverable file exists, without opening any of them
+  bundle_opens:
+    description: skips when every deliverable exists and manifest.json parses
+
+# Where each entrypoint wants to be told to write. The generators disagree -- one takes the
+# bundle directory, one its parent, one the data root -- so the mapping is declared here rather
+# than branched on in code. In v2 every source writes through `dataset_dir`.
+output_arg_kinds:
+  dataset_dir:
+    description: the bundle directory itself
+  dataset_parent:
+    description: the directory the bundle is created inside
+  data_root:
+    description: SOMA_DATA_ROOT; the generator derives its own output path beneath it
+
+# Where a body-model set lives, and who resolves a gender to a file inside it. `relative_path` is
+# the folder under the run's data root; SOMA_BODY_MODEL_DIR, when set, replaces it for the
+# generators and the runner alike (pipeline.paths.body_model_dir, pipeline.body_models), and the
+# runner hashes whichever folder it resolved. `resolver` names the package that owns the
+# file-naming convention: smpl18 (packages/smpl18), which every generator selects through.
+body_model_sets:
+  smpl_clean:
+    relative_path: body_models/smpl      # under the run's data root, unless SOMA_BODY_MODEL_DIR
+    resolver: smpl18.model.select
+    description: >-
+      Licence-free npz extracted from the MPI SMPL pkl, one per gender
+      (SMPL_MALE_clean.npz, SMPL_FEMALE_clean.npz, SMPL_NEUTRAL_clean.npz).
+
+sources:
+
+  amass:
+    small_mode: synthetic_from_smpl
+    artifact_class: experimental_non_candidate
+    bundle_lineage: amass_faithful_full
+    entrypoint:
+      script: scripts/poc/generate_amass_faithful_all.py
+      required_args: []
+      optional_args: ["--amass-root", "--out-root", "--datasets", "--groups", "--shard",
+                      "--limit", "--force", "--merge"]
+      selection_args: ["--datasets", "--groups", "--limit", "--shard"]
+      output_arg: "--out-root"
+      # The flag is named --out-root but it IS the bundle directory: the generator writes each
+      # take under it and its INDEX into it (DEFAULT_OUT_ROOT ends in amass_faithful_full).
+      output_arg_kind: dataset_dir
+      # How the runner's --jobs reaches this generator: N processes each given `--shard i/N`,
+      # then one `--merge` that joins the shard indexes and writes the description.
+      parallel_args:
+        shard: "--shard"
+        merge: "--merge"
+    # This generator predates the shared emitter and imports nothing from soma_synthetic_imu
+    # beyond pipeline.paths. `generate_amass_faithful` is loaded BY PATH and used as its library.
+    emitter: inline
+    path_loads: ["generate_amass_faithful"]
+    resume: bundle_opens
+    parallel: shard          # --shard i/N, run as separate processes, merged with --merge
+    # All five call clean_model_path_for_gender, so the model is chosen per subject rather than
+    # fixed. §10.2 wants the model hash, which means hashing the file actually selected for the
+    # subject, not one nominated here.
+    body_model_set: smpl_clean
+    body_model_selection: by_subject_gender
+    # The smpl18 profile that describes this source's conversion to SMPL-24: a shipped
+    # profile name or a repository-relative path (shipped: packages/smpl18/configs/profiles/amass.yaml).
+    smpl18_profile: amass
+    stochastic: false
+    reads_env: ["SOMA_DATA_ROOT", "SOMA_SOURCE_ROOT", "SOMA_BODY_MODEL_DIR"]
+
+  prism:
+    small_mode: measured_physical
+    artifact_class: experimental_non_candidate
+    bundle_lineage: prism_faithful_full
+    entrypoint:
+      script: scripts/poc/generate_prism_measured_all.py
+      required_args: []
+      optional_args: ["--out", "--source-root", "--data-root", "--only", "--limit", "--force"]
+      selection_args: ["--only", "--limit"]
+      # v1 wrote through --data-root, which reads <root>/extracted/prism whatever
+      # SOMA_SOURCE_ROOT says. --out is the bundle directory and leaves the source to
+      # SOMA_SOURCE_ROOT (default <SOMA_DATA_ROOT>/extracted), as every other source.
+      output_arg: "--out"
+      output_arg_kind: dataset_dir
+    # Run over the finished bundle, before KNOWN_LIMITATIONS.json is rendered; it writes
+    # heading_synth_reference.npz beside every take (the harness runs the same command line).
+    post_steps:
+      - script: scripts/poc/synthesize_insole_heading.py
+        args: ["{dataset_dir}"]
+        description: >-
+          writes heading_synth_reference.npz beside every take: the insole heading with its gyro
+          drift removed against the same leg's shank; small_reference.npz is not touched
+    emitter: inline
+    path_loads: ["generate_prism_faithful"]
+    resume: core_files_exist
+    parallel: none
+    # All five call clean_model_path_for_gender, so the model is chosen per subject rather than
+    # fixed. §10.2 wants the model hash, which means hashing the file actually selected for the
+    # subject, not one nominated here.
+    body_model_set: smpl_clean
+    body_model_selection: by_subject_gender
+    # The smpl18 profile that describes this source's conversion to SMPL-24: a shipped
+    # profile name or a repository-relative path (internal: authored here, published to $SHARED_DATASET_PATH/smpl18/profiles/).
+    smpl18_profile: configs/smpl18/profiles/prism.yaml
+    stochastic: false
+    reads_env: ["SOMA_DATA_ROOT", "SOMA_SOURCE_ROOT", "SOMA_BODY_MODEL_DIR"]
+
+  addbiomechanics:
+    small_mode: synthetic_from_smpl
+    artifact_class: experimental_non_candidate
+    bundle_lineage: addbio_unified8
+    entrypoint:
+      script: scripts/poc/generate_addbio_unified8.py
+      required_args: ["--out"]
+      optional_args: ["--raw", "--studies", "--subjects", "--trials", "--only", "--jobs",
+                      "--force"]
+      selection_args: ["--studies", "--subjects", "--trials", "--only"]
+      output_arg: "--out"
+      output_arg_kind: dataset_dir
+      # How the runner's --jobs reaches this generator: its own process pool.
+      parallel_args:
+        jobs: "--jobs"
+    # The SMPL-24 retarget corpus the bundle is built from. The generator reads it through --raw
+    # (else ADDBIO_RETARGET_CORPUS, else the lineage directory) and requires it under the data
+    # root, because every take's relative_path is written against the data root.
+    corpus:
+      script: scripts/poc/generate_addbio_smpl24.py
+      lineage: addbio_smpl24_raw
+      output_arg: "--out"
+      required_args: ["--out"]
+      optional_args: ["--source-root", "--per-study", "--only", "--trials", "--max-frames",
+                      "--shape-trials", "--shape-frames", "--landmark-offsets",
+                      "--unknown-sex-model", "--no-compress", "--resume"]
+      selection_args: ["--per-study", "--only", "--trials", "--max-frames"]
+      # Rebuilds every subject unless the operator passes --resume (--corpus-arg=--resume), which
+      # skips a subject whose marker exists; the runner never adds it.
+      fingerprint: SUMMARY.json
+      bundle_arg: "--raw"
+      library_imports:
+        - soma_synthetic_imu.addbio_retarget.artifact
+        - soma_synthetic_imu.addbio_retarget.attribution
+        - soma_synthetic_imu.addbio_retarget.b3d_frames
+        - soma_synthetic_imu.addbio_retarget.osim_kinematics
+        - soma_synthetic_imu.addbio_retarget.pose_fit
+        - soma_synthetic_imu.addbio_retarget.shape_fit
+        - soma_synthetic_imu.addbio_retarget.smpl_correspondence
+        - soma_synthetic_imu.addbio_retarget.wrap_repair
+    emitter: unified8_emit
+    # Since 2026-09-15 the generator also applies the pose-discontinuity scan while the INDEX is
+    # written (it was a hand-run post-pass before) and names the sex provenance itself.
+    path_loads: ["unified8_emit", "generate_addbio_faithful", "pose_discontinuity_scan"]
+    library_imports: ["soma_synthetic_imu.addbio_retarget.shape_fit"]
+    inputs:
+      # v1 also named cross_check_corpus (addbio_smpl24_synth). The bundle generator never read
+      # it, so it is gone from v2, and so is the reason to keep that corpus.
+      retarget_corpus: runs/experimental_generation_poc_demo/addbio_smpl24_raw
+    resume: manifest_exists
+    parallel: process_pool   # ProcessPoolExecutor, --jobs
+    # All five call clean_model_path_for_gender, so the model is chosen per subject rather than
+    # fixed. §10.2 wants the model hash, which means hashing the file actually selected for the
+    # subject, not one nominated here.
+    body_model_set: smpl_clean
+    body_model_selection: by_subject_gender
+    # The smpl18 profile that describes this source's conversion to SMPL-24: a shipped
+    # profile name or a repository-relative path (shipped: packages/smpl18/configs/profiles/addbiomechanics.yaml).
+    smpl18_profile: addbiomechanics
+    stochastic: false
+    reads_env: ["SOMA_DATA_ROOT", "SOMA_SOURCE_ROOT", "SOMA_BODY_MODEL_DIR",
+                "ADDBIO_RETARGET_CORPUS"]
+
+  gaitex:
+    small_mode: synthetic_from_markers
+    artifact_class: experimental_non_candidate
+    bundle_lineage: gaitex_unified8
+    entrypoint:
+      script: scripts/poc/generate_gaitex_unified8.py
+      required_args: ["--out"]
+      optional_args: ["--retarget", "--extracted", "--settings", "--sites", "--subjects"]
+      selection_args: ["--subjects"]
+      output_arg: "--out"
+      output_arg_kind: dataset_dir
+    # The SMPL-24 retarget corpus the bundle is built from, read through --retarget and required
+    # under the data root. `--compress` is left to the operator (--corpus-arg=--compress; it is
+    # not a selection flag, so the production corpus takes it too).
+    corpus:
+      script: scripts/poc/generate_gaitex_smpl24.py
+      lineage: gaitex_smpl24
+      output_arg: "--out"
+      required_args: []
+      optional_args: ["--source-root", "--out", "--subjects", "--max-frames", "--shape-frames",
+                      "--minimum-frames", "--compress"]
+      selection_args: ["--subjects", "--max-frames"]
+      # converts every usable trial of every selected subject; nothing is skipped
+      fingerprint: _run.json
+      bundle_arg: "--retarget"
+      library_imports:
+        - soma_synthetic_imu.addbio_retarget.artifact
+        - soma_synthetic_imu.addbio_retarget.osim_kinematics
+        - soma_synthetic_imu.addbio_retarget.pose_fit
+        - soma_synthetic_imu.addbio_retarget.shape_fit
+        - soma_synthetic_imu.addbio_retarget.smpl_correspondence
+        - soma_synthetic_imu.gaitex_retarget
+    emitter: unified8_emit
+    path_loads: ["unified8_emit"]
+    # The furthest along of the five: small is synthesised from marker clusters through the
+    # library rather than from SMPL forward kinematics, and the source adapter is a package
+    # module rather than inline parsing -- gaitex_retarget.native, so that generation does not
+    # load source_parsing.
+    library_imports:
+      - soma_synthetic_imu.addbio_retarget.attribution
+      - soma_synthetic_imu.addbio_retarget.shape_fit
+      - soma_synthetic_imu.gaitex_synthesis.marker_small
+      - soma_synthetic_imu.sensors.site_registry
+      - soma_synthetic_imu.gaitex_retarget.native
+    inputs:
+      retarget_corpus: runs/experimental_generation_poc_demo/gaitex_smpl24
+    configs:
+      synthesis: configs/datasets/gaitex_synthesis_v1_1.yaml
+      sites: configs/datasets/gaitex_sensor_sites_v1.yaml
+      joint_ranges: configs/datasets/gaitex_joint_ranges_v1.yaml
+    # GAITEX goes through the same gendered selection as the others, but the archive records no
+    # sex, so `neutral` is declared as a modelling choice rather than read from the source. The
+    # bundle's SEX_PROVENANCE says so; recorded here because it explains why one source always
+    # resolves to the same model file.
+    body_model_note: gender declared neutral; the archive carries no sex
+    resume: none
+    parallel: none
+    # All five call clean_model_path_for_gender, so the model is chosen per subject rather than
+    # fixed. §10.2 wants the model hash, which means hashing the file actually selected for the
+    # subject, not one nominated here.
+    body_model_set: smpl_clean
+    body_model_selection: by_subject_gender
+    # The smpl18 profile that describes this source's conversion to SMPL-24: a shipped
+    # profile name or a repository-relative path (shipped: packages/smpl18/configs/profiles/gaitex.yaml).
+    smpl18_profile: gaitex
+    stochastic: false
+    reads_env: ["SOMA_DATA_ROOT", "SOMA_SOURCE_ROOT", "SOMA_BODY_MODEL_DIR"]
+
+  hknu:
+    small_mode: synthetic_from_smpl
+    artifact_class: experimental_non_candidate
+    bundle_lineage: hknu_unified8
+    entrypoint:
+      script: scripts/poc/generate_hknu_unified8.py
+      required_args: ["--out"]
+      optional_args: ["--paired", "--hknu-root", "--subjects", "--trials"]
+      selection_args: ["--subjects", "--trials"]
+      output_arg: "--out"
+      output_arg_kind: dataset_dir
+    # The 2026-09-08 repaired-fit retarget (pelvis constant, lumbar zero, measured bone lengths,
+    # per-frame root), read through --paired.
+    corpus:
+      script: scripts/poc/generate_hknu_faithful.py
+      lineage: hknu_smpl24_paired
+      output_arg: "--out"
+      required_args: ["--out"]
+      optional_args: ["--root", "--subjects", "--trials"]
+      selection_args: ["--subjects", "--trials"]
+      # converts every trial of every selected subject (a trial with non-finite input is recorded
+      # as skipped, not reused); nothing finished is skipped
+      fingerprint: SUMMARY.json
+      bundle_arg: "--paired"
+      path_loads: ["generate_amass_faithful", "hknu_retarget_probe"]
+      library_imports:
+        - soma_synthetic_imu.addbio_retarget.pose_fit
+        - soma_synthetic_imu.addbio_retarget.shape_fit
+    emitter: unified8_emit
+    # The generator also loads the pose-discontinuity scan by path and applies it while the
+    # INDEX is written (2026-09-14), and reads source_attribution from the contracts registry.
+    path_loads: ["unified8_emit", "pose_discontinuity_scan"]
+    library_imports:
+      - soma_synthetic_imu.addbio_retarget.shape_fit
+      - soma_synthetic_imu.contracts.source_attribution
+    inputs:
+      # The 2026-09-08 repaired-fit retarget (pelvis constant, lumbar zero, measured bone
+      # lengths, per-frame root); the generator's --paired default is this path.
+      retarget_corpus: runs/experimental_generation_poc_demo/hknu_smpl24_paired
+    resume: none
+    parallel: none
+    # All five call clean_model_path_for_gender, so the model is chosen per subject rather than
+    # fixed. §10.2 wants the model hash, which means hashing the file actually selected for the
+    # subject, not one nominated here.
+    body_model_set: smpl_clean
+    body_model_selection: by_subject_gender
+    # The smpl18 profile that describes this source's conversion to SMPL-24: a shipped
+    # profile name or a repository-relative path (internal: authored here, published to $SHARED_DATASET_PATH/smpl18/profiles/).
+    smpl18_profile: configs/smpl18/profiles/hknu.yaml
+    stochastic: false
+    reads_env: ["SOMA_DATA_ROOT", "SOMA_SOURCE_ROOT", "SOMA_BODY_MODEL_DIR"]

@@ -1,0 +1,422 @@
+{
+  "config_id": "gaitex_synthesis_v1_1",
+  "version": "1.1.1",
+  "schema_version": "1.0.0",
+  "created_date": "2026-09-06",
+  "activation_state": "non_authorizing",
+  "distribution_scope": "internal_only",
+  "source": "gaitex",
+  "description": "Proposal. Execution constants for synthesising virtual inertial signals from GAITEX marker kinematics. Every value here would otherwise have to live in code, which MASTERPLAN.md:93 forbids while DETERMINISTIC_EXECUTION_CONFIG_HOLD is active. Collecting them in one versioned file is what makes the library callable without violating that. This file is NOT an approved execution configuration: it lifts no hold, and it has had no independent review. See reports/source_parsing/2026-09-03-gaitex-plan-governance-conflict.md. Revision 1.1.0 (2026-09-06) is the first version a generator reads: scripts/poc/generate_gaitex_unified8.py, through src/soma_synthetic_imu/gaitex_synthesis/marker_small.py. The owner's decisions it encodes are recorded in ADR-0039.",
+  "hold_status": {
+    "deterministic_execution_config_hold": "active",
+    "independent_review": "NOT_PERFORMED",
+    "authorises_generation": false,
+    "note": "Values below are proposals derived from measurements on the extraction, recorded so that evidence runs are reproducible. Promoting them to an execution configuration requires the reviewed atomic transition the hold names."
+  },
+  "source_binding": {
+    "native_root": "extracted/gaitex",
+    "version_doi": "10.5281/zenodo.15729056",
+    "concept_doi": "10.5281/zenodo.15729055",
+    "archive_md5": "cc69aa2b8d1317430012252e5a58d2b5",
+    "archive_sha256": "9d2d0f25cb5d05524652e270b894f7c4a2622686e5dfa77a6893c1bfb96cb4f8",
+    "extracted_files": 7081,
+    "extracted_bytes": 17658016882,
+    "trials": 73,
+    "subjects": 19,
+    "license": "CC-BY-4.0",
+    "attribution_required": true
+  },
+  "grid": {
+    "rate_hz": 100.0,
+    "dt_s": 0.01,
+    "note": "Native. The specification's P4 target is the same 100 Hz, so no resampling is involved and none is configured."
+  },
+  "frames": {
+    "global_frame": "qualisys_lab_z_up",
+    "gravity_world_m_per_s2": [
+      0.0,
+      0.0,
+      -9.80665
+    ],
+    "note": "Measured on the extraction: head minus heel is 1650 mm on Z at frame 0, so Z is vertical. The Qualisys and Xsens world frames differ by a 22.38 degree heading with pitch -2.12 and roll 0.08, i.e. both are gravity-aligned. Synthesis works entirely in the Qualisys frame, so that offset does not enter."
+  },
+  "marker_conditioning": {
+    "occlusion_sentinel": "exact_zero_triplet",
+    "max_marker_speed_m_per_s": 10.0,
+    "rigid_distance_tolerance_m": 0.002,
+    "note": "The speed bound is a generous physiological ceiling for a body-mounted marker. The rigid tolerance is about 3 standard deviations of the observed inter-marker distance scatter, which ranges 0.09 to 0.74 mm across clusters."
+  },
+  "pose": {
+    "residual_flag_threshold_m": 0.003,
+    "note": "Observed fit residual RMS is 0.26 to 1.02 mm, so this flags a constellation that has stopped behaving rigidly rather than ordinary noise. Flagged frames are kept and marked, never dropped."
+  },
+  "gap_policy": {
+    "max_interpolated_gap_frames": 20,
+    "window_frames": 1000,
+    "stride_frames": 500,
+    "max_estimated_fraction": 0.02,
+    "note": "The 20-frame limit covers 388 of the 437 observed sub-three-marker runs while interpolating only 1450 frames in 1.85 million. Raising it to 100 would recover a further 1355 frames, because the run-length distribution is bimodal: p50 is 2 frames but 19 runs longer than a second hold 89 percent of the lost frames. Twenty frames is also the same order as the zero-phase filter's own impulse response, beyond which an interpolated stretch would start contaminating its neighbours' derivatives."
+  },
+  "filter": {
+    "type": "butterworth",
+    "order": 4,
+    "zero_phase": true,
+    "cutoff_hz": 12.0,
+    "edge_trim_frames": 17,
+    "note": "At 12 Hz the propagated acceleration noise is 0.27 m/s^2 against a signal RMS of 6.18, a signal-to-noise ratio of 27.3 dB. 99.61 percent of vertical position power lies below 6 Hz and 0.0068 percent between 15 and 30 Hz. The consequence, recorded rather than hidden: impact transients above the cut-off are not reproduced. The owner directed on 2026-09-03 that impact transients are a minor concern for this source, and this cut-off follows that direction. That is an owner decision on record, not an independent review: hold_status.independent_review in this same file remains NOT_PERFORMED. Corrected 2026-09-04, which also measured the band edge: zero-phase filtering applies the 4th-order response twice, so the chain reaches a gain of 0.726 at 10 Hz, below the 12 Hz cut-off rather than above it."
+  },
+  "lever_arm": {
+    "depth_m": 0.014,
+    "depth_uncertainty_m": 0.006,
+    "in_plane_offset_m": [
+      0.0,
+      0.0
+    ],
+    "note": "NOT OBSERVABLE FROM THIS DATASET. GAITEX publishes no accelerometer, so the lever cannot be fitted dynamically, and its OpenSim models define no IMU frames, so it cannot be read off either. The value is a hardware assumption bounded by the Xsens MTw case depth plus the marker plate, and the uncertainty is carried explicitly: at the observed rates it implies about 0.33 m/s^2 at the 95th percentile, which is 3.4 percent of gravity. Open item; not yet decided."
+  },
+  "plate_geometry_reference": {
+    "per_site_edge_lengths_m": {
+      "chest": [
+        0.05287,
+        0.05502,
+        0.06437,
+        0.06985,
+        0.08311,
+        0.08888
+      ],
+      "shank_l": [
+        0.05324,
+        0.05573,
+        0.06366,
+        0.06953,
+        0.08233,
+        0.08947
+      ],
+      "shank_r": [
+        0.05327,
+        0.05633,
+        0.06429,
+        0.07114,
+        0.08378,
+        0.09015
+      ],
+      "foot_l": [
+        0.0531,
+        0.05632,
+        0.06441,
+        0.06909,
+        0.08321,
+        0.08919
+      ],
+      "foot_r": [
+        0.05231,
+        0.0557,
+        0.0636,
+        0.06983,
+        0.08234,
+        0.08901
+      ],
+      "pelvis": [
+        0.05313,
+        0.05509,
+        0.06395,
+        0.07024,
+        0.08218,
+        0.0899
+      ],
+      "thigh_l": [
+        0.05305,
+        0.05566,
+        0.06396,
+        0.06907,
+        0.0823,
+        0.08925
+      ],
+      "thigh_r": [
+        0.05271,
+        0.05628,
+        0.06379,
+        0.07035,
+        0.08285,
+        0.08967
+      ]
+    },
+    "edge_tolerance_m": 0.0015,
+    "planarity_tolerance_m": 0.0005,
+    "note": "CORRECTED 2026-09-03 after the corpus run. An earlier 13-trial sample was averaged ACROSS sites and appeared to show one standardised plate; measuring all 73 trials site by site shows otherwise. Each site's plate is highly reproducible -- within-site scatter across trials is at most 0.472 mm -- but the eight plates differ from each other by up to 2.076 mm on one edge. A single global reference with a 1.0 mm tolerance therefore failed 164 of 364 site-trials, concentrated on shank_r (1.542 mm from the old global mean) and foot_l (1.320 mm). The reference is now per site and the tolerance is 1.5 mm, roughly three times the observed within-site scatter. pelvis, thigh_l and thigh_r are measured and kept here although no virtual sensor site is declared at them: GAITEX mounts real sensors there, and the eight-plate spread quoted above is what establishes that the plates are not interchangeable. No code path reads those three entries; they are evidence for the tolerance, not inputs to it."
+  },
+  "evidence_run": {
+    "minimum_synthesised_frames": 100,
+    "minimum_comparable_frames": 100,
+    "minimum_drift_fit_frames": 500,
+    "note": "Admission criteria for the evidence and drift sweeps, not synthesis parameters: they decide which site-trials reach a report and nothing about how a signal is built. Recorded here on 2026-09-04 because they had been literals inside scripts/gaitex_corpus_evidence.py and scripts/gaitex_corpus_drift.py, where the two sweeps disagreed with each other over the same corpus and neither figure was visible to a reader of the reports. The values are unchanged from those literals, so the committed evidence is unaffected. On this corpus none of the three excludes anything: every comparable site-trial clears all of them."
+  },
+  "validation": {
+    "minimum_rate_rad_per_s": 0.5,
+    "quasi_static_rate_deg_per_s": 3.0,
+    "quasi_static_magnitude_tolerance_m_per_s2": 0.5,
+    "magnitude_bound_m_per_s2": 200.0,
+    "note": "The rate floor keeps frames with an ill-defined rotation axis out of the mounting fit. The magnitude bound is a loose physical ceiling, about 20 g, chosen to catch a broken pipeline rather than to characterise gait. Added in 1.1.1: relabel_offset_guard_deg. The mean rotation between a worn-unit-backed site's marker-built sensor frame and the emitter's SMPL-anatomical one for the same site is bounded; a plate whose normal was signed the wrong way is a half turn from it, a correct fit is tens of degrees at most. Above the bound the take is refused.",
+    "relabel_offset_guard_deg": 120.0
+  },
+  "excluded_modalities": [
+    "emg"
+  ],
+  "absent_in_source": [
+    "accelerometer",
+    "gyroscope",
+    "magnetometer",
+    "ground_reaction_force",
+    "center_of_pressure",
+    "free_moment",
+    "heart_rate",
+    "standalone_anthropometry_table"
+  ],
+  "supersedes": {
+    "config_id": "gaitex_synthesis_v1",
+    "version": "1.0.0",
+    "note": "Every block of 1.0.0 is carried unchanged. 1.1.0 adds the blocks the marker-driven small generator needs and that would otherwise be code constants: forearm_conditioning, placement, worn_unit_counterpart_twin, sensor_frame_rules and imu_confidence. gaitex_synthesis_v1.yaml stays as the evidence scripts read it; a used config version is never altered in place."
+  },
+  "forearm_conditioning": {
+    "styloid_pair_distance_tolerance_m": 0.01,
+    "max_rate_deg_per_s": 2000.0,
+    "note": "The three upper-limb markers are not a rigid body (HLE is on the humerus), so the plate rigidity test cannot be applied; these two tests replace it. Measured 2026-09-06 over 146 arm-trials (73 trials x 2 sides) after the occlusion sentinel and the 10 m/s speed ceiling: the radial-ulnar styloid distance has a within-trial standard deviation of 0.59 mm median, 1.45 mm at the 95th percentile and 5.2 mm at most, while its largest frame-to-frame jump is 6.3 mm median, 21 mm at the 90th percentile and 142 mm at most -- the latter are label swaps and ghost markers, and 10 mm separates the two populations. The unfiltered frame-to-frame rotation rate of the anatomical frame has a 99th percentile of 213 deg/s median and 1281 deg/s at most, while 11 of 146 arm-trials carry single-frame steps above 2000 deg/s (up to 4603), which no forearm produces in gait; the ceiling withdraws both frames of such a step. Neither value was tuned against a validator outcome; both sit between the measured populations they separate. Added in 1.1.1: max_gap_twist_deg and label_swap_max_withdrawn_fraction. A radial/ulnar label swap leaves the styloid-pair distance unchanged and, inside a gap, escapes the rate ceiling too; it is a half turn about the forearm axis, so the twist about +Y across every interior gap of the usable series is measured, and each crossing above max_gap_twist_deg flips the labelling parity of what follows. No GAITEX marker says which parity is anatomical, so the parity with more usable frames is kept and the other is withdrawn (never relabelled) and listed on the manifest; when the minority exceeds label_swap_max_withdrawn_fraction of the usable frames the majority is no longer a reason and the site is refused for the take. Measured 2026-09-07 over the 144 wrist-trials: two trials carry a swapped island about 100 frames long (178-179 deg across the gap on either side of it, austra/ng wrist_r and yaxkin/ng wrist_l), the next largest crossing is 71 deg, so 90 deg separates the two populations. A trial swapped throughout has no crossing and is not detected.",
+    "max_gap_twist_deg": 90.0,
+    "label_swap_max_withdrawn_fraction": 0.2
+  },
+  "placement": {
+    "back_T4": {
+      "kind": "offset_twin",
+      "twin": "chest",
+      "note": "Owner decision D1 (2026-09-06). back_T4 and chest are the same THOR1-4 plate, and the worn XSens_Sternum unit sits beneath it, so the plate offset and the worn counterpart are chest's. The synthesised channel is therefore the sternum sensor, not a T4 sensor: ADR-0037 measured the specification's T4 site 110-322 mm away. The manifest says so per site."
+    },
+    "occiput": {
+      "kind": "declared_zero",
+      "note": "Owner decision D1. The head rigid body (R_HEAD, L_HEAD, SGL) has no plate and no registered offset; the sensor is placed at the body's own origin, recorded as a declared fallback per ADR-0037 section 6 and flagged provisional."
+    },
+    "wrist_l": {
+      "kind": "declared_zero",
+      "note": "Owner decision D1. Sensor at the styloid midpoint of the anatomical forearm frame; declared fallback, provisional."
+    },
+    "wrist_r": {
+      "kind": "declared_zero",
+      "note": "As wrist_l."
+    },
+    "note": "Sites whose registry offset is resolved (shank_l/r, foot_l/r) take it from the registry and need no entry here; an entry for such a site must say kind registry or is refused."
+  },
+  "worn_unit_counterpart_twin": {
+    "back_T4": "chest",
+    "note": "Which registered site's measured_counterpart stands opposite a site that has none of its own. back_T4 borrows chest's XSens_Sternum for the same reason it borrows the plate."
+  },
+  "sensor_frame_rules": {
+    "note": "Owner decision D4 (2026-09-06). The spec sensor frame S (small/00_sensors.qmd, IMU axis alignment): +Y proximal, +Z outward lateral (limbs) or subject-right (trunk, head), +X = Y x Z, which makes the left limbs' +X posterior. Each site names a primary axis (kept exactly), a secondary axis (orthogonalised against it) and the landmark construction of each; the third axis completes a right-handed triad. Axes are built per frame in world, expressed in the fitted cluster frame and averaged over the take into ONE constant relabel, so imu_orientation stays a rigid relabel of the fitted body. Construction kinds: landmarks (midpoint-to-midpoint direction), plate_normal_outward (the registered plate's normal, pointing away from the body), world_up (the trial-mean gravity-opposite direction expressed in the cluster frame, a static-calibration analogue), plane_normal (normal of three markers, signed towards world up), toward_cluster_origin (from a landmark midpoint to the fitted cluster origin), styloid_dorsal (sign * (radial - ulnar) x proximal: the back of the wrist on either arm; sign +1 right, -1 left, derived from the anatomical position and independent of posture). Added in 1.1.1: minimum_frames, the fewest solved frames on which a sensor-frame axis may be built. A rule alternative that the trial carries but can build on fewer frames than this (a landmark occluded nearly throughout) falls through to the next alternative the same as an absent one.",
+    "back_T4": {
+      "kind": "trunk",
+      "primary": "y",
+      "secondary": "x",
+      "y": {
+        "kind": "world_up"
+      },
+      "x": {
+        "kind": "plate_normal_outward"
+      },
+      "note": "Y up along the trunk as the trial mean; X anterior from the sternum plate; Z = X x Y = subject right."
+    },
+    "wrist_l": {
+      "kind": "forearm",
+      "primary": "y",
+      "secondary": "z",
+      "y": {
+        "kind": "landmarks",
+        "from": [
+          "L_RSP",
+          "L_USP"
+        ],
+        "to": [
+          "L_HLE"
+        ]
+      },
+      "z": {
+        "kind": "styloid_dorsal",
+        "radial": "L_RSP",
+        "ulnar": "L_USP",
+        "proximal_from": [
+          "L_RSP",
+          "L_USP"
+        ],
+        "proximal_to": [
+          "L_HLE"
+        ],
+        "sign": -1
+      },
+      "note": "Y proximal (styloid midpoint to epicondyle); Z out of the back of the wrist; X = Y x Z = posterior on the left."
+    },
+    "wrist_r": {
+      "kind": "forearm",
+      "primary": "y",
+      "secondary": "z",
+      "y": {
+        "kind": "landmarks",
+        "from": [
+          "R_RSP",
+          "R_USP"
+        ],
+        "to": [
+          "R_HLE"
+        ]
+      },
+      "z": {
+        "kind": "styloid_dorsal",
+        "radial": "R_RSP",
+        "ulnar": "R_USP",
+        "proximal_from": [
+          "R_RSP",
+          "R_USP"
+        ],
+        "proximal_to": [
+          "R_HLE"
+        ],
+        "sign": 1
+      },
+      "note": "As wrist_l with the right-hand sign; X = anterior on the right."
+    },
+    "shank_l": {
+      "kind": "limb",
+      "primary": "y",
+      "secondary": "z",
+      "y": {
+        "kind": "landmarks",
+        "from": [
+          "L_FAL",
+          "L_TAM"
+        ],
+        "to": [
+          "L_FLE",
+          "L_FME"
+        ]
+      },
+      "z": [
+        {
+          "kind": "landmarks",
+          "from": [
+            "L_FME"
+          ],
+          "to": [
+            "L_FLE"
+          ]
+        },
+        {
+          "kind": "plate_normal_outward"
+        }
+      ],
+      "note": "Y ankle centre to knee centre (whichever malleoli and epicondyles the trial carries); Z medial to lateral epicondyle (outward), or the lateral plate normal when an epicondyle is absent; X = Y x Z = posterior on the left."
+    },
+    "shank_r": {
+      "kind": "limb",
+      "primary": "y",
+      "secondary": "z",
+      "y": {
+        "kind": "landmarks",
+        "from": [
+          "R_FAL",
+          "R_TAM"
+        ],
+        "to": [
+          "R_FLE",
+          "R_FME"
+        ]
+      },
+      "z": [
+        {
+          "kind": "landmarks",
+          "from": [
+            "R_FME"
+          ],
+          "to": [
+            "R_FLE"
+          ]
+        },
+        {
+          "kind": "plate_normal_outward"
+        }
+      ],
+      "note": "As shank_l; X = anterior on the right."
+    },
+    "occiput": {
+      "kind": "head",
+      "primary": "y",
+      "secondary": "z",
+      "y": {
+        "kind": "plane_normal",
+        "markers": [
+          "SGL",
+          "R_HEAD",
+          "L_HEAD"
+        ]
+      },
+      "z": {
+        "kind": "landmarks",
+        "from": [
+          "L_HEAD"
+        ],
+        "to": [
+          "R_HEAD"
+        ]
+      },
+      "note": "Y the head-marker plane normal signed upward; Z left to right head marker (subject right); X = Y x Z = anterior."
+    },
+    "foot_l": {
+      "kind": "foot",
+      "primary": "y",
+      "secondary": "x",
+      "y": {
+        "kind": "world_up"
+      },
+      "x": {
+        "kind": "toward_cluster_origin",
+        "from": [
+          "L_FCC"
+        ],
+        "sign": -1
+      },
+      "note": "Y is the spec insole's up -- the sole normal -- approximated as for the trunk by the trial-mean world up expressed in the foot cluster frame; the dorsal plate's own normal was rejected because on a curved dorsum it tilts tens of degrees from the sole normal (45 degrees on austra/gwo's right foot). The malleoli are not carried by every trial (L_TAM is absent in austra/gwo), so the second axis is the long axis of the foot from the calcaneus marker to the dorsal plate, orthogonalised against Y. The spec makes the left foot +X posterior (its +Z is outward lateral and +X = Y x Z), so on the left the heel-to-plate direction is negated; Z = X x Y then comes out lateral on both feet without any further rotation."
+    },
+    "foot_r": {
+      "kind": "foot",
+      "primary": "y",
+      "secondary": "x",
+      "y": {
+        "kind": "world_up"
+      },
+      "x": {
+        "kind": "toward_cluster_origin",
+        "from": [
+          "R_FCC"
+        ],
+        "sign": 1
+      },
+      "note": "As foot_l with the anterior sign: X towards the toes, Z = X x Y = lateral."
+    },
+    "minimum_frames": 10
+  },
+  "imu_confidence": {
+    "source_backed_position_with_worn_counterpart": 0.6,
+    "declared_position_without_counterpart": 0.3,
+    "invalid_cell": 0.0,
+    "sites": {
+      "back_T4": 0.6,
+      "shank_l": 0.6,
+      "shank_r": 0.6,
+      "foot_l": 0.6,
+      "foot_r": 0.6,
+      "occiput": 0.3,
+      "wrist_l": 0.3,
+      "wrist_r": 0.3
+    },
+    "note": "What this corpus means by imu_confidence, since the field means something else on every other corpus of the lineage: 0.6 = rotation and position both source-derived (a fitted plate with a registered offset) and the site validated against a worn unit; 0.3 = rotation source-derived but position a declared fallback (zero offset) with no worn counterpart; 0.0 = the cell is invalid (imu_valid_mask False). The gap between 0.6 and 0.3 is deliberate: these are different kinds of value, not different degrees of one. Added in 1.1.1: a worn-unit-backed site whose comparison did not run on a take (the unit is absent from that trial's file, or the comparison failed) takes the declared-position value on that take, because nothing stood behind it there; the manifest's worn_unit_compared_sites names the sites the value 0.6 applies to on each take.",
+    "backed_site_without_comparison_on_this_take": 0.3
+  },
+  "revision_note": {
+    "1.1.1": "2026-09-07, after a review of the marker-driven small generator: forearm_conditioning.max_gap_twist_deg and label_swap_max_withdrawn_fraction, sensor_frame_rules.minimum_frames, imu_confidence.backed_site_without_comparison_on_this_take and validation.relabel_offset_guard_deg. No value of 1.1.0 changed."
+  }
+}

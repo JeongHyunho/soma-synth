@@ -1,0 +1,3 @@
+[submodule "packages/smpl18"]
+	path = packages/smpl18
+	url = https://github.com/JeongHyunho/smpl18.git

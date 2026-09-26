@@ -1,0 +1,61 @@
+# Visual3D segment and landmark names (HKNU FullBody) -> SMPL-24 joints, as data.
+#
+# Lifted from scripts/diagnostics/hknu_retarget_probe.py in the SOMA Synthetic IMU project
+# (CORRESPONDENCE :78-103, DISTAL_CORRESPONDENCE :118-123 applied by default, TRUNK_ALIAS :58,
+# build_table :126-145), 2026-09-15. The measured justification for each centre is in that
+# file's comments and in the HKNU full-body conversion audit report (parent project record, 2026-08-29).
+schema: smpl18_correspondence_v1
+id: visual3d_hknu
+# Entries name source *bodies* (segments) that drive an SMPL joint's rotation, and the named
+# centre that is its position target. The two are separate questions: a joint may have a
+# centre and no measured rotation (neck), or a rotation and no centre (head).
+names: segments
+
+joints:
+  pelvis:         {body: PV,  centre: PELVIS}
+  left_hip:       {body: LTH, centre: LHJC}
+  right_hip:      {body: RTH, centre: RHJC}
+  spine1:         {fill: distribute}            # no lumbar landmark in the model (probe :71,74-77)
+  left_knee:      {body: LSK, centre: LKJC}
+  right_knee:     {body: RSK, centre: RKJC}
+  spine2:         {fill: distribute}
+  left_ankle:     {body: LFT, centre: LAJC}
+  right_ankle:    {body: RFT, centre: RAJC}
+  spine3:         {fill: distribute, centre: THORAX_BASE}   # TA's caudal end sits at spine3's height (probe :88)
+  # The toes and hand tips carry a centre so that the ankles and wrists have a descendant to
+  # aim at (probe :9-12,106-117). The body listed is the foot or hand itself, since the source
+  # has no separate toe or hand-tip segment: the emitted local rotation is identity. The probe
+  # labels these `measured` because its target filter keys on provenance; the position is
+  # measured, the rotation is not (probe :114-117). Kept as the probe has it, for parity.
+  left_foot:      {body: LFT, centre: LTOE}
+  right_foot:     {body: RFT, centre: RTOE}
+  neck:           {fill: weld, centre: NECK}    # the thorax's cranial end; rotation unmeasured (probe :91)
+  left_collar:    {fill: weld}                  # the model goes thorax -> upper arm directly (probe :92-93)
+  right_collar:   {fill: weld}
+  head:           {body: HE}                    # rotation measured, no centre: every HE point sits near +840 mm (probe :72,94)
+  left_shoulder:  {body: LUA, centre: LSJC}
+  right_shoulder: {body: RUA, centre: RSJC}
+  left_elbow:     {body: LFA, centre: LEJC}
+  right_elbow:    {body: RFA, centre: REJC}
+  left_wrist:     {body: LHA, centre: LWJC}
+  right_wrist:    {body: RHA, centre: RWJC}
+  left_hand:      {body: LHA, centre: LHAND}    # distal, as left_foot
+  right_hand:     {body: RHA, centre: RHAND}
+
+# The trunk (TA) turns relative to the pelvis (PV) and the three spine joints take a third
+# each; only spine3 has a centre to aim at here (probe :82-88; pose_fit.py:162-168).
+lumbar:
+  smpl: [spine1, spine2, spine3]
+  split: equal_thirds
+  centre_on: spine3
+
+trunk_body: TA
+
+# The probe hands TA to pose_fit under the name "torso" because pose_fit hardcodes the trunk
+# body (probe :57-58,142,348). With trunk_body declared above the alias is not needed by the
+# engine; it is kept so the table says what the probe did.
+aliases: {torso: TA}
+
+# No translation coordinates: the source stores segment rotations and positions, not joint
+# angles.
+root_translation: []

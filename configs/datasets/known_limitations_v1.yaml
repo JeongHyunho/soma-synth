@@ -1,0 +1,2741 @@
+# What each bundle cannot promise, in the one shape every bundle shares.
+#
+# Schema and rules: src/soma_synthetic_imu/contracts/dataset_limitations.py and
+# docs/guides/KNOWN_LIMITATIONS.md. Rendered into each bundle root as KNOWN_LIMITATIONS.json by
+# scripts/write_known_limitations.py; the validator checks the rendered copy against this file.
+#
+# Every entry names the exact place a reader verifies it. Nothing here is a guess: a suspected
+# limitation without evidence belongs in an investigation document, not in this file.
+#
+# This file states no threshold and no tolerance (DETERMINISTIC_EXECUTION_CONFIG_HOLD).
+# A limitation is stated, scoped and attributed, never scored.
+#
+# Bundle keys are lineage names without a version suffix (retention rule 1.1, 2026-09-14):
+# one directory per lineage, replaced in place when regenerated. A block therefore describes
+# the lineage's current generation; an entry that a regeneration closed is kept with
+# status fixed and fixed_in rather than deleted, so a reader of older figures can see what
+# changed. A block may predate the regeneration of a lineage that has been retired.
+
+schema: dataset_limitations_v1
+bundles:
+  prism_faithful_full:
+  - id: prism.internal_only
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: 'distribution_scope is internal_only. PRISM is a form-scoped internal dataset: non-commercial
+      academic research only, no redistribution, no commercial purpose, not publicly citable; no official
+      licence, DUA or provider authorisation exists (license_id form_scoped_internal_noncommercial_no_redistribution,
+      publication NOT_ESTABLISHED).'
+    consequence: Do not upload to any public Git, cloud, model or dataset hub, or share by public link;
+      do not redistribute or cite it as a public dataset.
+    evidence: DATA_DESCRIPTION_EN.md 'Scope & handling (read first)' bullet 1; manifest.json distribution_scope,
+      source_attribution.license_id, source_attribution.publication, source_attribution.attribution_note
+      (all 150 takes); INDEX.json distribution_scope; configs/datasets/source_attribution_v1.yaml sources.prism
+    status: open
+    since: '2026-08-18'
+    related:
+    - prism.experimental_non_candidate
+  - id: prism.experimental_non_candidate
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: 'artifact_class is experimental_non_candidate and quality_gate is NOT_EVALUATED: a measured-sensor
+      simulation reference, not canonical output, not contract-compliant, and no production quality gate
+      (PHYSICS_QUALITY_GATES.md) was applied. The PRISM usage policy records that PRISM_SOURCE_PASS is
+      not satisfied.'
+    consequence: Do not use the bundle as a training or evaluation label, and do not cite it as gate-passing
+      or contract-compliant output; a validation PASS is not a quality-gate judgement.
+    evidence: DATA_DESCRIPTION_EN.md 'Scope & handling' bullet 2 and section 7 'unavailable / not applied'
+      row; manifest.json artifact_class, artifact_label, quality_gate, unavailable_or_not_applied 'quality
+      gates (PHYSICS_QUALITY_GATES.md)'; configs/datasets/prism_usage_policy_v1.yaml does_not_satisfy
+    status: open
+    since: '2026-08-18'
+    related:
+    - prism.internal_only
+  - id: prism.official_split_chunk_leakage
+    kind: coverage
+    severity: caution
+    scope:
+      level: bundle
+    statement: 'The cohort is six subjects and 150 takes, and PRISM''s official split is chunk-level (seed
+      42): 126 of 150 takes contribute to both train and test, so test performance includes temporally
+      adjacent chunks of the same take. The usage policy makes this disclosure mandatory.'
+    consequence: Test scores on the official split are not an across-take or across-subject generalisation
+      bound; an across-subject claim needs a separate grouped analysis, and the disclosure must accompany
+      any reported score.
+    evidence: DATA_DESCRIPTION_EN.md 'Scope & handling' bullet 3; configs/datasets/prism_usage_policy_v1.yaml
+      evaluation_split (takes_on_both_sides 126, mandatory_disclosures)
+    status: open
+    since: '2026-08-18'
+  - id: prism.emg_excluded
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+    statement: EMG is an excluded modality; the recorded reason is not_in_synthetic_artifact_scope.
+    consequence: No EMG channel exists in any deliverable; do not expect or derive one from this bundle.
+    evidence: manifest.json excluded_modalities ['emg'] and excluded_modality_reasons.emg (all 150 takes)
+    status: open
+    since: '2026-08-18'
+  - id: prism.back_t4_spine3_proxy
+    kind: proxy
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      arrays:
+      - imu_orientation
+      - imu_acceleration
+      - imu_angular_velocity
+      - imu_confidence
+      - gyro_provenance
+      - q_anatomical_from_sensor
+    statement: 'PRISM has no trunk/T4 sensor. back_T4 is a non-physical proxy: the SMPL spine3 orientation
+      plus an axial acceleration term at the chest proxy point pelvis + 2/3 (head - pelvis) (chest_alpha
+      0.667), relabelled to the spec back frame; its gyro is derived, q_anatomical_from_sensor is identity,
+      and imu_confidence is 0.4 against 0.7 on the physical channels.'
+    consequence: 'Treat back_T4 as kinematic, not measured: exclude it (imu_confidence < 0.7, or gyro_provenance
+      starting ''proxy_non_physical'') wherever a measured-sensor claim is made; the specific-force round-trip
+      check does not apply to it.'
+    evidence: DATA_DESCRIPTION_EN.md section 3.2 idx 0, section 3.4 ('n/a (proxy)'), section 7 'proxy
+      (non-physical)' row and Key caveat 1; manifest.json small_sites_provenance.back_T4 'proxy_non_physical:spine3+axial',
+      canonicalization_config.chest_alpha; small_reference.npz gyro_provenance[0], imu_confidence[:,0]
+      = 0.4
+    status: open
+    since: '2026-08-18'
+  - id: prism.insole_heading_unreferenced
+    kind: hardware_limit
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - foot_l
+      - foot_r
+      arrays:
+      - imu_orientation
+      - imu_orientation_absolute_heading
+      takes:
+      - prism-subj001-take012
+      - prism-subj001-take024
+      - prism-subj003-take002
+      - prism-subj003-take017
+      - prism-subj004-take030
+      - prism-subj004-take034
+      - prism-subj004-take035
+      - prism-subj005-take004
+      - prism-subj006-take017
+      - prism-subj006-take018
+      - prism-subj006-take019
+      - prism-subj006-take022
+      files:
+      - small_reference.npz
+      - VALIDATION_REPORT.json
+    statement: 'The Moticon OpenGo insoles are six-axis: gravity references their tilt and nothing references
+      their heading, so the insole heading in small_reference.npz is the gyro integral and drifts (imu_orientation_absolute_heading
+      = [T,T,T,T,T,T,F,F]). It wanders 0.17-0.65 deg/s on most feet across all 150 takes; on the twelve
+      takes listed in scope.takes it is 2.4-45.9 deg/s, sweeping one to eight full turns, and VALIDATION_REPORT.json
+      flags each as an L3 axes WARN (relabel dispersion 80-97 deg above the 75 deg band). Tilt stays sound
+      throughout.'
+    consequence: Do not read the insole heading in small_reference.npz as absolute; use its tilt only,
+      or use the heading_synth_reference.npz companion when a usable heading is needed. The flag stays
+      False because it describes the hardware.
+    evidence: DATA_DESCRIPTION_EN.md section 3.1 row imu_orientation_absolute_heading, section 6.1, section
+      7 Key caveat 3; small_reference.npz imu_orientation_absolute_heading; VALIDATION_REPORT.json findings
+      (12 x L3 'axes' WARN); PRISM insole-heading investigation (parent project record, 2026-09-09) sections
+      5.4, 5.6, 7
+    status: mitigated
+    mitigation: Per-take companion heading_synth_reference.npz (v2 method; written for this generation
+      on 2026-09-15 by scripts/poc/synthesize_insole_heading.py; the 2026-09-09 v1 method is superseded)
+      keeps the insole's own attitude and removes only the linear heading drift, fitted as a Theil-Sen
+      trend through per-stride medians of the foot-vs-shank world-Z twist (strides from foot_contact_mask);
+      the ankle's real rotation stays. Over 300 take/foot pairs relabel dispersion goes p95 72.7 -> 23.9
+      deg, max 97.1 -> 33.4 deg, 12 -> 0 pairs above 75 deg, no pair worse than measured by more than
+      5 deg. small_reference.npz is untouched.
+    since: '2026-09-09'
+    related:
+    - prism.heading_synth_companion_is_estimate
+    - prism.foot_gyro_axis_relabel
+  - id: prism.heading_synth_companion_is_estimate
+    kind: approximation
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - imu_orientation
+      - imu_orientation_heading_source
+      - heading_shift_deg
+      - heading_donor
+      files:
+      - heading_synth_reference.npz
+      sites:
+      - foot_l
+      - foot_r
+    statement: In heading_synth_reference.npz the two insole channels carry the insole's own heading with
+      a fitted linear drift removed (imu_orientation_heading_source 'synthesized:insole_dedrifted_shank_trend';
+      the other six channels are the shipped quaternions copied bit-for-bit). The drift is a per-take
+      linear model anchored at the first frame, so any non-linear drift and any real heading change that
+      is slow and monotone over the take remain confounded (three of the twelve drifting takes were piecewise,
+      not linear); six of 300 pairs move 1-3.3 deg further from the segment than the measured attitude.
+      imu_acceleration and imu_angular_velocity are not rewritten, so under the companion attitude f =
+      R^T (a_world - g) does not hold in the horizontal dynamic component. It is not a measurement and
+      never a substitute for small_reference.npz.
+    consequence: Read imu_orientation_heading_source before using the array; read heading_drift_rate_deg_s
+      and heading_stride_count to see what was removed and on how many strides it was fitted; use the
+      measured attitude from small_reference.npz whenever the specific-force identity is required; never
+      present the companion heading as a measurement.
+    evidence: DATA_DESCRIPTION_EN.md section 6.1; heading_synth_reference.npz imu_orientation_heading_source,
+      heading_drift_rate_deg_s, heading_stride_count, method; scripts/poc/synthesize_insole_heading.py;
+      PRISM insole-heading investigation (parent project record, 2026-09-09) sections 5.7 and 6
+    status: open
+    since: '2026-09-09'
+    related:
+    - prism.insole_heading_unreferenced
+  - id: prism.foot_gyro_axis_relabel
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: site
+      sites:
+      - foot_l
+      - foot_r
+      arrays:
+      - imu_angular_velocity
+      files:
+      - small_reference.npz
+    statement: The foot gyro was originally transformed as if the insole's gyr_local_raw shared the body
+      frame of imu.ori; it does not, and a fixed relabel M mapping (a,b,c) -> (-a,c,b) was missing on
+      all 150 takes (300/300 foot-takes converge on M, median 1.0 deg from it; with it a healthy foot's
+      gyro integrates to its own orientation within 2.9 deg instead of 134.6 deg). The six body channels
+      were never affected because their gyro is derived from orientation.
+    consequence: Before using the foot gyro check manifest.small_measured.gyro_axis_relabel.applied ==
+      true. This generation applies M at emit; a copy of the retired bundle taken before 2026-09-14T03:38Z
+      carries the defect and must apply the recorded formula w_corrected = r_cal^T M r_cal w_shipped.
+    evidence: manifest.json small_measured.gyro_axis_relabel (applied, channels, matrix, formula 'applied
+      by generate_prism_measured.py at emit', applied_utc = generated_utc; all 150 takes); scripts/poc/generate_prism_measured.py
+      GYR_LOCAL_AXIS_RELABEL and build_measured; DATA_DESCRIPTION_EN.md section 6.1 'foot gyro axes' callout;
+      PRISM insole-heading investigation (parent project record, 2026-09-09) sections 5.1, 5.5
+    status: fixed
+    fixed_in: 'the generator since 2026-09-15: generate_prism_measured.py rotates gyr_local_raw
+      by M at emit and writes the marker; the retired 2026-08-18 bundle had been rewritten in place on
+      2026-09-14T03:38Z, with the original foot gyro of every take kept beside its rollback journal
+      under _manifest_backfill/ where that generation was retired'
+    since: '2026-09-09'
+    related:
+    - prism.insole_heading_unreferenced
+  - id: prism.body_gyro_derived_from_orientation
+    kind: approximation
+    severity: info
+    scope:
+      level: site
+      sites:
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      arrays:
+      - imu_angular_velocity
+      - gyro_provenance
+    statement: For the five physical body IMUs the angular velocity is the rotation-log of the calibrated
+      physical orientation, not a measured rate; only the two insoles carry a measured gyro (gyr_local_raw).
+    consequence: The body-site gyro inherits the noise and bias of the orientation stream rather than
+      a gyroscope's; do not use it to characterise raw-rate noise. gyro_provenance names the source per
+      channel.
+    evidence: DATA_DESCRIPTION_EN.md section 3.2 'gyro source' column and section 7 'derived' row; manifest.json
+      small_measured.gyro; small_reference.npz gyro_provenance[1..5] 'derived_from_orientation:rotation_log'
+    status: open
+    since: '2026-08-18'
+  - id: prism.wrist_frames_gap_filled
+    kind: coverage
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - wrist_l
+      - wrist_r
+      arrays:
+      - imu_synth_mask
+      - imu_orientation
+      - imu_acceleration
+      - imu_angular_velocity
+    statement: 'The physical wrist streams contain frames the source gap-filled by interpolation. They
+      are flagged per frame in imu_synth_mask and counted per take in manifest.small_measured.synth_frames:
+      118 of 150 takes are affected (R_Wrist in 93 takes, L_Wrist in 25; e.g. subj001/take002 R_Wrist
+      7,423 of 13,160 frames, subj004/take022 R_Wrist 6,520 of 6,520). imu_valid_mask stays True on these
+      frames.'
+    consequence: Mask imu_synth_mask frames out of any measured-only use; imu_valid_mask does not exclude
+      them. The other six channels have zero synth frames.
+    evidence: DATA_DESCRIPTION_EN.md section 3.1 row imu_synth_mask, section 3.2 idx 2, section 3.4, section
+      7 Key caveat 2; manifest.json small_measured.synth_frames (per take); small_reference.npz imu_synth_mask
+    status: open
+    since: '2026-08-18'
+    related:
+    - prism.policy_excluded_sites_shipped_as_measured
+  - id: prism.policy_excluded_sites_shipped_as_measured
+    kind: source_defect
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - wrist_l
+      - wrist_r
+      - occiput
+      arrays:
+      - imu_orientation
+      - imu_acceleration
+      - imu_confidence
+      - imu_synth_mask
+    statement: 'The PRISM usage policy (finding A-1, CLEAN_SITES_ONLY) adopted only L_Foot, L_Knee, Pelvis,
+      R_Foot and R_Knee as measured sites and excluded Head, L_Wrist and R_Wrist because their measured
+      channels contain frames bit-identical to the model-derived companion (R_Wrist 93 files, L_Wrist
+      25, Head 1 file with 1,915 frames the official mask does not declare). This bundle nevertheless
+      ships wrist_l, wrist_r and occiput as measured_physical at confidence 0.7: at the wrists the bit-identical
+      set equals the gap-fill set exposed by imu_synth_mask; at the head nothing is flagged, and the policy
+      records the head''s measured orientation as orthonormal to 1e-6 like imu_gt.'
+    consequence: Do not make an upper-limb or head 'measured IMU' claim from this bundle without the policy
+      caveat; where measured-vs-model-derived matters, treat occiput as possibly model-derived and rely
+      on imu_synth_mask at the wrists.
+    evidence: configs/datasets/prism_usage_policy_v1.yaml measured_companion (adopted_sites, excluded_sites,
+      excluded_sites_contaminated_files) and orientation.head_measured_orientation_is_already_orthonormal;
+      manifest.json small_sites_provenance (occiput 'measured_physical:imu.Head') and prism_usage_policy.note;
+      small_reference.npz imu_confidence[:,5] = 0.7, imu_synth_mask[:,5] all False
+    status: open
+    since: '2026-08-18'
+    related:
+    - prism.wrist_frames_gap_filled
+  - id: prism.orientation_projected_to_so3
+    kind: source_defect
+    severity: info
+    scope:
+      level: site
+      sites:
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - foot_l
+      - foot_r
+      arrays:
+      - imu_orientation
+    statement: PRISM's released physical imu.ori is slightly non-orthonormal (det 0.96-1.02 at foot, knee
+      and wrist; the policy records max |det - 1| per site of 0.04-0.27, worst at R_Wrist; head is clean).
+      The stored orientation is the nearest rotation after projection to SO(3).
+    consequence: The shipped quaternion is a projected, not raw, released matrix; the deviation is a source-quality
+      signal, and the round-trip a_world = R f + g holds to <= 3e-6 m/s^2 only because of the projection.
+    evidence: DATA_DESCRIPTION_EN.md section 3.3 'Acceleration & orientation self-consistency'; manifest.json
+      small_measured.orientation_projection; configs/datasets/prism_usage_policy_v1.yaml orientation (disposition
+      SVD_POLAR_PROJECTION, per_site_measured_max_abs_det_minus_one)
+    status: mitigated
+    mitigation: SVD/polar projection to SO(3) with sign correction (policy B-3), verified by the <= 3e-6
+      m/s^2 round-trip and 1.2e-7 quaternion-norm check recorded in manifest.validation.
+    since: '2026-08-18'
+  - id: prism.shank_sites_are_knee_units
+    kind: approximation
+    severity: info
+    scope:
+      level: site
+      sites:
+      - shank_l
+      - shank_r
+    statement: The spec's shank channels are populated from PRISM's imu.L_Knee and imu.R_Knee units, described
+      by the bundle as an upper-shank (upper-anterior) proxy for the shank placement.
+    consequence: Signals reflect an upper-shank/knee placement rather than a mid- or distal-shank mount;
+      lever-arm and soft-tissue characteristics differ accordingly.
+    evidence: DATA_DESCRIPTION_EN.md section 3.2 idx 3-4 ('physical imu.L_Knee (upper-shank proxy)');
+      manifest.json small_sites_provenance.shank_l / shank_r 'measured_physical:imu.L_Knee / R_Knee'
+    status: open
+    since: '2026-08-18'
+  - id: prism.no_sensor_mount_extrinsics
+    kind: source_scope
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+      arrays:
+      - p_segment_to_sensor_m
+    statement: 'The segment-to-sensor lever arm is unavailable: p_segment_to_sensor_m is all zeros and
+      every site sits at its joint/segment origin. Only the rotational mount calibration q_anatomical_from_sensor
+      is provided (identity for back_T4).'
+    consequence: Lever-arm (centripetal and tangential) acceleration cannot be modelled or removed; do
+      not fit or evaluate sensor-placement models on this bundle; the mount extrinsic is rotation-only.
+    evidence: DATA_DESCRIPTION_EN.md section 3.1 row p_segment_to_sensor_m and section 7 Key caveat 4;
+      manifest.json unavailable_or_not_applied 'sensor mount extrinsics'; small_reference.npz p_segment_to_sensor_m
+      == 0 for all 8 sites
+    status: open
+    since: '2026-08-18'
+  - id: prism.no_jcs_joint_angles
+    kind: source_scope
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      files:
+      - large_reference.npz
+    statement: joint_rotation holds the pelvis global orientation and 17 SMPL parent-relative local quaternions;
+      no ISB/JCS clinical joint angles (joint_angles_jcs_deg) are produced because no ISB/JCS convention
+      was applied.
+    consequence: Do not read joint_rotation as anatomical flexion/abduction/rotation angles; derive clinical
+      angles yourself under a convention of your choosing, none is asserted by the bundle.
+    evidence: DATA_DESCRIPTION_EN.md section 4 joint_rotation row and section 7 'unavailable / not applied'
+      row; manifest.json unavailable_or_not_applied 'joint_angles_jcs_deg (needs ISB/JCS convention --
+      not applied)'
+    status: open
+    since: '2026-08-18'
+  - id: prism.no_canonical_kinetics
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+    statement: Canonical SOMA-world GRF [T,3] and CoP [T,2], joint torques, and physics-informed moments,
+      powers and COM are not produced (DETERMINISTIC_EXECUTION_CONFIG_HOLD). Insole kinetics exist only
+      in development_reference.npz in source-native form.
+    consequence: No kinetic supervision can be taken from the synthetic Small/Large pair; pair the bundle
+      with a measured kinetics source when kinetics are needed.
+    evidence: DATA_DESCRIPTION_EN.md section 6 and section 7 'unavailable / not applied' row; manifest.json
+      unavailable_or_not_applied 'physics-informed GRF / inverse dynamics / moments / powers / COM' and
+      data_specification_code_compatibility.unavailable_codes (grf, cop, joint_torques)
+    status: open
+    since: '2026-08-18'
+    related:
+    - prism.development_reference_not_supervision
+    - prism.insole_grf_source_native_units
+  - id: prism.development_reference_not_supervision
+    kind: rights
+    severity: caution
+    scope:
+      level: bundle
+      files:
+      - development_reference.npz
+    statement: 'development_reference.npz (namespace development_reference/prism_insole_v1: per-foot GRF,
+      CoP, contact mask) is development context only: generator_input false, supervision false. It is
+      not part of the synthetic Small/Large pair.'
+    consequence: Never use it as a generator input, a training label or an evaluation target.
+    evidence: DATA_DESCRIPTION_EN.md section 6 and section 9 table; manifest.json faithful_content.development_reference;
+      configs/datasets/dataset_profiles_v1.yaml profiles.prism.capabilities
+    status: open
+    since: '2026-08-18'
+    related:
+    - prism.no_canonical_kinetics
+  - id: prism.insole_grf_source_native_units
+    kind: source_scope
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - grf_feet_source_native
+      files:
+      - development_reference.npz
+      sites:
+      - foot_l
+      - foot_r
+    statement: The insole ground-reaction force is stored in PRISM source-native units (grf_feet_source_native),
+      not SI newtons; CoP is in metres and contacts are normalised to bool on load (policy C-8).
+    consequence: Do not read the GRF array as newtons or compare it across datasets without a calibration
+      the source does not provide.
+    evidence: DATA_DESCRIPTION_EN.md section 6 ('PRISM source-native units, not SI N'); manifest.json
+      prism_usage_policy.note ('Insole contacts normalized to bool (C-8)'); configs/datasets/prism_usage_policy_v1.yaml
+      insole_dtype
+    status: open
+    since: '2026-08-18'
+    related:
+    - prism.no_canonical_kinetics
+  - id: prism.anthro_source_units_undeclared
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - height
+      - body_mass
+      files:
+      - anthro_reference.npz
+    statement: height and body_mass are written in SOMA spec units (m, kg) but the PRISM subj_info units
+      are undeclared upstream (policy C-7); height was interpreted as cm by value range and weight as
+      kg. arm_length is excluded because it exceeds height for subj1 and has no official definition or
+      unit.
+    consequence: Treat the m/kg values as an assumed unit conversion of measured source values; no arm
+      length is available.
+    evidence: anthro_reference.npz height_provenance and body_mass_provenance ('source unit undeclared
+      upstream'); manifest.json prism_usage_policy.note ('PRISM source subj_info units undeclared upstream
+      (C-7); arm_length excluded'); configs/datasets/prism_usage_policy_v1.yaml anthropometry
+    status: open
+    since: '2026-08-18'
+  - id: prism.pelvis_trajectory_trans_only
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - pelvis_position_world_aux
+      - root_velocity
+      - smpl_trans
+      files:
+      - large_reference.npz
+      - smpl_root_translation.npz
+    statement: The pelvis world trajectory follows PRISM's released trans-only rule (root_offset not added),
+      whereas PRISM's documented rule is trans + root_offset; the policy measured a 0.21-0.26 m disagreement
+      between the two (finding A-2) and requires derivatives to record that the documented rule was not
+      followed.
+    consequence: Absolute pelvis position is in the trans-only convention and can differ from PRISM's
+      documented convention by about 0.2 m; state this when comparing against PRISM-native positions.
+    evidence: manifest.json prism_usage_policy.note ('consistent with trans-only world (A-2; root_offset
+      not added)'); configs/datasets/prism_usage_policy_v1.yaml world_translation (disagreement_metres,
+      provenance_requirement)
+    status: open
+    since: '2026-08-18'
+  - id: prism.reduced_model_weld_residual
+    kind: approximation
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      - fixed_joint_rotation
+      files:
+      - large_reference.npz
+      - anthro_reference.npz
+    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
+      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject over the pooled
+      frames of all of its takes, and spine3 and the shoulders absorb the removed rotation; distal global
+      orientation is exact but a joint-centre position residual remains on the trunk/arm chain. Across
+      the 6 fit groups the fitted residual RMS is 47.3-70.6 mm (the mean-rotation starting guess 49.4-76.1
+      mm) and the worst frame is 257.6 mm (prism_subj006). Per take, overall_max is 0.050-0.259 m (worst
+      prism-subj006-take009) and 128 of 150 takes flag at least one fixed joint above the 0.05 m p95 promotion
+      threshold (471 flagged pairs); promotion to Large motion is a candidate decision, not applied.'
+    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
+      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
+      read them before relying on reconstructed positions.
+    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
+      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
+      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance; prism_faithful_reduced_model_policy_v1.json
+      at the bundle root (takes_with_any_candidate 128, flagged_pairs)
+    status: mitigated
+    mitigation: large_reference.npz smpl_global_orientation_prism_world keeps all 24 SMPL joints' global
+      orientation losslessly; use it with the raw SMPL data (manifest.anthro_reconstruction.lossless_alternative)
+      when exact joint positions matter.
+    since: '2026-08-18'
+  - id: prism.imu_confidence_semantics
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - imu_confidence
+      - imu_valid_mask
+      files:
+      - small_reference.npz
+    statement: 'imu_confidence is a declared per-site level, not a measurement: 0.7 on the seven physical
+      channels and 0.4 on the back_T4 proxy. imu_valid_mask is all True on every take; the gap-filled
+      wrist frames are flagged in imu_synth_mask, not in the valid mask. The levels are set per corpus
+      and mean something else on every other bundle of the lineage.'
+    consequence: Never compare imu_confidence across bundles or read it as measured channel reliability;
+      do not use imu_valid_mask to find gaps (it marks none).
+    evidence: DATA_DESCRIPTION_EN.md section 3.1 rows imu_valid_mask ('all True') and imu_confidence ('0.7
+      physical-measured, 0.4 back_T4 proxy'); README.md small_reference.npz field table row imu_confidence;
+      small_reference.npz imu_confidence (constant per site) and imu_valid_mask
+    status: open
+    since: '2026-08-18'
+  - id: prism.native_100hz_not_resampled
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+    statement: All streams are stored at PRISM's native 100 Hz; the spec's 1 kHz grid and the MTi-630
+      400 Hz trunk band are recorded as metadata only, never resampled (resample.method 'none', noop true).
+    consequence: Expect no content above 50 Hz and do not assume the spec sampling rate; the native, window,
+      in and out frame counts agree.
+    evidence: DATA_DESCRIPTION_EN.md section 1 'Timebase'; manifest.json small_measured.notes, resample,
+      source.native_rate_hz
+    status: open
+    since: '2026-08-18'
+  - id: prism.index_relative_path_waiver
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - INDEX.json
+    statement: Until 2026-09-15 INDEX.json take entries named the take path relative_path only, where
+      the registry standardises on rel, and the prism profile waived the difference until 2026-12-31.
+    consequence: 'None: every entry carries rel and take_id, with relative_path kept beside them for readers
+      that branched on it.'
+    evidence: 'INDEX.json takes[*].rel, take_id, relative_path; scripts/poc/generate_prism_measured_all.py
+      run(); configs/datasets/dataset_profiles_v1.yaml profiles.prism (waivers: [])'
+    status: fixed
+    since: '2026-09-07'
+    fixed_in: 'the 2026-09-15 regeneration: generate_prism_measured_all.py writes rel; the waiver closed'
+  - id: prism.legacy_manifest_keys_waiver
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - manifest.json
+    statement: Until 2026-09-15 each manifest carried two pre-faithful-v2 legacy keys, data_specification_code_compatibility
+      and recipe_alignment, waived until 2026-12-31; their text predated the measured_physical rewrite.
+    consequence: 'None: the keys are gone; small_measured, faithful_content and small_sites_provenance
+      are the record.'
+    evidence: 'manifest.json top-level keys (28, neither legacy key present); scripts/poc/generate_prism_faithful.py
+      manifest dict; configs/datasets/dataset_profiles_v1.yaml profiles.prism (waivers: [])'
+    status: fixed
+    since: '2026-09-07'
+    fixed_in: 'the 2026-09-15 regeneration: generate_prism_faithful.py no longer writes the two keys (docx_code_compatibility_metadata()
+      stays for its callers); the waiver closed'
+  - id: prism.generation_provenance_unrecoverable
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+    statement: The retired prism_faithful_full_v1's producing run recorded no code revision, dependency
+      versions or host environment and kept none of the seven run artifacts; its 2026-09-09 retrofit named
+      those unrecoverable (provenance coverage 4/10). This bundle was produced through the pipeline runner
+      and carries the full run record.
+    consequence: Reproduce from the run record (code revision, environment, source asset fingerprints)
+      rather than from the bundle alone; the retired generation's retrofit sidecar stays with its evidence
+      under _superseded/prism_faithful_full_v1/.
+    evidence: _runs/run_<identity>/manifest.json and environment.lock beside the
+      bundle root (PIPELINE_GOVERNANCE.md sections 10.1 and 10.2); _superseded/prism_faithful_full_v1/PROVENANCE_RETROFIT.json
+      for the retired generation
+    status: fixed
+    since: '2026-09-09'
+    fixed_in: the 2026-09-15 prism_faithful_full regeneration through soma-synth run (owner record
+      research/decisions/2026-09-15_*_experimental_regeneration_authorization.md),
+      which left the seven run-directory artifacts PIPELINE_GOVERNANCE.md section 10.1 requires
+  hknu_unified8:
+  - id: hknu.internal_only
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: distribution_scope is internal_only. The source is CC BY 4.0, and the 2026-08-21
+      decision (SOMA-S2R-DEC-20260821-HKNU) authorises internal research and derivative outputs only;
+      it does not authorise public redistribution or external transfer of subject data.
+    consequence: Do not upload to any public Git, cloud, model or dataset hub, or share by public link;
+      do not transfer subject data outside the team.
+    evidence: DATA_DESCRIPTION_EN.md header paragraph and section 8 last paragraph; manifest.json distribution_scope
+      and source_attribution.attribution_note; configs/datasets/source_attribution_v1.yaml
+    status: open
+    since: '2026-08-30'
+    related:
+    - hknu.experimental_non_candidate
+    - hknu.cc_by_attribution_required
+  - id: hknu.experimental_non_candidate
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: 'artifact_class is experimental_non_candidate and quality_gate is NOT_EVALUATED: not canonical
+      output, not contract-compliant, and no production quality gate was applied. The L4 validation PASS
+      is not an authorisation and not a quality-gate judgement.'
+    consequence: Do not use the bundle as a training or evaluation label, and do not cite it as gate-passing
+      or contract-compliant output.
+    evidence: DATA_DESCRIPTION_EN.md header paragraph; manifest.json artifact_class, artifact_label, quality_gate,
+      unavailable_or_not_applied 'quality gates'
+    status: open
+    since: '2026-08-30'
+    related:
+    - hknu.internal_only
+  - id: hknu.cc_by_attribution_required
+    kind: rights
+    severity: info
+    scope:
+      level: bundle
+    statement: The source is CC BY 4.0 (Lee and Lee, Hankyong National University, Zenodo concept DOI
+      10.5281/zenodo.17188465; Scientific Data 2026) and the manifest records changes_made (SMPL-24 retarget,
+      18-joint reduction, synthetic IMU).
+    consequence: Any figure, report or derivative must name the authors, the concept DOI, the CC BY 4.0
+      licence and the changes made.
+    evidence: DATA_DESCRIPTION_EN.md section 8 'Provenance and attribution (mandatory)'; manifest.json
+      source_attribution (license_id, dataset_citation, publication, changes_made, attribution_note)
+    status: open
+    since: '2026-08-30'
+  - id: hknu.emg_excluded
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+    statement: EMG is an excluded modality; the recorded reason is not_in_synthetic_artifact_scope.
+    consequence: No EMG channel exists in any deliverable; do not expect or derive one from this bundle.
+    evidence: manifest.json excluded_modalities ['emg'] and excluded_modality_reasons.emg (all 287 manifests)
+    status: open
+    since: '2026-08-30'
+  - id: hknu.no_measured_kinetics
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - development_reference.npz
+    statement: 'There is no development_reference.npz: HKNU recorded force plates and insoles at the source,
+      but they are not carried into this bundle, and no physics-informed GRF, inverse dynamics, joint
+      moments, powers or COM were derived.'
+    consequence: Nothing in this bundle can serve as a kinetic ground truth; anyone needing GRF/CoP must
+      go back to the source archive.
+    evidence: DATA_DESCRIPTION_EN.md section 1 last sentence and section 7 bullet 'No ground reaction
+      force ...'; manifest.json unavailable_or_not_applied rows 'development_reference / measured GRF
+      / CoP' and 'physics-informed GRF / ...', faithful_content.development_reference 'NONE.'; configs/datasets/dataset_profiles_v1.yaml
+      profiles.hknu.capabilities []
+    status: open
+    since: '2026-08-30'
+  - id: hknu.all_channels_synthetic
+    kind: source_scope
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: 'Every Small channel is forward kinematics of the SMPL body (small_mode synthetic_from_smpl):
+      no sensor noise, bias, misalignment or soft-tissue motion is modelled. HKNU recorded a worn IMU
+      on all eight sites, but it is deliberately not in this bundle because measured_physical requires
+      the mounting extrinsics, which were never resolved; the measured stream lives in hknu_smpl24_paired,
+      where synthetic and worn were compared on |f| and |omega| over 263 trials (median per-trial Pearson
+      r 0.908-0.970 for |omega|) with no acceptance band.'
+    consequence: Treat all eight channels as simulated, not measured; do not use the paired-corpus agreement
+      figures as a validation of this bundle.
+    evidence: DATA_DESCRIPTION_EN.md sections 3 and 4; manifest.json unavailable_or_not_applied row 'measured
+      IMU ...', paired_measured_counterpart, small_sites_provenance; small_reference.npz small_mode 'synthetic_from_smpl';
+      configs/datasets/dataset_profiles_v1.yaml profiles.hknu.small_mode
+    status: open
+    since: '2026-08-30'
+    related:
+    - hknu.no_sensor_mount_extrinsics
+  - id: hknu.no_jcs_joint_angles
+    kind: source_scope
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      files:
+      - large_reference.npz
+    statement: joint_rotation holds SMPL parent-relative local quaternions; no ISB/JCS clinical joint
+      angles (joint_angles_jcs_deg) are produced because no ISB/JCS convention was applied.
+    consequence: Do not read joint_rotation as anatomical angles; derive clinical angles yourself under
+      a convention of your choosing, none is asserted by the bundle.
+    evidence: manifest.json unavailable_or_not_applied 'joint_angles_jcs_deg (needs ISB/JCS convention)';
+      DATA_DESCRIPTION_EN.md section 7 bullet 'no JCS joint angles'
+    status: open
+    since: '2026-08-30'
+  - id: hknu.back_t4_spine3_proxy
+    kind: proxy
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+    statement: 'No SMPL joint sits at T4. back_T4 is a non-rigid chest proxy: its orientation is the spine3
+      segment and its acceleration is evaluated at pelvis + 2/3 (head - pelvis) (chest_alpha 0.667); imu_confidence
+      is 0.4 for this reason.'
+    consequence: Treat back_T4 as a synthetic point on a deforming trunk line, not a sensor rigidly mounted
+      on a vertebra; weight it by its 0.4 confidence.
+    evidence: DATA_DESCRIPTION_EN.md section 3 last sentence and section 5; manifest.json small_sites_provenance.back_T4
+      and canonicalization_config.chest_alpha; small_reference.npz imu_confidence[:,0] = 0.4
+    status: open
+    since: '2026-08-30'
+  - id: hknu.no_sensor_mount_extrinsics
+    kind: approximation
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: 'No segment-to-sensor lever arm is applied: each virtual sensor sits at its SMPL joint
+      centre. The shanks are the measured worst case: the spec differentiates them at the knee joint centre
+      while HKNU''s worn units sat 128-161 mm distal of it, so the rotational lever-arm term is absent
+      and the median |f| Pearson r against the worn unit falls to 0.475 / 0.548 (shank_l / shank_r) while
+      |omega| r stays 0.960 / 0.951.'
+    consequence: Accelerometer channels lack the lever-arm term of a worn unit, most at shank_l and shank_r;
+      angular velocity is the trustworthy shank channel. Do not fit or evaluate sensor-placement models
+      on this bundle.
+    evidence: DATA_DESCRIPTION_EN.md section 4 table and paragraph, section 7 bullet 'The shank sites
+      differentiate the knee centre'; manifest.json unavailable_or_not_applied 'sensor mount extrinsics
+      (segment->sensor lever arm)' and small_sites_provenance.shank_l / shank_r
+    status: open
+    since: '2026-08-30'
+    related:
+    - hknu.all_channels_synthetic
+  - id: hknu.head_no_fitted_rotation
+    kind: approximation
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - occiput
+    statement: The head carries no rotation fitted from motion; it is placed from the subject's N-pose
+      reference, so occiput follows the thorax through a fixed offset.
+    consequence: occiput orientation and gyro contain no independent head motion (no nodding or turning
+      relative to the trunk); do not use occiput for head-kinematics work.
+    evidence: DATA_DESCRIPTION_EN.md section 7 bullet 'The head carries no fitted rotation'; manifest.json
+      small_sites_provenance.occiput ('head placed from the N-pose reference (no head DOF is fitted from
+      motion)'); HKNU full-body conversion audit report (parent project record, 2026-08-29) section 5.9
+    status: open
+    since: '2026-08-30'
+  - id: hknu.smpl_beta_space_below_cohort_build
+    kind: approximation
+    severity: caution
+    scope:
+      level: bundle
+    statement: 'The SMPL 10-beta space does not reach this cohort''s build: fitted mass sits about 18
+      kg below the measured mean (62-104 kg), and measured hip spacing is 180-263 mm against 104-135 mm
+      reachable by SMPL. The fitted body is the nearest SMPL body, not the subject''s.'
+    consequence: Use the measured height and mass fields for anthropometry and read joint positions and
+      spans as measured-length skeleton values; do not treat the SMPL shape (betas, mesh) as the subject's.
+    evidence: DATA_DESCRIPTION_EN.md section 2 change 3 and section 7 first bullet; anthro_reference.npz
+      skeleton_provenance ('scaled onto the source's measured bone lengths'); HKNU full-body conversion audit report (parent project record, 2026-08-29)
+      limit L2 and section 5.5; HKNU fit diagnosis (parent project record, 2026-09-07)
+    status: mitigated
+    since: '2026-08-30'
+    mitigation: 'Since the 2026-09-08 fit repair the rest skeleton is scaled onto the subject''s measured
+      bone lengths after the betas are fitted (hip and shoulder spans, the pelvis-to-neck chain, the six
+      limb bone pairs), so joint positions and spans match the measurement: fitted hip width agrees with
+      the measured one to 0.02 mm on the standing take. The mesh is still the nearest SMPL body, so anything
+      that reads the surface (contact, clothing, vertex-derived masses) inherits the limit unchanged.'
+  - id: hknu.pose_residual_above_baseline
+    kind: approximation
+    severity: caution
+    scope:
+      level: bundle
+    statement: 'In the retired hknu_unified8_v1 the retarget pose residual was 1.5-2.4 times the AddBiomechanics
+      baseline of the same fitting code (upper body 200-219 mm, lower body 59-83 mm, worst-frame). This
+      bundle''s residual is at or below that baseline: knee 20.6 / 22.9 mm and ankle 22.7 / 25.2 mm against
+      AddBio''s 35 / 41, shoulder / elbow / wrist 51.4 / 49.9 / 49.3 mm against 125-143 (RMS, walking,
+      107 takes).'
+    consequence: None specific to this bundle; the floor is the laboratory's own joint-centre chain, which
+      wobbles 6.8 mm through a stride, so roughly three times that is where a rigid skeleton lands. Figures
+      quoted from v1 (or from the 2026-08-29 audit) are superseded.
+    evidence: 'DATA_DESCRIPTION_EN.md section 2 table (knee, ankle, shoulder rows) and section 7 second
+      bullet; HKNU fit diagnosis (parent project record, 2026-09-07); reports/hknu_fullbody_audit/mech_2026-09-08/hknu_large_mech_before_after_walking.md;
+      the retired figures: HKNU full-body conversion audit report (parent project record, 2026-08-29)
+      limit L1 and section 5.7'
+    status: fixed
+    since: '2026-08-30'
+    fixed_in: 'the 2026-09-14 hknu_unified8 generation (soma-synth run, record research/decisions/2026-09-14_hknu_experimental_generation_authorization.md)
+      from hknu_smpl24_paired, the 2026-09-08 body-fit repair: pelvis alignment constant solved in closed
+      form, lumbar zero from the subject''s standing take, rest skeleton scaled onto measured bone lengths,
+      root solved per frame over hips, knees, ankles and shoulders'
+  - id: hknu.pose_discontinuity_exclusions
+    kind: coverage
+    severity: do_not_use
+    scope:
+      level: take
+      takes:
+      - hknu_S03_Walking_4KPH_10
+      - hknu_S04_Half_Squat_1
+      - hknu_S04_Squat_Jump_2
+      - hknu_S08_Squat_Jump_2
+      - hknu_S11_Running_8KPH
+      - hknu_S12_Running_6KPH
+      - hknu_S12_Side_Squat_2
+    statement: 'Seven of 287 takes carry status ''excluded'' in INDEX.json (excluded_by pose_discontinuity_scan):
+      the retarget stepped a joint by 120.6-178.0 deg between adjacent frames (12,059-17,796 deg/s at
+      100 Hz), past the spec''s 8000 deg/s band. They were not validated, yet their take directories are
+      present on disk with the full five-file payload.'
+    consequence: Select takes by INDEX.json status == 'ok' (280 takes), never by directory listing; the
+      seven excluded directories must not be loaded as data.
+    evidence: DATA_DESCRIPTION_EN.md section 6 paragraph 'Seven takes are excluded'; INDEX.json counts
+      {total 287, ok 280, excluded 7} and each excluded entry's reason / excluded_by; VALIDATION_REPORT.json
+      takes_checked 280
+    status: open
+    since: '2026-08-30'
+  - id: hknu.foot_heading_flag_spec_sensor
+    kind: hardware_limit
+    severity: info
+    scope:
+      level: site
+      sites:
+      - foot_l
+      - foot_r
+      arrays:
+      - imu_orientation_absolute_heading
+      files:
+      - small_reference.npz
+    statement: imu_orientation_absolute_heading is [T,T,T,T,T,T,F,F] because the spec's foot sensor is
+      a six-axis insole with no heading reference; the flag describes what the target sensor provides,
+      not how this bundle was made. Here the foot orientations are FK-exact and do carry a world heading.
+    consequence: A model trained on these foot orientations for deployment on the spec's insoles must
+      not depend on foot heading; the flag, not the array, says what the real sensor will give.
+    evidence: small_reference.npz imu_orientation_absolute_heading; README.md small_reference.npz field
+      table row imu_orientation_absolute_heading ('False = gravity-referenced only (insole feet)'); scripts/poc/unified8_emit.py
+      (absolute-heading constant); src/soma_synthetic_imu/contracts/field_docs_v1.py
+    status: open
+    since: '2026-08-30'
+  - id: hknu.imu_confidence_semantics
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - imu_confidence
+      - imu_valid_mask
+      files:
+      - small_reference.npz
+    statement: 'imu_confidence is the emitter''s fixed per-site prior (0.4 on back_T4, 0.5 on foot_l /
+      foot_r, 0.6 elsewhere), a declared level, not a measurement, and not on the GAITEX (0.6 / 0.3 /
+      0.0) or PRISM (0.7 / 0.4) scale. imu_valid_mask is all True on every take: forward kinematics of
+      a complete SMPL motion has no gaps, so nothing was interpolated or withdrawn.'
+    consequence: Never compare imu_confidence across bundles or read it as measured channel reliability;
+      do not use imu_valid_mask to find gaps (it marks none).
+    evidence: DATA_DESCRIPTION_EN.md section 5; small_reference.npz imu_confidence (constant per site)
+      and imu_valid_mask (all True); scripts/poc/unified8_emit.py FAITHFUL.SITE_CONFIDENCE
+    status: open
+    since: '2026-08-30'
+  - id: hknu.accel_lowpass_7hz
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - imu_acceleration
+      files:
+      - small_reference.npz
+    statement: The specific force at every site is a 4th-order Butterworth 7 Hz zero-phase (filtfilt)
+      filtered double difference of the joint's world position (canonicalization_config.filter butter4_7hz_filtfilt_odd15).
+    consequence: Expect no acceleration content above the 7 Hz cutoff, well below the 100 Hz grid's Nyquist;
+      do not use these channels to study impact transients.
+    evidence: manifest.json canonicalization_config.filter and canonicalization_config.imu_synthesis ('fk_orientation+doublediff_accel+rotationlog_gyro');
+      DATA_DESCRIPTION_EN.md section 3 (double-differentiated world position)
+    status: open
+    since: '2026-08-30'
+  - id: hknu.source_ankle_joint_angle_not_reproducible
+    kind: source_defect
+    severity: info
+    scope:
+      level: bundle
+    statement: 'The source''s ankle Joint.Angle (both sides) is not reproducible from its segment rotations
+      (SegRot): 10 of 12 joints reproduce, the two ankles do not (22.8 / 23.8 deg). This bundle does not
+      read Joint.Angle, so the conversion is unaffected.'
+    consequence: Downstream ankle-angle work should not use the source's Joint.Angle field; derive ankle
+      angles from segment rotations instead.
+    evidence: DATA_DESCRIPTION_EN.md section 7 bullet 'The source's ankle Joint.Angle is not reproducible';
+      HKNU full-body conversion audit report (parent project record, 2026-08-29) limit L3 and section
+      4.3
+    status: open
+    since: '2026-08-30'
+  - id: hknu.reduced_model_weld_residual
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      - fixed_joint_rotation
+      files:
+      - large_reference.npz
+      - anthro_reference.npz
+    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
+      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject over the pooled
+      frames of all of its takes, and spine3 and the shoulders absorb the removed rotation; distal global
+      orientation is exact but a joint-centre position residual remains on the trunk/arm chain. Across
+      the 12 fit groups the fitted residual RMS is 4.2-44.1 mm (the mean-rotation starting guess 4.3-47.7
+      mm) and the worst frame is 196.0 mm (hknu_S03).'
+    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
+      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
+      read them before relying on reconstructed positions.
+    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
+      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
+      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance
+    status: mitigated
+    mitigation: large_reference.npz smpl_global_orientation_world[M,24,4] keeps all 24 SMPL joints' global
+      orientation losslessly (manifest.anthro_reconstruction.lossless_alternative); use it when exact
+      per-joint orientation matters.
+    since: '2026-08-30'
+  - id: hknu.sex_provenance_mislabelled
+    kind: pipeline_defect
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - sex_provenance
+      files:
+      - anthro_reference.npz
+    statement: In the retired hknu_unified8_v1 anthro_reference.npz sex_provenance read 'measured:prism_subj_info.gender',
+      a PRISM constant the shared anthro emitter stamps on every source (scripts/poc/anthro_smpl.py).
+      This bundle's string names the HKNU workbook column the sex was read from.
+    consequence: None in this bundle. Bundles of other sources emitted before 2026-09-14 (amass, addbiomechanics)
+      still carry the PRISM string until they are regenerated.
+    evidence: anthro_reference.npz sex_provenance ('measured:DatasetInfo.xlsx Gender'); scripts/poc/generate_hknu_unified8.py
+      SEX_PROVENANCE and identity_for; scripts/poc/unified8_emit.py build_bundle (sex_provenance override);
+      scripts/poc/generate_hknu_faithful.py subjects_from_workbook (column 'Gender')
+    status: fixed
+    since: '2026-09-07'
+    fixed_in: 'the 2026-09-14 hknu_unified8 generation: unified8_emit writes SourceIdentity.sex_provenance
+      when a generator names it, and the HKNU generator names the workbook column (''measured:DatasetInfo.xlsx
+      Gender'')'
+  - id: hknu.source_version_not_fingerprinted
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+    statement: The project's copy of the source was downloaded 2026-08-17 but its Zenodo version was never
+      fingerprinted (the record's latest version at review time was v2, 2026-04-24), so the concept DOI
+      is cited instead of a version DOI.
+    consequence: Cite the concept DOI 10.5281/zenodo.17188465 and state that the version was not fingerprinted;
+      a version-exact reproduction from Zenodo cannot be guaranteed.
+    evidence: DATA_DESCRIPTION_EN.md section 8 first paragraph; manifest.json source_attribution.source_version
+      and source_attribution.attribution_note
+    status: open
+    since: '2026-09-07'
+  - id: hknu.cohort_sex_imbalance
+    kind: coverage
+    severity: info
+    scope:
+      level: bundle
+    statement: The cohort is twelve subjects, ten male and two female (hknu_S09 and hknu_S11), 21-24 takes
+      each.
+    consequence: Per-sex statistics rest on two female subjects; do not read the bundle as sex-balanced.
+    evidence: DATA_DESCRIPTION_EN.md header line ('12 subjects (10 male, 2 female)') and section 6; anthro_reference.npz
+      sex per take
+    status: open
+    since: '2026-08-30'
+  - id: hknu.generation_provenance_unrecoverable
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+    statement: The retired hknu_unified8_v1's producing run recorded no code revision, dependency versions
+      or host environment and kept none of the seven run artifacts; its 2026-09-09 retrofit named those
+      unrecoverable (provenance coverage 4/10). This bundle was produced through the pipeline runner and
+      carries the full run record.
+    consequence: Reproduce from the run record (code revision, environment, corpus fingerprint) rather
+      than from the bundle alone; v1's retrofit sidecar stays with its evidence under _superseded/.
+    evidence: _runs/run_<identity>/manifest.json and environment.lock beside the bundle root (PIPELINE_GOVERNANCE.md
+      sections 10.1 and 10.2); _superseded/hknu_unified8_v1/PROVENANCE_RETROFIT.json for the retired generation
+    status: fixed
+    since: '2026-09-09'
+    fixed_in: the 2026-09-14 hknu_unified8 generation through soma-synth run, which left the seven run-directory
+      artifacts PIPELINE_GOVERNANCE.md section 10.1 requires under _runs/run_<identity>/ (resolved_config.yaml,
+      manifest.json with code revision, provenance and the generation decision, environment.lock, source_assets.json
+      with the paired corpus fingerprint, metrics.json, exclusions.json, logs/)
+  - id: hknu.pelvis_alignment_constant_v1
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+    statement: 'The retired hknu_unified8_v1 placed the body wrong by a constant: SMPL''s pelvis joint
+      sits 17.7 mm in front of its own hip midpoint and Visual3D''s PV.ProxEndPos 44.2 mm in front of
+      the measured one, and with only the two hip offsets as targets the fit paid that 26.5 mm displacement
+      as a 23.4 deg rotation about the hip axis, which the lumbar rule carried into the trunk, head and
+      arms (CoM 91.8 mm ahead of the laboratory CoM on walking). This bundle solves the pelvis constant
+      from normalised anatomical directions with the translation in closed form.'
+    consequence: 'None in this bundle: on the standing take the fitted trunk lean matches the measured
+      lean to 0.00 deg across all twelve subjects. Any figure, slide or viewer tile quoted from v1 (the
+      15-20 deg forward lean, the 90 mm CoM offset) is superseded.'
+    evidence: DATA_DESCRIPTION_EN.md section 2 (first paragraph and change 1, table row 'CoM against the
+      laboratory CoM'); HKNU fit diagnosis (parent project record, 2026-09-07); reports/hknu_fullbody_audit/fit_repair_2026-09-08/pelvis_placement_before.json
+      and pelvis_placement_after.json, hknu_npose_skeleton.png
+    status: fixed
+    fixed_in: 'the 2026-09-14 hknu_unified8 generation (soma-synth run, record research/decisions/2026-09-14_hknu_experimental_generation_authorization.md)
+      from hknu_smpl24_paired, the 2026-09-08 body-fit repair: pelvis alignment constant solved in closed
+      form, lumbar zero from the subject''s standing take, rest skeleton scaled onto measured bone lengths,
+      root solved per frame over hips, knees, ankles and shoulders'
+    since: '2026-08-30'
+    related:
+    - hknu.pose_residual_above_baseline
+  - id: hknu.lumbar_zero_from_standing_take
+    kind: approximation
+    severity: info
+    scope:
+      level: subject
+    statement: The lumbar zero (the offset between the pelvis and thorax frames at neutral) is taken from
+      each subject's own N-pose take rather than assumed to be parallel, because the source is a marker-driven
+      Visual3D model whose frames are not parallel at neutral; the thirds rule then splits trunk rotation
+      across spine1/2/3 from that zero.
+    consequence: Trunk posture is referenced to the subject's own standing take; a subject whose N-pose
+      was not neutral carries that offset into every take of theirs.
+    evidence: DATA_DESCRIPTION_EN.md section 2 change 2; HKNU fit diagnosis (parent project record, 2026-09-07)
+    status: open
+    since: '2026-09-08'
+  - id: hknu.root_solved_per_frame_shoulder_anchor_set
+    kind: approximation
+    severity: info
+    scope:
+      level: bundle
+    statement: 'The root is solved per frame by least squares over eight measured joint centres (hips,
+      knees, ankles, shoulders) rather than hung from the hip midpoint, because the source places its
+      fifteen segments independently and its joint-centre chain does not close (adjacent segments disagree
+      about a shared joint by 6.8 mm sd through a stride). The anchor set stops at the shoulders on purpose:
+      adding elbows and wrists raised balance R^2 further but pushed the knee residual to 36 mm, past
+      the 35 mm the audit set.'
+    consequence: pelvis_position_world_aux is a least-squares placement against eight centres, not the
+      laboratory PV.ProxEndPos frame for frame; a constant per-trial offset between the two (about 27
+      mm on walking) is expected and is not a drift.
+    evidence: DATA_DESCRIPTION_EN.md section 2 change 4 and the paragraph 'Stopping at the shoulders is
+      deliberate'; reports/hknu_fullbody_audit/fit_repair_2026-09-08/ap_root_anchor_sets.txt; scripts/diagnostics/hknu_large_mech.py
+      header (frame alignment paragraph)
+    status: open
+    since: '2026-09-08'
+  - id: hknu.balance_metric_mass_model_floor
+    kind: approximation
+    severity: info
+    scope:
+      level: bundle
+    statement: 'Against the laboratory the vertical CoM offset stays at -26.7 mm and running anteroposterior
+      balance R^2 at 0.029 (laboratory 0.754), and both are limits of the comparison''s mass model rather
+      than of the body: the metric places segment masses at SMPL part vertex means where the laboratory
+      uses its own Segment.CoMPos (head 138 mm, thorax 76 mm apart), and the 2.4 mm stride-locked CoM
+      difference that remains after mass-weighted cancellation is multiplied by (2 pi f)^2 in the force
+      residual, 0.067 BW at running''s 2.50 Hz. A geometrically exact N-pose fit still reports 32.7 mm
+      of vertical offset through the same metric.'
+    consequence: 'Do not read the vertical offset or the running balance R^2 as a fit error: joint centres,
+      segment lengths and orientations, which this bundle carries, do not depend on where the masses sit.
+      Quote balance figures with this stated.'
+    evidence: DATA_DESCRIPTION_EN.md section 2 paragraph 'Two things this did not fix' and section 7;
+      reports/hknu_fullbody_audit/fit_repair_2026-09-08/ap_gap_attribution.txt and running_ap_spectrum.json;
+      HKNU fit diagnosis (parent project record, 2026-09-07)
+    status: open
+    since: '2026-09-08'
+  gaitex_unified8:
+  - id: gaitex.internal_only
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: distribution_scope is internal_only. GAITEX is CC BY 4.0, but the 2026-09-06 authorisation
+      covers internal research use only and exercises no redistribution.
+    consequence: Do not upload to any public Git, cloud, model or dataset hub, or share by public link;
+      internal team-drive copies keep distribution_scope internal_only.
+    evidence: DATA_DESCRIPTION_EN.md line 3 (INTERNAL-ONLY banner); manifest.json distribution_scope and
+      source_attribution.attribution_note; research/decisions/2026-09-06_gaitex_internal_use_authorization.md
+      sections 1, 5 and 6
+    status: open
+    since: '2026-09-06'
+    related:
+    - gaitex.experimental_non_candidate
+    - gaitex.cc_by_attribution_required
+  - id: gaitex.experimental_non_candidate
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: 'artifact_class is experimental_non_candidate and quality_gate is NOT_EVALUATED: not canonical
+      output, not contract-compliant, and no production quality gate was applied. The L4 validation PASS
+      is not a quality-gate judgement.'
+    consequence: Do not use the bundle as a training or evaluation label, and do not cite it as gate-passing
+      or contract-compliant output.
+    evidence: DATA_DESCRIPTION_EN.md line 3; manifest.json artifact_class, artifact_label, quality_gate,
+      unavailable_or_not_applied 'quality gates'
+    status: open
+    since: '2026-09-06'
+    related:
+    - gaitex.internal_only
+    - gaitex.generated_under_unresolved_hold
+  - id: gaitex.cc_by_attribution_required
+    kind: rights
+    severity: info
+    scope:
+      level: bundle
+    statement: GAITEX is CC BY 4.0 and its licence note conditions any redistribution on crediting the
+      Zenodo dataset record (Munz, Spilz and Oppel, Dataset GAITEX, 10.5281/zenodo.15729056), which source_attribution.dataset_citation
+      carries; the Scientific Data article named in publication is a different object. changes_made is
+      recorded.
+    consequence: Any derived work or report must carry dataset_citation verbatim and state the changes
+      made; do not substitute the publication for the Zenodo record as the attribution target.
+    evidence: manifest.json source_attribution (license_id, dataset_citation, publication, attribution_note,
+      changes_made); research/decisions/2026-09-06_gaitex_internal_use_authorization.md section 2
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.generated_under_unresolved_hold
+    kind: rights
+    severity: caution
+    scope:
+      level: bundle
+    statement: 'The bundle was generated while DETERMINISTIC_EXECUTION_CONFIG_HOLD was active and its
+      scope draft unresolved; the synthesis settings (gaitex_synthesis_v1_1 v1.1.1) are proposals with
+      independent_review NOT_PERFORMED and authorises_generation false, and neither the 2026-09-06 internal-use
+      authorisation nor the 2026-09-15 regeneration record lifts a hold: the record is the parent
+      project''s generation-hold
+      exception for an experimental_non_candidate run, and the runner copied it into the run manifest
+      as generation_decision with the gates'' refusal beside it.'
+    consequence: Do not treat the recorded settings as a reviewed execution configuration or the bundle
+      as an approved generation; regenerating requires the reviewed atomic transition the hold names.
+    evidence: manifest.json generated_under (settings, recorded_conflicts, recorded_authorizations, authorises_generation,
+      note); DATA_DESCRIPTION_EN.md 'Known limits' last bullet; research/decisions/DRAFT_deterministic_execution_hold_scope.md;
+      research/decisions/2026-09-15_gaitex_experimental_regeneration_authorization.md;
+      _runs/run_<identity>/manifest.json
+      generation_decision
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.emg_excluded
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+    statement: EMG is an excluded modality; the recorded reason is not_in_synthetic_artifact_scope.
+    consequence: No EMG channel exists in any deliverable; do not expect or derive one from this bundle.
+    evidence: manifest.json excluded_modalities ['emg'] and excluded_modality_reasons.emg
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.no_measured_kinetics
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - development_reference.npz
+    statement: GAITEX records no force plate and no insole force, so there is no development_reference.npz
+      and no measured GRF/CoP; physics-informed GRF, inverse dynamics, moments, powers and COM are not
+      derived.
+    consequence: Nothing in this bundle can serve as a kinetic ground truth; the gaitex profile declares
+      capabilities [] so the validator expects none.
+    evidence: manifest.json unavailable_or_not_applied rows 'development_reference / measured GRF / CoP'
+      and 'physics-informed GRF / ...'; DATA_DESCRIPTION_EN.md 'Known limits' bullet 9 ('It records no
+      ground reaction force either'); configs/datasets/dataset_profiles_v1.yaml profiles.gaitex.capabilities
+      []
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.no_jcs_joint_angles
+    kind: source_scope
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      files:
+      - large_reference.npz
+    statement: joint_rotation holds SMPL parent-relative local quaternions; no ISB/JCS clinical joint
+      angles (joint_angles_jcs_deg) are produced because no ISB/JCS convention was applied.
+    consequence: Do not read joint_rotation as anatomical angles; derive clinical angles yourself under
+      a convention of your choosing, none is asserted by the bundle.
+    evidence: manifest.json unavailable_or_not_applied 'joint_angles_jcs_deg (needs ISB/JCS convention)'
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.no_measured_accel_gyro
+    kind: source_scope
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: 'GAITEX publishes the XSens orientation quaternions only: the synthesised accelerometer
+      and gyroscope have no measured counterpart on any site, and the worn-unit comparison on the five
+      backed sites is an orientation comparison with no acceptance band (the residual is reported, not
+      judged).'
+    consequence: Treat imu_acceleration and imu_angular_velocity as unvalidated synthetic channels on
+      every site; worn_unit_comparison numbers describe orientation agreement only and certify nothing.
+    evidence: DATA_DESCRIPTION_EN.md 'Known limits' bullet 9 and the 'Five sites are compared' paragraph
+      ('No acceptance band is applied'); manifest.json unavailable_or_not_applied row 'measured accelerometer
+      and gyroscope' and worn_unit_comparison.method
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.back_t4_sternum_plate
+    kind: proxy
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+    statement: The back_T4 channel is synthesised from the sternum plate (THOR1-4 rigid fit at the chest
+      twin's registered plate offset) and compared with XSens_Sternum; the plate is anterior and the specification's
+      T4 site is 110-322 mm away.
+    consequence: back_T4 is not a posterior-thorax sensor; any model trained or evaluated as a T4 back
+      sensor must account for the anterior sternum placement.
+    evidence: DATA_DESCRIPTION_EN.md 'Known limits' bullet 1; manifest.json small_sites_provenance.back_T4
+      and small_synthesis.sites.back_T4.placement (kind offset_twin, provisional true); docs/adr/ADR-0037-virtual-imu-placement-model.md
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.declared_zero_placement
+    kind: approximation
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - wrist_l
+      - wrist_r
+      - occiput
+    statement: 'These three sites have a marker-fitted rotation but no worn unit and no registered mount
+      offset: the sensor sits at the body''s own origin (styloid midpoint, head-cluster origin) as a declared,
+      provisional zero offset, so the accelerometer carries no lever-arm term; imu_confidence is 0.3 there.'
+    consequence: Accelerations at wrist_l, wrist_r and occiput omit the lever-arm contribution a real
+      mount would add, and there is no worn counterpart to compare against; the 0.3 confidence marks a
+      different kind of value from 0.6, not a lower degree of it.
+    evidence: DATA_DESCRIPTION_EN.md 'Known limits' bullet 2 and the 'Five sites are compared' paragraph;
+      manifest.json declared_placement_sites, small_synthesis.sites.{wrist_l,wrist_r,occiput}.placement
+      (kind declared_zero, provisional true), unavailable_or_not_applied row 'sensor mount extrinsics
+      for wrist_l, wrist_r and occiput'; docs/adr/ADR-0037-virtual-imu-placement-model.md section 6
+    status: open
+    since: '2026-09-06'
+    related:
+    - gaitex.imu_confidence_semantics
+    - gaitex.wrist_frame_anatomical_not_rigid
+    - gaitex.plate_depth_uncertainty
+  - id: gaitex.wrist_frame_anatomical_not_rigid
+    kind: approximation
+    severity: info
+    scope:
+      level: site
+      sites:
+      - wrist_l
+      - wrist_r
+    statement: The wrist frames are anatomical forearm frames built from HLE, RSP and USP (HLE lies on
+      the humerus, so this is not a rigid-body fit), conditioned by a styloid-pair distance tolerance
+      (0.01 m), an angular-rate ceiling (2000 deg/s), a gap-twist limit and a label-swap guard; frames
+      failing the conditioning are withdrawn into the mask.
+    consequence: Wrist orientation includes elbow-related humeral and soft-tissue motion; check small_synthesis.sites.wrist_*.withdrawn_*
+      and label_swap_* on each take before relying on a wrist channel.
+    evidence: manifest.json small_sites_provenance.wrist_l / wrist_r, small_synthesis.forearm_conditioning,
+      small_synthesis.sites.wrist_*.frame_source; docs/adr/ADR-0037-virtual-imu-placement-model.md section
+      5
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.plate_depth_uncertainty
+    kind: approximation
+    severity: info
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - shank_l
+      - shank_r
+      - foot_l
+      - foot_r
+    statement: The five plate sites carry the registered 14 mm plate depth as the sensor lever arm with
+      a recorded 6 mm uncertainty (small_synthesis.lever_arm_depth_uncertainty_m 0.006); ADR-0037 puts
+      the acceleration cost of that uncertainty at about 0.23-0.98 m/s^2.
+    consequence: Lever-arm accelerations at plate sites carry that systematic uncertainty; it is a hardware-drawing
+      unknown, not a fit residual.
+    evidence: manifest.json unavailable_or_not_applied row 'sensor mount extrinsics ...' (plate depth
+      clause), small_synthesis.lever_arm_depth_uncertainty_m and small_synthesis.sites.*.lever_arm_local_m;
+      docs/adr/ADR-0037-virtual-imu-placement-model.md
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.orientation_not_constant_relabel_of_smpl
+    kind: approximation
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: 'imu_orientation is a rigid relabel of the marker-fitted body, not of the SMPL joint in
+      large; the two disagree most on the wrists and head (gaitex_austra_gwo: dispersion vs large 20.5
+      / 15.1 deg wrists, 7.2 deg occiput; mean offset vs the SMPL-anatomical frame 90.6 / 96.2 deg wrists,
+      52.2 deg occiput).'
+    consequence: Do not assume a constant rotation between small imu_orientation and the large joint orientation;
+      the spec_S_v2 axis check (L3) judges this corpus like a measured sensor (WARN only). Read relabel_dispersion_vs_large_deg
+      and relabel_offset_vs_smpl_anatomical_deg per take.
+    evidence: DATA_DESCRIPTION_EN.md 'Known limits' bullet 3; manifest.json relabel_dispersion_vs_large_deg
+      and relabel_offset_vs_smpl_anatomical_deg; README.md Conventions bullet on orientation under synthetic_from_markers;
+      docs/adr/ADR-0039-marker-derived-small-and-mask-governed-nan.md 'Validation and migration'
+    status: open
+    since: '2026-09-06'
+    related:
+    - gaitex.large_arm_head_joints_undriven
+  - id: gaitex.large_arm_head_joints_undriven
+    kind: source_scope
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      - joint_velocity
+      - smpl_global_orientation_world
+      files:
+      - large_reference.npz
+    statement: GAITEX's OpenSim inverse kinematics never drove the SMPL wrist and head joints, so in large
+      those joints do not carry the source's arm and head motion; the earlier SMPL-derived bundle had
+      four channels resting on such undriven joints, which is why small is now synthesised from markers.
+    consequence: Do not use large's wrist or head joint rotations or velocities as ground truth for arm
+      or head motion; the marker-derived small at wrist_l, wrist_r and occiput is the only source-backed
+      motion for those segments.
+    evidence: DATA_DESCRIPTION_EN.md 'What this is, and what it is not' ('four channels resting on undriven
+      joints') and 'Known limits' bullet 3 ('GAITEX's inverse kinematics never drove the SMPL joint');
+      manifest.json relabel_offset_vs_smpl_anatomical_deg.what
+    status: open
+    since: '2026-09-06'
+    related:
+    - gaitex.orientation_not_constant_relabel_of_smpl
+  - id: gaitex.sensor_frame_constant_per_take
+    kind: approximation
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: The sensor frame S is one constant per take built from landmarks; trunk and feet use the
+      trial-mean world up as +Y (a static-calibration analogue), so a take's mean lean or foot pitch is
+      absorbed into that constant (gaitex_austra_gwo foot_l primary-axis scatter 14.3 deg median, 47.8
+      deg p95).
+    consequence: Sensor axes are not anatomically identical across takes; per-take mean posture is baked
+      into S, most strongly at back_T4, foot_l and foot_r.
+    evidence: DATA_DESCRIPTION_EN.md 'Known limits' bullet 4; manifest.json small_synthesis.sites.*.sensor_frame.primary_construction
+      (world_up for back_T4, foot_l, foot_r) and primary_axis_scatter_deg_median / p95
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.shank_frame_epicondyle_fallback
+    kind: approximation
+    severity: info
+    scope:
+      level: take
+      takes:
+      - gaitex_neves_rd
+      - gaitex_neves_rgs
+      - gaitex_austra_gwo
+      sites:
+      - shank_l
+      - shank_r
+    statement: 'Where an epicondyle marker is absent the shank +Z falls back to the lateral plate normal
+      instead of the medial-to-lateral epicondyle axis: gaitex_neves_rd and gaitex_neves_rgs on both shanks
+      (FME absent, secondary_construction plate_normal_outward); gaitex_austra_gwo shank_l lacks L_TAM
+      so its +Y uses L_FAL alone. On takes where both exist the plate normal differs from the landmark
+      axis by about 42-45 deg.'
+    consequence: Shank sensor axes on these takes are constructed differently from the rest of the bundle;
+      treat cross-take shank axis comparisons with that in mind.
+    evidence: gaitex_austra_gwo/manifest.json small_sites_provenance.shank_l ('or the lateral plate normal
+      when an epicondyle is absent'); the named takes' manifest.json small_synthesis.sites.shank_*.sensor_frame.landmarks_missing,
+      secondary_construction and plate_outward_vs_landmark_axis_deg
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.ik_solve_came_apart
+    kind: source_defect
+    severity: do_not_use
+    scope:
+      level: take
+      takes:
+      - gaitex_julia_gwo
+      - gaitex_katee_gwo
+      - gaitex_marquise_ng
+      - gaitex_neves_rgs
+      files:
+      - large_reference.npz
+    statement: 'On four takes the source''s own inverse kinematics came apart and large carries joint
+      angles no body can produce (joint_ranges.solve_came_apart true; impossible spans: julia_gwo ankle_angle_r
+      / knee_angle_r, katee_gwo hip_flexion_r / knee_angle_r / lumbar_extension, marquise_ng hip_flexion_r
+      / knee_angle_r, neves_rgs ankle_angle_r). small does not pass through that IK and is unaffected;
+      the pair is broken on the large side only.'
+    consequence: Filter large on joint_ranges.solve_came_apart (not on frames_outside_any) and exclude
+      these takes from any use of large; small on the same takes remains usable.
+    evidence: DATA_DESCRIPTION_EN.md 'Known limits' bullet 5; each named take's manifest.json joint_ranges.solve_came_apart,
+      coordinates_whose_span_is_impossible and how_to_read_this
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.mask_governed_nan_cells
+    kind: coverage
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - imu_orientation
+      - imu_acceleration
+      - imu_angular_velocity
+      - imu_valid_mask
+      - imu_confidence
+      files:
+      - small_reference.npz
+    statement: Where a site has no signal (a marker gap the 20-frame policy does not bridge, the 17-frame
+      filter edge of every usable run, a withdrawn glitch) the cell is NaN in the three IMU arrays, False
+      in imu_valid_mask and 0.0 in imu_confidence; nothing is zero-filled. Summing source_window.invalid_cells
+      over the 72 manifests gives 42,583 invalid cells of 12,496,320 (0.34%) on 33 takes; three (take,
+      site) pairs have valid_fraction below 0.5 (gaitex_austra_ng wrist_r 0.18, gaitex_etsuko_ng occiput
+      0.25, gaitex_yaxkin_gwo wrist_l 0.42). large is finite on every frame.
+    consequence: Apply imu_valid_mask before any filter, derivative or loss, and to large as well when
+      frames are paired; never treat a NaN cell as zero or as identity.
+    evidence: DATA_DESCRIPTION_EN.md 'The mask is not decoration'; manifest.json small_synthesis.mask_discipline,
+      small_synthesis.filter.edge_trim_frames, source_window.invalid_cells, source_window.sites.*.usable_runs_bundle_rows
+      and valid_fraction; docs/adr/ADR-0039-marker-derived-small-and-mask-governed-nan.md Decision
+    status: open
+    since: '2026-09-06'
+    related:
+    - gaitex.gap_bridged_frames_ship_valid
+  - id: gaitex.gap_bridged_frames_ship_valid
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - imu_orientation
+      - imu_acceleration
+      - imu_angular_velocity
+      - imu_valid_mask
+      files:
+      - small_reference.npz
+    statement: 'A gap in a cluster''s pose of at most 20 frames is interpolated (Hermite translation,
+      squad rotation) before synthesis and ships as a VALID cell; the manifests sum to 4,429 bridged site-frames
+      across the bundle (gaitex_austra_gwo: wrist_r 8 frames, shank_r 3 frames).'
+    consequence: Interpolated frames are indistinguishable from observed ones in imu_valid_mask; exclude
+      them via source_window.sites[*].interpolated_runs_bundle_rows if an analysis needs observed-only
+      data.
+    evidence: DATA_DESCRIPTION_EN.md 'The mask is not decoration' ('One thing is bridged'); manifest.json
+      small_synthesis.gap_policy and source_window.sites.*.interpolated_frames / interpolated_runs_bundle_rows
+    status: open
+    since: '2026-09-06'
+    related:
+    - gaitex.mask_governed_nan_cells
+  - id: gaitex.take_window_pelvis_solved_span
+    kind: coverage
+    severity: info
+    scope:
+      level: bundle
+    statement: 'Each take is the retarget''s longest pelvis-solved span minus leading and trailing frames
+      on which no marker site is valid, not the whole source trial (gaitex_austra_gwo: 10,606 of 19,543
+      trial frames, 54.3%, 17 leading frames trimmed).'
+    consequence: Take frames do not map 1:1 onto the source trial; use source_window.csv_frame_start /
+      csv_frame_stop to index the source csv and source_trial_coverage.fraction to know how much of the
+      trial the take covers.
+    evidence: DATA_DESCRIPTION_EN.md 'Known limits' bullet 6; manifest.json source_window (csv_frame_start,
+      csv_frame_stop, frames_trimmed_at_ends) and source_trial_coverage
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.missing_subject_condition_combinations
+    kind: coverage
+    severity: info
+    scope:
+      level: subject
+      subjects:
+      - gaitex_hans
+      - gaitex_jung-hee
+    statement: '72 of the 76 subject x condition combinations were recovered: INDEX.json holds no take
+      for gaitex_hans gwo / ng / rgs or gaitex_jung-hee gwo, and counts them neither as failed nor excluded
+      (failed 0, excluded 0). Conditions are therefore unbalanced (gwo 17, ng 18, rd 19, rgs 18). Why
+      the four were not recovered is not stated anywhere in the bundle.'
+    consequence: Do not assume four conditions per subject; per-condition statistics rest on 17-19 takes,
+      and gaitex_hans contributes only rd.
+    evidence: DATA_DESCRIPTION_EN.md cohort line ('72 of the 76 combinations recovered'); INDEX.json counts
+      and takes[].subject_id / sequence_id
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.hans_rd_shank_r_no_worn_counterpart
+    kind: source_scope
+    severity: info
+    scope:
+      level: take
+      takes:
+      - gaitex_hans_rd
+      sites:
+      - shank_r
+    statement: The XSens_LowerLeg_Right unit is absent from the gaitex_hans_rd trial file, so the shank_r
+      worn-unit comparison did not run (status measured_counterpart_absent), the site is missing from
+      worn_unit_compared_sites on that take and its imu_confidence is 0.3 instead of 0.6.
+    consequence: shank_r on this take is synthesised from the same marker cluster as elsewhere but nothing
+      stood behind it; weight it as a declared-position site.
+    evidence: gaitex_hans_rd/manifest.json worn_unit_comparison.sites.shank_r, worn_unit_compared_sites,
+      small_synthesis.imu_confidence_on_this_take.shank_r; gaitex_austra_gwo/manifest.json small_synthesis.imu_confidence_semantics.backed_site_without_comparison_on_this_take
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.anthropometry_unavailable
+    kind: source_scope
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - sex
+      - height
+      - body_mass
+      - betas
+      files:
+      - anthro_reference.npz
+    statement: The archive writes placeholders (mass 90, height -1) for every subject and records no sex;
+      gender neutral is a declared modelling choice. anthro.height is the neutral SMPL rest stature at
+      betas fitted from bone lengths alone (height_provenance 'estimated:'), anthro.body_mass is NaN and
+      sex is 'U'.
+    consequence: Do not use anthro.height as a measured stature, or body_mass and sex at all; betas were
+      fitted without stature or mass constraints.
+    evidence: DATA_DESCRIPTION_EN.md 'Known limits' bullet 8; manifest.json unavailable_or_not_applied
+      row 'subject sex, stature and mass'; anthro_reference.npz height_provenance, body_mass_provenance,
+      sex_provenance and betas_provenance
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.betas_pooled_per_subject
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - betas
+      - segment_length
+      - joint_position
+      files:
+      - anthro_reference.npz
+    statement: GAITEX rescales its OpenSim model per trial, so a subject's per-trial skeletons disagree
+      (about 2.7% on a femur, femur/tibia deviations anticorrelated); betas are fitted once per subject
+      from segment lengths pooled by median across the subject's trials.
+    consequence: anthro constants are subject-constant and will not exactly match any single trial's scaled
+      model.
+    evidence: DATA_DESCRIPTION_EN.md 'Known limits' bullet 7; anthro_reference.npz subject_scope_note
+      and betas_provenance
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.root_translation_recovered_from_pelvis_markers
+    kind: approximation
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - root_velocity
+      - pelvis_position_world_aux
+      - smpl_trans
+      files:
+      - large_reference.npz
+      - smpl_root_translation.npz
+    statement: The published GAITEX IK froze the pelvis translation at the static scaling pose, so the
+      root was recovered per frame from the four pelvis marker stations with a shape learned from the
+      observed cluster; the recovered origin still steps a median 3.7 mm whenever the set of visible pelvis
+      markers changes. Those steps are in large's root_velocity and pelvis_position_world_aux and are
+      not in small.
+    consequence: Expect small discontinuities in root velocity and position at pelvis-marker visibility
+      changes; small's accelerations are differentiated from each site's own cluster and do not depend
+      on the root.
+    evidence: manifest.json root_translation (published, used, shape_fitted, known_limitation) and source.note;
+      smpl_root_translation.npz smpl_trans_provenance
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.foot_heading_flag_spec_sensor
+    kind: hardware_limit
+    severity: info
+    scope:
+      level: site
+      sites:
+      - foot_l
+      - foot_r
+      arrays:
+      - imu_orientation_absolute_heading
+      files:
+      - small_reference.npz
+    statement: imu_orientation_absolute_heading is [T,T,T,T,T,T,F,F] because the spec's foot sensor is
+      a six-axis insole with no heading reference; the flag describes what the target sensor provides,
+      not how this bundle was made. Here both foot orientations are marker-fitted rigid bodies carrying
+      a heading and were compared with the XSens foot units.
+    consequence: Do not read the False flag as saying the foot heading in this bundle wanders; conversely,
+      a model aimed at the spec's insoles must not rely on a foot heading a real six-axis insole would
+      not give.
+    evidence: small_reference.npz imu_orientation_absolute_heading; README.md small_reference.npz field
+      table row imu_orientation_absolute_heading; scripts/poc/generate_gaitex_unified8.py replace_small
+      docstring
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.imu_confidence_semantics
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - imu_confidence
+      files:
+      - small_reference.npz
+    statement: 'imu_confidence is a declared level, not a measurement, and takes exactly three values
+      on this corpus: 0.6 (plate site with a registered offset, compared with a worn unit on that take),
+      0.3 (declared-zero placement without counterpart, or a backed site whose comparison did not run
+      on that take), 0.0 (invalid cell). The levels are set per corpus and mean something else on every
+      other bundle of the lineage.'
+    consequence: Never compare imu_confidence across bundles or treat 0.3 and 0.6 as degrees of one scale;
+      read small_synthesis.imu_confidence_semantics and imu_confidence_on_this_take per take.
+    evidence: manifest.json small_synthesis.imu_confidence_semantics (note, backed_site_without_comparison_on_this_take)
+      and imu_confidence_on_this_take; README.md field table row imu_confidence; DATA_DESCRIPTION_EN.md
+      'Five sites are compared' paragraph
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.canonicalization_config_stale
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - manifest.json
+    statement: The manifest's canonicalization_config (filter butter4_7hz_filtfilt_odd15, imu_synthesis
+      fk_orientation+doublediff_accel+rotationlog_gyro) describes the shared emitter and the SMPL-derived
+      small this generator replaced, not the shipped small; the shipped small's filter is small_synthesis.filter
+      (Butterworth order 4, 12 Hz, zero-phase, 17-frame edge trim), and large's joint_velocity and root_velocity
+      are unfiltered finite differences. DATA_DESCRIPTION_EN.md's '7 Hz' figure in 'What this is' repeats
+      the stale value.
+    consequence: Read small_synthesis.filter, not canonicalization_config or the description's 7 Hz, for
+      how small was filtered; expect unfiltered differentiation noise in large's velocities.
+    evidence: manifest.json small_synthesis.canonicalization_config_note, small_synthesis.filter (cutoff_hz
+      12.0, edge_trim_frames 17) and canonicalization_config; faithful_content.small; DATA_DESCRIPTION_EN.md
+      'What this is, and what it is not'
+    status: mitigated
+    mitigation: Every manifest carries small_synthesis.canonicalization_config_note naming the stale keys
+      and small_synthesis.filter with the shipped values.
+    since: '2026-09-06'
+  - id: gaitex.in_place_replacement_of_earlier_bundle
+    kind: pipeline_defect
+    severity: caution
+    scope:
+      level: bundle
+    statement: 'The lineage has carried three generations: gaitex_unified8_v1 of 2026-09-05 (small_mode
+      synthetic_from_smpl), its in-place replacement of 2026-09-07 (marker-driven small; every take''s
+      pair_id changed because contract_version is hashed into it, and frame counts changed), and gaitex_unified8
+      of 2026-09-15, regenerated from a fresh gaitex_smpl24 retarget through the pipeline runner after
+      the _v1 name was retired under the no-version rule.'
+    consequence: Nothing here can be matched to the 2026-09-05 copy by take identity; match by subject
+      and condition instead, and rebuild anything built against it. Tell generations apart by INDEX.json.generated_utc
+      and the run record, never by the directory name.
+    evidence: DATA_DESCRIPTION_EN.md 'Read this first if you hold an earlier copy'; manifest.json identity.contract_version
+      (0.0.2-poc-marker-small+cfg.9b81387f0e35a433); _superseded/gaitex_unified8_v1/INDEX.json (the 2026-09-07
+      generation); _runs/run_<identity>/; retention rule 1.1 (one directory per
+      lineage)
+    status: open
+    since: '2026-09-06'
+  - id: gaitex.reduced_model_weld_residual
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      - fixed_joint_rotation
+      files:
+      - large_reference.npz
+      - anthro_reference.npz
+    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
+      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject over the pooled
+      frames of all of its takes, and spine3 and the shoulders absorb the removed rotation; distal global
+      orientation is exact but a joint-centre position residual remains on the trunk/arm chain. Across
+      the 19 fit groups the fitted residual RMS is 5.6-27.5 mm (the mean-rotation starting guess 5.6-29.5
+      mm) and the worst frame is 140.0 mm (gaitex_katee).'
+    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
+      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
+      read them before relying on reconstructed positions.
+    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
+      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
+      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance
+    status: mitigated
+    mitigation: large_reference.npz smpl_global_orientation_world[M,24,4] keeps all 24 SMPL joints' global
+      orientation losslessly (manifest.anthro_reconstruction.lossless_alternative); use it when exact
+      per-joint orientation matters.
+    since: '2026-09-06'
+  - id: gaitex.generation_provenance_unrecoverable
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+    statement: The retired gaitex_unified8_v1's producing run recorded no code revision, dependency versions
+      or host environment and kept none of the seven run artifacts; its 2026-09-09 retrofit named those
+      unrecoverable (provenance coverage 4/10). This bundle was produced through the pipeline runner and
+      carries the full run record.
+    consequence: Reproduce from the run record (code revision, environment, source asset fingerprints)
+      rather than from the bundle alone; the retired generation's retrofit sidecar stays with its evidence
+      under _superseded/gaitex_unified8_v1/.
+    evidence: _runs/run_<identity>/manifest.json and environment.lock beside the
+      bundle root (PIPELINE_GOVERNANCE.md sections 10.1 and 10.2); _superseded/gaitex_unified8_v1/PROVENANCE_RETROFIT.json
+      for the retired generation
+    status: fixed
+    since: '2026-09-09'
+    fixed_in: the 2026-09-15 gaitex_unified8 regeneration through soma-synth run (owner record
+      research/decisions/2026-09-15_*_experimental_regeneration_authorization.md),
+      which left the seven run-directory artifacts PIPELINE_GOVERNANCE.md section 10.1 requires
+  amass_faithful_full:
+  - id: amass.internal_only
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: distribution_scope is internal_only. The bundled AMASS licence text permits derivative
+      works for non-commercial scientific research only and forbids redistribution and commercial use;
+      the 2026-07-23 portal text omits the derivative-grant bullet (the recorded LICENSE_TEXT_CONFLICT),
+      no SPDX licence applies (license_id amass_bundled_noncommercial_no_redistribution) and no publication
+      is established.
+    consequence: Do not upload to any public Git, cloud, model or dataset hub, or share by public link;
+      do not redistribute outside the project or use commercially; cite the bundled licence text, not
+      an SPDX identifier.
+    evidence: DATA_DESCRIPTION_EN.md 'Scope & handling (read first)' bullet 1; manifest.json distribution_scope,
+      source_attribution.license_id, source_attribution.publication, source_attribution.attribution_note;
+      configs/datasets/source_attribution_v1.yaml sources.amass; research/datasets/licenses/ds-amass.md
+    status: open
+    since: '2026-08-13'
+    related:
+    - amass.experimental_non_candidate
+  - id: amass.experimental_non_candidate
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: 'artifact_class is experimental_non_candidate and quality_gate is NOT_EVALUATED: a synthetic
+      SMPL-derived PoC replica of the PRISM faithful recipe, not canonical output, not contract-compliant,
+      and no production quality gate was applied. The AMASS field registry is non_authorizing, and the
+      governed pipeline''s source holds and SPEC_DRIFT gating were left out of scope (governance_disposition.not_the_governed_pipeline
+      true).'
+    consequence: Do not use the bundle as a training or evaluation label, and do not cite it as gate-passing
+      or contract-compliant output.
+    evidence: DATA_DESCRIPTION_EN.md 'Scope & handling' bullet 2 and closing italic line; manifest.json
+      artifact_class, artifact_label, quality_gate, governance_disposition, unavailable_or_not_applied
+      'quality gates'; configs/datasets/amass_field_registry_v2.yaml activation_state non_authorizing
+    status: open
+    since: '2026-08-13'
+    related:
+    - amass.internal_only
+  - id: amass.emg_excluded
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+    statement: EMG is an excluded modality; the recorded reason is not_in_synthetic_artifact_scope.
+    consequence: No EMG channel exists in any deliverable; do not expect or derive one from this bundle.
+    evidence: manifest.json excluded_modalities ['emg'] and excluded_modality_reasons.emg
+    status: open
+    since: '2026-08-13'
+  - id: amass.all_channels_synthetic
+    kind: source_scope
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: 'AMASS ships only SMPL-H pose parameters, so every IMU channel at all eight sites is synthesised
+      by forward kinematics from the SMPL body (small_mode synthetic_from_smpl): orientation is the SMPL
+      segment frame relabelled into spec frame S, acceleration a double-differenced world joint position,
+      the gyro a rotation-log finite difference. No sensor noise, bias, misalignment or soft-tissue motion
+      is modelled and there is no measured counterpart.'
+    consequence: Treat all eight channels as simulated, an upper bound on what a worn sensor could report;
+      a model trained only here has never seen noise, bias drift or mounting error.
+    evidence: DATA_DESCRIPTION_EN.md sections 1 and 3, section 7 'synthetic (SMPL FK)' row and Key caveat
+      1; manifest.json source.note, small_sites_provenance, canonicalization_config.imu_synthesis; small_reference.npz
+      small_mode 'synthetic_from_smpl'
+    status: open
+    since: '2026-08-13'
+    related:
+    - amass.no_sensor_mount_extrinsics
+    - amass.accel_lowpass_7hz
+  - id: amass.accel_lowpass_7hz
+    kind: approximation
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - imu_acceleration
+      files:
+      - small_reference.npz
+    statement: The specific force at every site is a 4th-order Butterworth 7 Hz zero-phase (filtfilt)
+      filtered double difference of the joint's world position (canonicalization_config.filter butter4_7hz_filtfilt_odd15),
+      and the first and last ~15 frames of every take carry a filter edge transient plus a one-sided boundary
+      derivative (a few percent of |a| near gravity). AMASS sequences are standalone, so these boundary
+      frames are included rather than windowed away as PRISM's were.
+    consequence: Expect no acceleration content above the 7 Hz cutoff, and discard or down-weight the
+      first and last 15 frames of each take before computing derivatives, losses or impact statistics.
+    evidence: manifest.json canonicalization_config.filter, validation.accel_filter_edge_transient_frames
+      15 and validation.accel_boundary_note; DATA_DESCRIPTION_EN.md section 3.3 'Accel boundary note'
+    status: open
+    since: '2026-08-13'
+  - id: amass.back_t4_spine3_proxy
+    kind: proxy
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+    statement: 'No SMPL joint sits at T4. back_T4 is a non-rigid chest proxy: its orientation is the spine3
+      segment and its acceleration is evaluated at pelvis + 2/3 (head - pelvis) (chest_alpha 0.667); imu_confidence
+      is 0.4 for this reason.'
+    consequence: Treat back_T4 as a synthetic point on a deforming trunk line, not a sensor rigidly mounted
+      on a vertebra; weight it by its 0.4 confidence.
+    evidence: DATA_DESCRIPTION_EN.md section 3.2 idx 0, section 7 'proxy' row and Key caveat 2; manifest.json
+      small_sites_provenance.back_T4 and canonicalization_config.chest_alpha; small_reference.npz imu_confidence[:,0]
+      = 0.4
+    status: open
+    since: '2026-08-13'
+  - id: amass.no_sensor_mount_extrinsics
+    kind: approximation
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: 'No segment-to-sensor lever arm is applied: each site''s orientation is its driving SMPL
+      joint''s frame and its acceleration is evaluated at a joint centre (wrist joint for the wrists,
+      knee joint for the shanks, head joint for the occiput, foot/toe joint for the insoles, the chest
+      proxy point for back_T4) rather than at a sensor case on the skin.'
+    consequence: The centripetal and tangential terms a real sensor offset from the joint would see are
+      absent; do not fit or evaluate sensor-placement or mounting-offset models on this bundle.
+    evidence: manifest.json unavailable_or_not_applied 'sensor mount extrinsics (segment->sensor lever
+      arm)' and small_sites_provenance (orientation joint / accel joint per site); DATA_DESCRIPTION_EN.md
+      section 3.2 'Synthesis (orientation joint / accel position)' column and section 7 'estimated / unavailable'
+      row
+    status: open
+    since: '2026-08-13'
+    related:
+    - amass.all_channels_synthetic
+  - id: amass.foot_heading_flag_spec_sensor
+    kind: hardware_limit
+    severity: info
+    scope:
+      level: site
+      sites:
+      - foot_l
+      - foot_r
+      arrays:
+      - imu_orientation_absolute_heading
+      files:
+      - small_reference.npz
+    statement: imu_orientation_absolute_heading is [T,T,T,T,T,T,F,F] because the spec's foot sensor is
+      a six-axis Moticon OpenGo with no heading reference; the flag describes what the target sensor provides,
+      not how this bundle was made. Here the foot orientations are FK-exact and do carry a world heading.
+    consequence: A model trained on these foot orientations for deployment on the spec's insoles must
+      not depend on foot heading; honour the flag when mixing with measured bundles and do not expect
+      a real insole to reproduce the stored heading.
+    evidence: small_reference.npz imu_orientation_absolute_heading; DATA_DESCRIPTION_EN.md section 3.1
+      row imu_orientation_absolute_heading ('sensor model; the synthetic value is model-exact'), section
+      3.2 idx 6-7, Key caveat 3; README.md field table row imu_orientation_absolute_heading
+    status: open
+    since: '2026-08-13'
+  - id: amass.no_measured_kinetics
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - development_reference.npz
+    statement: AMASS has no measured GRF, CoP, insole pressure or kinetics, so no development_reference.npz
+      is produced; canonical SOMA-world GRF/CoP, joint torques, and physics-informed moments, powers and
+      COM are not produced either.
+    consequence: Nothing in this bundle can serve as a kinetic ground truth; pair it with a measured bundle
+      when kinetics are needed.
+    evidence: DATA_DESCRIPTION_EN.md sections 1 and 6; manifest.json faithful_content.development_reference
+      ('NONE -- AMASS has no measured GRF/insole/kinetics'), unavailable_or_not_applied rows 'development_reference
+      / measured GRF / CoP / insole' and 'physics-informed GRF / ...'; configs/datasets/dataset_profiles_v1.yaml
+      profiles.amass.capabilities []
+    status: open
+    since: '2026-08-13'
+  - id: amass.no_jcs_joint_angles
+    kind: source_scope
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      files:
+      - large_reference.npz
+    statement: joint_rotation holds the pelvis global orientation and 17 SMPL parent-relative local quaternions;
+      no ISB/JCS clinical joint angles (joint_angles_jcs_deg) are produced because no ISB/JCS convention
+      was applied.
+    consequence: Do not read joint_rotation as anatomical flexion/abduction/rotation angles; derive clinical
+      angles yourself under a convention of your choosing, none is asserted by the bundle.
+    evidence: DATA_DESCRIPTION_EN.md section 4 joint_rotation row and Key caveat 5; manifest.json unavailable_or_not_applied
+      'joint_angles_jcs_deg (needs ISB/JCS convention)'
+    status: open
+    since: '2026-08-13'
+  - id: amass.anthropometry_unavailable
+    kind: source_scope
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - height
+      - body_mass
+      files:
+      - anthro_reference.npz
+    statement: 'AMASS records no subject height or mass: anthro.height is an SMPL rest-pose stature estimate
+      (shaped-vertex Y-extent, height_provenance ''estimated:smpl_rest_stature_yup'') and anthro.body_mass
+      is NaN in every take.'
+    consequence: Do not use height as a measured stature; mass-normalised quantities cannot be formed
+      from this bundle, so test body_mass for NaN before any arithmetic.
+    evidence: anthro_reference.npz height_provenance and body_mass_provenance ('unavailable:amass_no_subject_mass');
+      DATA_DESCRIPTION_EN.md section 5 and Key caveat 4; manifest.json unavailable_or_not_applied 'measured
+      subject height & body_mass' and faithful_content.anthro
+    status: open
+    since: '2026-08-13'
+  - id: amass.betas_16_truncated_to_10
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - betas
+      files:
+      - anthro_reference.npz
+    statement: The source betas are 16-dimensional but the clean SMPL model used for the rest skeleton
+      carries 10 shape dimensions, so the rest geometry uses only the first 10 (smpl10_beta_truncation).
+    consequence: The stored 16 betas do not fully describe the skeleton that produced joint_position and
+      segment_length; reproduce the skeleton with betas[:10].
+    evidence: anthro_reference.npz betas_provenance; DATA_DESCRIPTION_EN.md section 5 and Key caveat 4;
+      manifest.json faithful_content.anthro ('betas(16, model uses 10)')
+    status: open
+    since: '2026-08-13'
+  - id: amass.anthro_per_sequence_not_per_subject
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - anthro_reference.npz
+    statement: Each AMASS npz carries its own MoSh betas, so betas and the rest skeleton are stored per
+      sequence, and the frozen-joint constants are shared only by the sequences of one subject that have
+      the same betas and body model (one fit group in reduced_model_fit.json). In this corpus every subject's
+      sequences carry identical betas, so each of the 249 subjects is exactly one group; a future source
+      release that varies betas within a subject would split it.
+    consequence: Do not assume one skeleton per subject across takes; key anthro constants by pair_id,
+      or by the fit group reduced_model_fit.json names for the take, not by subject_id.
+    evidence: anthro_reference.npz subject_scope and subject_scope_note; reduced_model_fit.json takes
+      and groups; DATA_DESCRIPTION_EN.md section 5 opening paragraph
+    status: open
+    since: '2026-08-13'
+  - id: amass.reduced_model_weld_residual
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      - fixed_joint_rotation
+      files:
+      - large_reference.npz
+      - anthro_reference.npz
+    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
+      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject group (one subject,
+      one body model and one set of MoSh betas) over the pooled frames of all of its takes, and spine3
+      and the shoulders absorb the removed rotation; distal global orientation is exact but a joint-centre
+      position residual remains on the trunk/arm chain. Across the 249 fit groups the fitted residual
+      RMS is 8.8-96.2 mm (the mean-rotation starting guess 8.8-108.3 mm) and the worst frame is 334.1
+      mm (amass_CMU_26|M|betas:2b13b2858784).'
+    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
+      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
+      read them before relying on reconstructed positions.
+    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
+      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
+      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance
+    status: mitigated
+    mitigation: large_reference.npz smpl_global_orientation_world[M,24,4] keeps all 24 SMPL joints' global
+      orientation losslessly; use it with the resampled raw poses (manifest.anthro_reconstruction.lossless_alternative)
+      when exact joint positions matter.
+    since: '2026-08-13'
+  - id: amass.resampled_to_100hz
+    kind: approximation
+    severity: info
+    scope:
+      level: bundle
+      arrays:
+      - timestamps_s
+    statement: Source framerates differ by collection (e.g. 120 Hz for BMLmovi; 100 Hz for KIT, where
+      resampling is a no-op); every take is resampled to 100 Hz by per-joint Slerp on local rotations
+      and linear interpolation of the root translation.
+    consequence: The 100 Hz grid is interpolated, not native; the native rate and frames_in / frames_out
+      for each take are in its manifest.resample and manifest.source.
+    evidence: manifest.json resample (source_fps, target_fps, frames_in, frames_out, method, noop) and
+      source.native_rate_hz; DATA_DESCRIPTION_EN.md section 1 'Timebase'
+    status: open
+    since: '2026-08-13'
+  - id: amass.imu_confidence_semantics
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - imu_confidence
+      - imu_valid_mask
+      files:
+      - small_reference.npz
+    statement: imu_confidence is the emitter's fixed per-site prior (0.4 on back_T4, 0.5 on foot_l / foot_r,
+      0.6 elsewhere), a declared level, not a measurement, and not on the GAITEX (0.6 / 0.3 / 0.0) or
+      PRISM (0.7 / 0.4) scale. imu_valid_mask is all True on every take (emitted before the ADR-0039 mask-governed
+      NaN rule of 2026-09-06); nothing was interpolated or withdrawn.
+    consequence: Never compare imu_confidence across bundles or read it as measured channel reliability;
+      do not use imu_valid_mask to find gaps (it marks none).
+    evidence: DATA_DESCRIPTION_EN.md section 3.1 rows imu_valid_mask ('all True') and imu_confidence ('0.6
+      body / 0.5 foot / 0.4 back_T4 proxy'); README.md 'Conventions' imu_valid_mask bullet ('Datasets
+      emitted before 2026-09-06 carry an all-True mask') and field table row imu_confidence; small_reference.npz
+      imu_confidence (constant per site) and imu_valid_mask (all True); docs/adr/ADR-0039-marker-derived-small-and-mask-governed-nan.md
+    status: open
+    since: '2026-08-13'
+  - id: amass.string_arrays_object_dtype
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+      arrays:
+      - sensor_codes
+      - mount_id
+      - joint_names
+      - reference_poses
+      - segment_names
+      - fixed_joint_names
+    statement: The 2026-08-13 generation stored seven one-dimensional string arrays per take with numpy
+      object dtype, which forced allow_pickle=True on every reader and handed arbitrary-code-execution
+      risk to the consumer (57,827 arrays across 8,261 takes); the 2026-09-07 generation had them reserialised
+      to U after the fact. This generation writes them as U.
+    consequence: 'Every string array is U dtype: load with allow_pickle=False.'
+    evidence: small_reference.npz sensor_codes and mount_id, large_reference.npz joint_names, anthro_reference.npz
+      reference_poses / joint_names / segment_names / fixed_joint_names, all dtype U; scripts/poc/generate_amass_faithful.py
+      small and large dicts and scripts/poc/anthro_smpl.py compute_anthro (dtype 'U'); _superseded/amass_faithful_full_v2/RESERIALIZATION.json
+      for the retired generation; ADR-0040 D2 and D5
+    status: fixed
+    fixed_in: the generator since 2026-09-15, which writes every string array as U; the
+      retired amass_faithful_full_v2 of 2026-09-07 had been reserialised in place (RESERIALIZATION.json),
+      and v1 was retired on 2026-09-08
+    since: '2026-09-07'
+  - id: amass.non_motion_shape_files_excluded
+    kind: coverage
+    severity: info
+    scope:
+      level: bundle
+    statement: 'Of the 8,354 AMASS npz enumerated across the five collections, 92 are subject-shape files
+      (shape.npz: gender + betas, no motion) and are listed in INDEX.json with status excluded_non_motion
+      instead of being synthesised.'
+    consequence: Expect 8,261 usable takes, not 8,354; filter INDEX.json takes on status == 'ok'.
+    evidence: INDEX.json counts {ok 8261, failed 1, excluded_non_motion 92, total 8354} and the 92 entries
+      with status excluded_non_motion; scripts/poc/generate_amass_faithful_all.py (shape-file exclusion)
+    status: open
+    since: '2026-08-13'
+    related:
+    - amass.one_take_failed_generation
+  - id: amass.one_take_failed_generation
+    kind: coverage
+    severity: info
+    scope:
+      level: take
+      takes:
+      - amass_KIT_9__WalkingStraightBackwards08_poses
+    statement: '1 motion sequence(s) failed generation and have no take directory: amass_KIT_9__WalkingStraightBackwards08_poses:
+      ValueError: sequence too short after resample (M=1): extracted/amass/KIT/9/WalkingStraightBackwards08_poses.npz.
+      INDEX.json records the status and the reason, and the run''s exclusions.json and logs are kept.'
+    consequence: The listed sequence(s) are absent; the reason is recorded, so a re-run would fail the
+      same way.
+    evidence: INDEX.json takes entries with status 'failed' and reason;
+      _runs/run_<identity>/exclusions.json
+      and logs/
+    status: open
+    since: '2026-08-13'
+    related:
+    - amass.non_motion_shape_files_excluded
+    - amass.generation_provenance_unrecoverable
+  - id: amass.five_collections_only
+    kind: coverage
+    severity: info
+    scope:
+      level: bundle
+    statement: 'The bundle covers five AMASS collections only: KIT 4,231, CMU 2,082, BMLmovi 1,801, Transitions
+      110 and TotalCapture 37 ok takes (8,261 in all); no other AMASS collection was registered. Take
+      length varies widely (8 to 26,363 frames at 100 Hz).'
+    consequence: Results generalise to these five collections, not to AMASS as a whole, and length-sensitive
+      consumers must handle takes shorter than one second.
+    evidence: DATA_DESCRIPTION_EN.md header line ('~8,261 AMASS sequences (BMLmovi, CMU, KIT, TotalCapture,
+      Transitions)') and section 1 'Sequence length T varies widely'; manifest.json source_attribution.dataset_citation
+      ('collections registered for this bundle'); INDEX.json takes (take_id collection prefix; frames)
+    status: open
+    since: '2026-08-13'
+  - id: amass.sex_provenance_mislabelled
+    kind: pipeline_defect
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - sex_provenance
+      - smpl_trans_provenance
+      files:
+      - anthro_reference.npz
+      - smpl_root_translation.npz
+    statement: In the retired generations anthro_reference.npz sex_provenance read 'measured:prism_subj_info.gender'
+      and smpl_root_translation.npz smpl_trans_provenance read 'source_derived:prism_pkl ...', PRISM constants
+      stamped by the shared anthro emitter and by the enrich pass that wrote the sidecars afterwards.
+      This generation names the AMASS npz fields the values come from.
+    consequence: None in this bundle; both strings name the AMASS npz.
+    evidence: anthro_reference.npz sex_provenance ('source_derived:amass npz 'gender' field ...'); smpl_root_translation.npz
+      smpl_trans_provenance ('source_derived:amass npz trans ...'); scripts/poc/generate_amass_faithful.py
+      SEX_PROVENANCE and SMPL_TRANS_PROVENANCE; scripts/poc/generate_amass_faithful_all.py root_translation_sidecar
+    status: fixed
+    since: '2026-09-07'
+    fixed_in: 'the 2026-09-15 regeneration: the generator writes sex_provenance itself
+      and writes the root-translation sidecar with its own provenance instead of a later enrich pass'
+  - id: amass.generation_provenance_unrecoverable
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+    statement: The retired amass_faithful_full_v2's producing run recorded no code revision, dependency
+      versions or host environment and kept none of the seven run artifacts; its 2026-09-09 retrofit named
+      those unrecoverable (provenance coverage 4/10). This bundle was produced through the pipeline runner
+      and carries the full run record.
+    consequence: Reproduce from the run record (code revision, environment, source asset fingerprints)
+      rather than from the bundle alone; the retired generation's retrofit sidecar stays with its evidence
+      under _superseded/amass_faithful_full_v2/.
+    evidence: _runs/run_<identity>/manifest.json and environment.lock beside the
+      bundle root (PIPELINE_GOVERNANCE.md sections 10.1 and 10.2); _superseded/amass_faithful_full_v2/PROVENANCE_RETROFIT.json
+      for the retired generation
+    status: fixed
+    since: '2026-09-09'
+    fixed_in: the 2026-09-15 amass_faithful_full regeneration through soma-synth run (owner record
+      research/decisions/2026-09-15_*_experimental_regeneration_authorization.md),
+      which left the seven run-directory artifacts PIPELINE_GOVERNANCE.md section 10.1 requires
+  - id: amass.index_relative_path_waiver
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - INDEX.json
+    statement: Until 2026-09-15 INDEX.json take entries carried relative_path but neither take_id nor
+      rel, and the amass profile waived the missing rel until 2026-12-31.
+    consequence: 'None: every entry carries take_id, rel and relative_path (all the take directory), with
+      the source npz path under source_relative_path.'
+    evidence: 'INDEX.json takes[*]; scripts/poc/generate_amass_faithful_all.py run(); configs/datasets/dataset_profiles_v1.yaml
+      profiles.amass (waivers: [])'
+    status: fixed
+    since: '2026-09-07'
+    fixed_in: 'the 2026-09-15 regeneration: generate_amass_faithful_all.py writes take_id and rel; the
+      waiver closed'
+  addbio_unified8:
+  - id: addbiomechanics.internal_only
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: distribution_scope is internal_only. AddBiomechanics Dataset 1.0 Core is CC BY 4.0 and
+      the attribution travels in source_attribution, but this derivative is not released.
+    consequence: Do not upload to any public Git, cloud, model or dataset hub, or share by public link.
+    evidence: DATA_DESCRIPTION_EN.md line 3 (INTERNAL-ONLY banner); manifest.json distribution_scope and
+      source_attribution.license_id; INDEX.json distribution_scope
+    status: open
+    since: '2026-08-31'
+    related:
+    - addbiomechanics.experimental_non_candidate
+    - addbiomechanics.source_hold
+    - addbiomechanics.cc_by_attribution_required
+  - id: addbiomechanics.experimental_non_candidate
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: 'artifact_class is experimental_non_candidate and quality_gate is NOT_EVALUATED: not canonical
+      output, not contract-compliant, and no production quality gate was applied. The L4 validation PASS
+      is not a quality-gate judgement.'
+    consequence: Do not use the bundle as a training or evaluation label, and do not cite it as gate-passing
+      or contract-compliant output.
+    evidence: DATA_DESCRIPTION_EN.md line 3; manifest.json artifact_class, artifact_label, quality_gate,
+      unavailable_or_not_applied 'quality gates'; INDEX.json artifact_class
+    status: open
+    since: '2026-08-31'
+    related:
+    - addbiomechanics.internal_only
+    - addbiomechanics.source_hold
+  - id: addbiomechanics.source_hold
+    kind: rights
+    severity: caution
+    scope:
+      level: bundle
+    statement: AddBiomechanics remains under ADDBIOMECHANICS_SOURCE_HOLD (NATIVE_AUDIT_PASS is not generation
+      authorisation); this bundle moves no gate. It is listed in the experimental catalog by the pipeline
+      runner's register step, which is an inventory of experimental_non_candidate assets, not a gate,
+      and it was generated on the 2026-09-15 authorization record, which releases no hold.
+    consequence: 'The bundle''s existence authorises nothing: no gate promotion and no push to the share
+      may be inferred from it; its catalog entry is an inventory line, not an approval.'
+    evidence: manifest.json source_hold and source.note; DATA_DESCRIPTION_EN.md 'Other limits'; configs/datasets/dataset_profiles_v1.yaml
+      profiles.addbiomechanics.additive.manifest_keys; _runs/run_<identity>/manifest.json
+      generation_decision; research/decisions/2026-09-15_addbiomechanics_experimental_regeneration_authorization.md
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.cc_by_attribution_required
+    kind: rights
+    severity: info
+    scope:
+      level: bundle
+    statement: The source is AddBiomechanics Dataset 1.0 Core under CC BY 4.0 and the manifest records
+      changes_made (OpenSim kinematics retargeted onto SMPL-24 and IMU synthesised).
+    consequence: Any use must attribute the source (dataset_citation, publication) and state that the
+      data were modified.
+    evidence: manifest.json source_attribution (license_id, dataset_citation, publication, changes_made,
+      retarget_content_hashes); configs/datasets/dataset_profiles_v1.yaml profiles.addbiomechanics.additive.source_attribution_keys
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.emg_excluded
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+    statement: EMG is an excluded modality; the recorded reason is not_in_synthetic_artifact_scope.
+    consequence: No EMG channel exists in any deliverable; do not expect or derive one from this bundle.
+    evidence: manifest.json excluded_modalities ['emg'] and excluded_modality_reasons.emg
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.all_channels_synthetic
+    kind: source_scope
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: AddBiomechanics carries no worn IMU, so every one of the eight channels is synthesised
+      by forward kinematics from the OpenSim-to-SMPL retarget (small_mode synthetic_from_smpl); no sensor
+      noise, bias, misalignment or soft-tissue motion is modelled, there is no physical sensor to compare
+      against, and the physical-plausibility evidence for the synthesis is borrowed from the HKNU comparison
+      of the same code path.
+    consequence: Treat all eight channels as simulated; validation on this bundle is self-consistency
+      only (specific-force inverse, gravity presence, site labels), never agreement with a real sensor.
+    evidence: manifest.json unavailable_or_not_applied row 'measured IMU (AddBiomechanics has none ...)'
+      and faithful_content.small; small_reference.npz small_mode 'synthetic_from_smpl'; AddBio synthetic-IMU conversion record (parent project record, 2026-08-30)
+      section 1
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.no_measured_kinetics
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - development_reference.npz
+    statement: 'There is no development_reference.npz: AddBiomechanics carries ground reaction force and
+      CoP data, but it is not converted into this bundle, and no physics-informed GRF, inverse dynamics,
+      moments, powers or COM were derived.'
+    consequence: Nothing in this bundle can serve as a kinetic ground truth; the profile's empty capabilities
+      list is the declared state.
+    evidence: manifest.json unavailable_or_not_applied row 'development_reference / measured GRF / CoP'
+      and faithful_content.development_reference 'NONE.'; configs/datasets/dataset_profiles_v1.yaml profiles.addbiomechanics.capabilities
+      []
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.no_jcs_joint_angles
+    kind: source_scope
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      files:
+      - large_reference.npz
+    statement: joint_rotation holds SMPL parent-relative local quaternions; no ISB/JCS clinical joint
+      angles (joint_angles_jcs_deg) are produced because no ISB/JCS convention was applied.
+    consequence: Do not read joint_rotation as anatomical angles; derive clinical angles yourself under
+      a convention of your choosing, none is asserted by the bundle.
+    evidence: manifest.json unavailable_or_not_applied 'joint_angles_jcs_deg (needs ISB/JCS convention)'
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.anthropometry_unavailable
+    kind: source_scope
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - height
+      - body_mass
+      files:
+      - anthro_reference.npz
+    statement: 'The retarget corpus does not carry the b3d subject anthropometry forward: anthro.height
+      is an SMPL rest-stature estimate (height_provenance ''estimated:smpl_rest_stature_yup'') and anthro.body_mass
+      is NaN in every take.'
+    consequence: Do not use height as a measured stature; mass-normalised quantities cannot be formed
+      from this bundle, so test body_mass for NaN before any arithmetic.
+    evidence: anthro_reference.npz height_provenance and body_mass_provenance ('unavailable:not carried
+      forward by the retarget corpus'); manifest.json unavailable_or_not_applied 'measured subject height
+      and body mass'; DATA_DESCRIPTION_EN.md 'Other limits' bullet 2
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.occiput_not_source_backed
+    kind: source_scope
+    severity: do_not_use
+    scope:
+      level: site
+      sites:
+      - occiput
+    statement: AddBiomechanics' OpenSim models carry no neck or head coordinates, so SMPL joint 15 sits
+      at its rest rotation and the head segment is welded to its nearest driven ancestor in every one
+      of the 40,484 takes; the occiput channel looks like an IMU trace but contains none of the head motion.
+    consequence: Do not use this bundle for any task that needs a head IMU; filter on manifest small_sites_provenance.occiput
+      (source_backed=False).
+    evidence: manifest.json small_sites_provenance.occiput and unavailable_or_not_applied row 'source
+      rotation for neck, head, collars and hands'; DATA_DESCRIPTION_EN.md site table ('absent everywhere');
+      AddBio synthetic-IMU conversion record (parent project record, 2026-08-30) sections 2 and 5
+    status: open
+    since: '2026-08-31'
+    related:
+    - addbiomechanics.wrists_not_source_backed_no_arm
+  - id: addbiomechanics.wrists_not_source_backed_no_arm
+    kind: source_scope
+    severity: do_not_use
+    scope:
+      level: site
+      sites:
+      - wrist_l
+      - wrist_r
+    statement: In the No_Arm study variants (27,278 of 40,484 takes) SMPL joints 18/19 have no source
+      rotation, so both wrist segments are welded to the nearest driven ancestor and the wrist channels
+      carry none of the arm motion; in the With_Arm variants (13,206 takes) the wrists are driven. The
+      label differs per take.
+    consequence: Read small_sites_provenance.wrist_l / wrist_r in each manifest before using a wrist channel;
+      in No_Arm takes (source_backed=False) the wrist channels must not be used as wrist motion.
+    evidence: manifest.json small_sites_provenance.wrist_l / wrist_r (source_backed=False in No_Arm, True
+      in With_Arm); DATA_DESCRIPTION_EN.md site table; AddBio synthetic-IMU conversion record (parent project record, 2026-08-30)
+      section 2
+    status: open
+    since: '2026-08-31'
+    related:
+    - addbiomechanics.occiput_not_source_backed
+  - id: addbiomechanics.back_t4_spine3_proxy
+    kind: proxy
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+    statement: 'No SMPL joint sits at T4. back_T4 is a non-rigid chest proxy: its orientation is the spine3
+      segment, whose rotation here is the source''s lumbar rotation split in equal thirds (source_orientation
+      derived_lumbar), and its acceleration is evaluated at pelvis + 2/3 (head - pelvis) (chest_alpha
+      0.667); imu_confidence is 0.4 for this reason.'
+    consequence: Treat back_T4 as a derived trunk signal on a deforming trunk line, not a sensor rigidly
+      mounted on a vertebra; do not compare it against a physical T4 sensor without accounting for the
+      equal-thirds split and the proxy position.
+    evidence: manifest.json small_sites_provenance.back_T4 and canonicalization_config.chest_alpha; DATA_DESCRIPTION_EN.md
+      site table row back_T4; small_reference.npz imu_confidence[:,0] = 0.4
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.no_sensor_mount_extrinsics
+    kind: approximation
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: 'No segment-to-sensor lever arm is applied: every virtual sensor sits at its SMPL joint
+      centre. The shank sites are the documented worst case, placed at the knee joint centre; in the HKNU
+      comparison of the same code path this definition dropped the shank |f| correlation to 0.475 / 0.548
+      against 0.737-0.943 elsewhere, because the rotational lever-arm term is missing.'
+    consequence: Accelerometer channels lack the lever-arm term of a worn unit, most at shank_l and shank_r;
+      do not fit or evaluate sensor-placement models on this bundle.
+    evidence: manifest.json unavailable_or_not_applied 'sensor mount extrinsics (segment->sensor lever
+      arm)'; AddBio synthetic-IMU conversion record (parent project record, 2026-08-30) section 5
+    status: open
+    since: '2026-08-31'
+    related:
+    - addbiomechanics.all_channels_synthetic
+  - id: addbiomechanics.tiziana2019_upsampled_bandwidth
+    kind: approximation
+    severity: caution
+    scope:
+      level: subject
+      subjects:
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject14
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject15
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject16
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject18
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject23
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject25
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject26
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject27
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject28
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject29
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject3
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject31
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject32
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject34
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject35
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject37
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject38
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject39
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject4
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject40
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject41
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject42
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject43
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject14
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject15
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject16
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject18
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject23
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject25
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject26
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject27
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject28
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject3
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject31
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject32
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject34
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject35
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject37
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject38
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject39
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject4
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject40
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject41
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject42
+      - addbio_Tiziana2019_Formatted_With_Arm_Subject43
+    statement: All 382 takes of these 45 Tiziana2019 subjects (both arm variants) were recorded at 60.7-61.5
+      Hz and are upsampled to 100 Hz by per-joint Slerp; they say 100 Hz but carry about 30 Hz of bandwidth.
+      Slerp adds no motion that was not there.
+    consequence: Do not expect content up to 50 Hz in these takes; identify them by manifest resample.direction
+      == 'upsample' or source.native_rate_hz < 100.
+    evidence: DATA_DESCRIPTION_EN.md 'Other limits' bullet 1 (382 of 40,484); manifest.json resample.direction
+      and source.native_rate_hz; AddBio synthetic-IMU conversion record (parent project record, 2026-08-30)
+      section 4.1 (45 subjects / 382 trials)
+    status: open
+    since: '2026-08-31'
+    related:
+    - addbiomechanics.resample_sets_bandwidth
+  - id: addbiomechanics.resample_sets_bandwidth
+    kind: approximation
+    severity: info
+    scope:
+      level: bundle
+      arrays:
+      - timestamps_s
+    statement: Source rates run 61-251 Hz against the 100 Hz target and 40,102 takes are downsampled (Slerp
+      on local rotations, linear on translation) before differentiation; against differentiating at the
+      native rate the p95 gyro difference is 1.6-20% and concentrates in fast transients. The record calls
+      this the bandwidth set by the target rate, not a conversion error.
+    consequence: Rotational peaks above the 100 Hz Nyquist band are not represented; compare against other
+      100 Hz data, not against native-rate derivatives.
+    evidence: manifest.json resample (source_fps, target_fps, method, direction) and source.native_rate_hz;
+      DATA_DESCRIPTION_EN.md 'Other limits' bullet 1; AddBio synthetic-IMU conversion record (parent project record, 2026-08-30)
+      section 4
+    status: open
+    since: '2026-08-31'
+    related:
+    - addbiomechanics.tiziana2019_upsampled_bandwidth
+  - id: addbiomechanics.accel_lowpass_7hz
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - imu_acceleration
+      files:
+      - small_reference.npz
+    statement: The specific force at every site is a 4th-order Butterworth 7 Hz zero-phase (filtfilt)
+      filtered double difference of the joint's world position (canonicalization_config.filter butter4_7hz_filtfilt_odd15).
+    consequence: Expect no acceleration content above the 7 Hz cutoff, well below the 100 Hz grid's Nyquist;
+      do not use these channels to study impact transients.
+    evidence: manifest.json canonicalization_config.filter and canonicalization_config.imu_synthesis ('fk_orientation+doublediff_accel+rotationlog_gyro');
+      AddBio synthetic-IMU conversion record (parent project record, 2026-08-30) section 4
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.source_wrap_filter_defect_repaired
+    kind: source_defect
+    severity: caution
+    scope:
+      level: bundle
+    statement: 'AddBiomechanics'' own lowPassFilter pass filtered wrapped angles (pelvis_rotation, arm_rot_r,
+      arm_flex_r) as plain scalars, smearing 2-pi steps into overshoots past pi; the defect is upstream
+      of this repository. The retarget corpus addbio_smpl24_raw (spec retarget-v2) repairs only the coordinates
+      that actually wrapped by re-filtering the unwrapped kinematics pass with the source''s own declared
+      filter (order 2, 30 Hz): 2,112 of 40,484 takes (pelvis_rotation 2,012, arm_rot_r 93, arm_flex_r
+      37; 30 takes with two coordinates). A repaired coordinate loses the source''s dynamics-pass refinement
+      (up to 0.306 rad observed).'
+    consequence: A take whose manifest wrap_repaired_coordinates is non-empty carries a re-filtered coordinate
+      rather than the source's dynamics value; an empty string means checked and untouched. The retired
+      2026-08-30 generation carried the defect unmarked (its evidence stays under _superseded/addbio_unified8_v1/)
+      and must not be used in its place.
+    evidence: manifest.json wrap_repaired_coordinates (additive key, configs/datasets/dataset_profiles_v1.yaml
+      profiles.addbiomechanics.additive.manifest_keys); AddBio wrap-repair record (parent project record, 2026-08-31)
+      sections 1, 1.2, 3.1 and 4; AddBio synthetic-IMU conversion record (parent project record, 2026-08-30)
+      section 4.2
+    status: mitigated
+    mitigation: src/soma_synthetic_imu/addbio_retarget/wrap_repair.py re-filters wrapped coordinates from
+      the kinematics pass (retarget-v2); every manifest records the repaired coordinate names in wrap_repaired_coordinates;
+      pose-level exclusions fell from 2,034 (the retired 2026-08-30 generation) to 24 with no new exclusions.
+    since: '2026-08-31'
+    related:
+    - addbiomechanics.pose_discontinuity_exclusions
+  - id: addbiomechanics.pose_discontinuity_exclusions
+    kind: coverage
+    severity: do_not_use
+    scope:
+      level: take
+      takes:
+      - addbio_Carter2023_Formatted_With_Arm_P004_split1_trial_0012
+      - addbio_Carter2023_Formatted_With_Arm_P007_split3_trial_0029
+      - addbio_Carter2023_Formatted_With_Arm_P009_split0_trial_0005
+      - addbio_Carter2023_Formatted_With_Arm_P010_split4_trial_0012
+      - addbio_Carter2023_Formatted_With_Arm_P011_split4_trial_0005
+      - addbio_Carter2023_Formatted_With_Arm_P012_split5_trial_0003
+      - addbio_Carter2023_Formatted_With_Arm_P014_split1_trial_0004
+      - addbio_Carter2023_Formatted_With_Arm_P015_split6_trial_0010
+      - addbio_Carter2023_Formatted_With_Arm_P016_split6_trial_0000
+      - addbio_Carter2023_Formatted_With_Arm_P024_split0_trial_0030
+      - addbio_Carter2023_Formatted_With_Arm_P024_split4_trial_0001
+      - addbio_Carter2023_Formatted_With_Arm_P033_split0_trial_0009
+      - addbio_Carter2023_Formatted_With_Arm_P034_split1_trial_0004
+      - addbio_Carter2023_Formatted_With_Arm_P038_split0_trial_0010
+      - addbio_Carter2023_Formatted_With_Arm_P045_split4_trial_0006
+      - addbio_Carter2023_Formatted_With_Arm_P046_split3_trial_0011
+      - addbio_Carter2023_Formatted_With_Arm_P046_split6_trial_0010
+      - addbio_Carter2023_Formatted_With_Arm_P049_split3_trial_0013
+      - addbio_Carter2023_Formatted_With_Arm_P050_split3_trial_0002
+      - addbio_Carter2023_Formatted_With_Arm_P051_split3_trial_0014
+      - addbio_Carter2023_Formatted_With_Arm_P052_split1_trial_0005
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject46_trial_0004
+      - addbio_Tiziana2019_Formatted_No_Arm_Subject47_trial_0006
+      - addbio_vanderZee2022_Formatted_With_Arm_p6_trial_0048
+    statement: '24 of 40484 takes carry status ''excluded'' in INDEX.json (excluded_by pose_discontinuity_scan,
+      applied by the generator while the INDEX is written): a joint steps past the spec''s 8000 deg/s
+      band between adjacent frames. Their take directories still hold full payloads. They are not the
+      wrap defect and their cause has not been established.'
+    consequence: Select takes by INDEX.json status == 'ok' (40,460), never by directory listing; the 24
+      excluded directories must not be loaded as data.
+    evidence: INDEX.json counts {total 40484, ok 40460, excluded 24} and each excluded entry's reason
+      / excluded_by; VALIDATION_REPORT.json takes_checked; scripts/poc/generate_addbio_unified8.py (SCAN
+      applied in main); AddBio wrap-repair record (parent project record, 2026-08-31) sections 3.5.1 and 6
+    status: open
+    since: '2026-08-31'
+    related:
+    - addbiomechanics.source_wrap_filter_defect_repaired
+  - id: addbiomechanics.sex_provenance_mislabelled
+    kind: pipeline_defect
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - sex_provenance
+      files:
+      - anthro_reference.npz
+    statement: In the retired generation anthro_reference.npz sex_provenance read 'measured:prism_subj_info.gender',
+      a PRISM constant the shared anthro emitter stamps on every source. This generation names the b3d
+      biological_sex the retarget corpus carries forward as 'gender' (unknown -> the neutral model).
+    consequence: None in this bundle; the string names the source field.
+    evidence: anthro_reference.npz sex_provenance; scripts/poc/generate_addbio_unified8.py identity_for
+      (sex_provenance); scripts/poc/unified8_emit.py build_bundle (sex_provenance override)
+    status: fixed
+    since: '2026-09-07'
+    fixed_in: the 2026-09-15 regeneration
+  - id: addbiomechanics.foot_heading_flag_spec_sensor
+    kind: hardware_limit
+    severity: info
+    scope:
+      level: site
+      sites:
+      - foot_l
+      - foot_r
+      arrays:
+      - imu_orientation_absolute_heading
+      files:
+      - small_reference.npz
+    statement: imu_orientation_absolute_heading is [T,T,T,T,T,T,F,F] because the spec's foot sensor is
+      a six-axis insole with no heading reference; the flag describes what the target sensor provides,
+      not how this bundle was made. Here the foot orientations are FK-derived and do carry a world heading.
+    consequence: A model trained on these foot orientations for deployment on the spec's insoles must
+      not depend on foot heading; the flag, not the array, says what the real sensor will give.
+    evidence: small_reference.npz imu_orientation_absolute_heading; README.md small_reference.npz field
+      table row imu_orientation_absolute_heading ('False = gravity-referenced only (insole feet)'); scripts/poc/unified8_emit.py
+      (absolute-heading constant shared with scripts/poc/generate_amass_faithful.py)
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.imu_confidence_semantics
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - imu_confidence
+      - imu_valid_mask
+      files:
+      - small_reference.npz
+    statement: imu_confidence is the emitter's fixed per-site prior (0.4 on back_T4, 0.5 on foot_l / foot_r,
+      0.6 elsewhere), a declared level, not a measurement, and not on the GAITEX (0.6 / 0.3 / 0.0) or
+      PRISM (0.7 / 0.4) scale; the manifest declares no imu_confidence_semantics of its own. imu_valid_mask
+      is all True on every take (emitted before the ADR-0039 mask-governed NaN rule of 2026-09-06); nothing
+      was interpolated or withdrawn.
+    consequence: Never compare imu_confidence across bundles or read it as measured channel reliability;
+      do not use imu_valid_mask to find gaps (it marks none).
+    evidence: README.md 'Conventions' imu_valid_mask bullet ('Datasets emitted before 2026-09-06 carry
+      an all-True mask') and field table row imu_confidence ('set per corpus and NOT comparable between
+      corpora'); small_reference.npz imu_confidence (constant per site) and imu_valid_mask (all True);
+      scripts/poc/unified8_emit.py FAITHFUL.SITE_CONFIDENCE
+    status: open
+    since: '2026-08-31'
+  - id: addbiomechanics.reduced_model_weld_residual
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - joint_rotation
+      - fixed_joint_rotation
+      files:
+      - large_reference.npz
+      - anthro_reference.npz
+    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
+      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject over the pooled
+      frames of all of its takes, and spine3 and the shoulders absorb the removed rotation; distal global
+      orientation is exact but a joint-centre position residual remains on the trunk/arm chain. Across
+      the 1085 fit groups the fitted residual RMS is 0.0-65.3 mm (the mean-rotation starting guess 0.0-86.4
+      mm) and the worst frame is 162.0 mm (addbio_Camargo2021_Formatted_No_Arm_AB15_split2). 1 group(s)
+      stopped at the evaluation cap without converging: addbio_Tiziana2019_Formatted_No_Arm_Subject26.'
+    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
+      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
+      read them before relying on reconstructed positions.
+    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
+      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
+      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance
+    status: mitigated
+    mitigation: large_reference.npz smpl_global_orientation_world[M,24,4] keeps all 24 SMPL joints' global
+      orientation losslessly (manifest.anthro_reconstruction.lossless_alternative); use it when exact
+      per-joint orientation matters.
+    since: '2026-08-31'
+  - id: addbiomechanics.generation_provenance_unrecoverable
+    kind: pipeline_defect
+    severity: info
+    scope:
+      level: bundle
+    statement: The retired addbio_unified8_v2's producing run recorded no code revision, dependency versions
+      or host environment and kept none of the seven run artifacts; its 2026-09-09 retrofit named those
+      unrecoverable (provenance coverage 4/10). This bundle was produced through the pipeline runner and
+      carries the full run record.
+    consequence: Reproduce from the run record (code revision, environment, source asset fingerprints)
+      rather than from the bundle alone; the retired generation's retrofit sidecar stays with its evidence
+      under _superseded/addbio_unified8_v2/.
+    evidence: _runs/run_<identity>/manifest.json and environment.lock beside the
+      bundle root (PIPELINE_GOVERNANCE.md sections 10.1 and 10.2); _superseded/addbio_unified8_v2/PROVENANCE_RETROFIT.json
+      for the retired generation
+    status: fixed
+    since: '2026-09-09'
+    fixed_in: the 2026-09-15 addbio_unified8 regeneration through soma-synth run (with the
+      generator fixes of 2026-09-15, owner record
+      research/decisions/2026-09-15_*_experimental_regeneration_authorization.md),
+      which left the seven run-directory artifacts PIPELINE_GOVERNANCE.md section 10.1 requires

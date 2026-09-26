@@ -1,0 +1,252 @@
+# Dataset profiles — the single place a synthetic bundle may declare how it differs.
+#
+# Authority: ADR-0040. Consumed by soma_synthetic_imu.contracts.dataset_profiles and, through
+# it, by the validator. A difference that is not declared here is a FAIL; that is the whole
+# point of the file. It is a whitelist, never a blacklist.
+#
+# Three tiers:
+#   universal  - every bundle must satisfy this.
+#   additive   - a real property of the source, not a defect. Present BECAUSE of a capability.
+#   waivers    - something to fix that is not fixed yet. reason/remedy/expires are mandatory,
+#                and an expired waiver fails, so a temporary exemption cannot quietly become
+#                a permanent one.
+#
+# This file declares no tolerance, threshold or numeric band. Every rule here is a
+# presence/equality judgement (DETERMINISTIC_EXECUTION_CONFIG_HOLD).
+
+schema: dataset_profiles_v1
+spec_id: qmd_unified8_smpl18
+spec_version: faithful-v2
+
+universal:
+  # Files the generator must leave at the bundle root. Absence is a FAIL.
+  # DATASET_DESCRIPTION_EN.md is deliberately absent: ADR-0040 D3 retires it in favour of
+  # DATA_DESCRIPTION_EN.md, which is the name docs/guides/SAMPLE_DATA_DISTRIBUTION.md requires.
+  bundle_files:
+    - INDEX.json
+    - DATA_DESCRIPTION_EN.md
+    # What the bundle cannot promise, in the one shape every bundle shares
+    # (contracts/dataset_limitations.py). Rendered from configs/datasets/known_limitations_v1.yaml
+    # by scripts/write_known_limitations.py; the validator checks the copy matches the config.
+    - KNOWN_LIMITATIONS.json
+    # The 18-joint reduced model's record: each subject's frozen-joint constants as
+    # smpl18.reduce fitted them, their residuals and settings, and which fit every take carries
+    # (soma_synthetic_imu.pipeline.reduced_model.FIT_FILE; smpl18 docs/primer.md section 5.3).
+    - reduced_model_fit.json
+
+  # Files a bundle needs before it may be shared, but which do not exist yet when it is first
+  # validated -- two of them are validation's own output, and requiring them to run validation
+  # would be circular. Absence is a WARN: the bundle is sound, it is simply not yet distributable.
+  distribution_files:
+    - README.md
+    - VALIDATION_REPORT.json
+    - validation_ledger.json
+
+  # Files that must sit in every take directory. Presence is L0's job (the spec knows which
+  # deliverables a capability implies); this list, plus a profile's additive
+  # `take_deliverables`, is the ALLOWLIST -- a take directory holding any other file is a
+  # FAIL, because an undeclared artifact next to the deliverables is exactly the kind of
+  # difference this registry exists to surface.
+  take_deliverables:
+    - small_reference.npz
+    - large_reference.npz
+    - anthro_reference.npz
+    - smpl_root_translation.npz
+    - manifest.json
+
+  # Top-level manifest keys required of every take. The first 24 are the historical
+  # MANIFEST_CORE_FIELDS; the last three are promoted by ADR-0040 D1.
+  manifest_keys:
+    - anthro_reconstruction
+    - artifact_class
+    - artifact_label
+    - canonicalization_config
+    - deliverables
+    - distribution_scope
+    - excluded_modalities
+    - excluded_modality_reasons
+    - faithful_content
+    - generated_utc
+    - global_frame
+    - identity
+    - large_joint_names
+    - quality_gate
+    - run_id
+    - safety
+    - small_sites_provenance
+    - source
+    - spec_documents
+    - spec_id
+    - spec_version
+    - unavailable_or_not_applied
+    - validation
+    - window
+    # --- promoted by ADR-0040 D1 ---
+    - up_axis
+    - resample
+    - source_attribution
+
+  # Keys every `source_attribution` block must carry. ADR-0040 D1 made the field universal but
+  # left its shape open, and the two bundles that had one disagreed -- gaitex wrote eight keys,
+  # addbio six. These five are their intersection, and the values themselves live in
+  # `source_attribution_v1.yaml` so a rights string is never a code constant.
+  # Checked only where the field is present; its absence is the manifest_keys rule's business.
+  source_attribution_keys:
+    - dataset_citation
+    - publication
+    - license_id
+    - stable_source_id
+    - changes_made
+
+  # Keys of each entry in INDEX.json["takes"].
+  index_take_entry_keys:
+    - take_id
+    - pair_id
+    - frames
+    - rel
+    - status
+
+  # String arrays are stored as numpy U dtype, never object. ADR-0040 D2: an object array
+  # forces allow_pickle on the reader, which hands arbitrary-code-execution risk to the
+  # consumer of the bundle.
+  string_arrays_dtype: U
+
+profiles:
+
+  prism:
+    small_mode: measured_physical
+    # SOURCE-derived capabilities only. `measured_physical` is deliberately absent: it follows
+    # from `small_mode`, not from which dataset this is, and listing it here would hand it to a
+    # prism take whose mode said otherwise. `small_mode` above records the mode itself.
+    capabilities:
+      - development_reference
+    additive:
+      # No `small_npz_keys` here. The measured-only arrays (q_anatomical_from_sensor,
+      # p_segment_to_sensor_m, imu_synth_mask, gyro_provenance) are gated by capability in the
+      # spec's ARTIFACTS table, which is where npz keys are judged; a list here was declared,
+      # never read, and so could drift from the spec without anything noticing. Removed
+      # 2026-09-14 rather than wired up twice.
+      #
+      # `take_deliverables` is the allowlist of files a take directory may hold beyond the
+      # universal set. A file not declared here or above is a FAIL; a file declared here but
+      # absent is a WARN, because a companion is something the bundle offers, not something a
+      # take owes.
+      take_deliverables:
+        - development_reference.npz
+        # The insoles are six-axis, so their heading is the gyro integral and it wanders; the
+        # bundle has always declared this in `imu_orientation_absolute_heading = [...,F,F]`.
+        # This companion carries the insole's own attitude with its linear heading drift removed
+        # (v2: the drift is the Theil-Sen trend through per-stride medians of the foot-vs-shank
+        # twist; the ankle's real rotation stays), and names its provenance per channel.
+        # `small_reference.npz` is untouched: measured data is never replaced with an estimate,
+        # and the measured stream is the only record of what the insole reported.
+        # Evidence: PRISM insole-heading investigation (parent project record, 2026-09-09)
+        - heading_synth_reference.npz
+      manifest_keys:
+        - small_measured
+        - prism_usage_policy
+      source_attribution_keys:
+        - source_name
+        - attribution_note
+      bundle_files:
+        - prism_faithful_reduced_model_policy_v1.json
+    # No waivers. The up_axis and resample waivers that stood here are gone. On 2026-09-09
+      # `scripts/backfill_manifest_fields.py` derived both from the manifests' own contents --
+      # the frame convention and the gravity vector agreeing on Z-up, and four frame counts
+      # agreeing that no resampling happened -- and wrote them to all 150 takes. Nothing was
+      # authored: the values were already in the file, in prose and in numbers.
+      # The source_attribution waiver that stood here is gone. The owner confirmed the
+      # interpretation on 2026-09-09 -- that this dataset is not publicly citable and that its
+      # licence is the access form's scope, neither being something a deriver may assert -- and
+      # the backfill wrote it to all 150 takes. See `source_attribution_v1.yaml`.
+      # The three waivers that stood here -- INDEX entries naming the take path `relative_path`
+      # only, and the legacy manifest keys `data_specification_code_compatibility` and
+      # `recipe_alignment` -- closed on 2026-09-15 with the regeneration their remedies named:
+      # the generator now writes `rel` beside `relative_path` and no longer writes the two keys.
+      # Since 2026-09-15 the generator also writes up_axis, resample and source_attribution
+      # itself, so a fresh bundle needs no backfill.
+    waivers: []
+
+  amass:
+    small_mode: synthetic_from_smpl
+    capabilities: []
+    additive:
+      manifest_keys:
+        - determinism
+        - governance_disposition
+      source_attribution_keys:
+        - source_name
+        - attribution_note
+      # 8,261 takes do not fit one index; the shards are a consequence of scale.
+      bundle_file_globs:
+        - "INDEX_shard_*_of_*.json"
+    # No waivers. The source_attribution waiver that stood here is gone. The owner confirmed on
+    # 2026-09-09 that `license_id` names the bundled licence text rather than an SPDX
+    # identifier, and that `publication` is recorded as NOT_ESTABLISHED because no record
+    # names one; the backfill then wrote it to all 8,261 takes. See
+    # `source_attribution_v1.yaml`, which keeps what was open about those two fields.
+    # The `relative_path` INDEX waiver closed on 2026-09-15: the generator now writes `take_id`
+    # and `rel` (the take directory) and keeps `relative_path` beside them for old readers.
+    # The dtype waiver that stood here is gone: amass_faithful_full_v2 re-serialised all 57,827
+    # object arrays to U on 2026-09-07 and validated FAIL 0; since 2026-09-15 the generator writes
+    # every string array as U in the first place. v1 was retired under retention rules section 1; its
+    # evidence is in _superseded/.
+    waivers: []
+
+  gaitex:
+    small_mode: synthetic_from_markers
+    capabilities: []
+    additive:
+      # The marker-driven lineage records what it fitted and how far it landed from SMPL.
+      manifest_keys:
+        - declared_placement_sites
+        - small_synthesis
+        - joint_ranges
+        - root_translation
+        - relabel_offset_vs_smpl_anatomical_deg
+        - relabel_dispersion_vs_large_deg
+        - source_window
+        - source_trial_coverage
+        - worn_unit_comparison
+        - worn_unit_backed_sites
+        - worn_unit_compared_sites
+        - worn_unit_compared_sites_note
+        - generated_under
+      source_attribution_keys:
+        - source_name
+        - source_version
+        - attribution_note
+    waivers: []
+
+  hknu:
+    small_mode: synthetic_from_smpl
+    capabilities: []
+    additive:
+      # HKNU is the one source with a worn-IMU corpus recorded alongside the same motion.
+      manifest_keys:
+        - paired_measured_counterpart
+      source_attribution_keys:
+        - source_name
+        - source_version
+        - attribution_note
+    # No waivers. The source_attribution waiver that stood here was closed, not renewed: the
+    # bundle shipped its own citation in DATA_DESCRIPTION_EN.md section 7 all along -- authors,
+    # concept DOI, licence, publication DOI and the changes made -- and on 2026-09-09 the
+    # backfill moved it into all 287 manifests. Transcription, not authorship.
+    waivers: []
+
+  addbiomechanics:
+    small_mode: synthetic_from_smpl
+    capabilities: []
+    additive:
+      manifest_keys:
+        - source_hold
+        - wrap_repaired_coordinates
+      # The retarget records which adapter, config, code and model produced the artifact.
+      source_attribution_keys:
+        - retarget_content_hashes
+    # No waivers. The two that stood here -- a missing README.md and a missing
+    # validation_ledger.json -- were remedied on 2026-09-07 rather than carried: the README was
+    # generated, and a full L4 re-validation over all 40,460 takes wrote the ledger and returned
+    # FAIL 0 / WARN 0. A waiver is for a gap you have not closed yet, not a place to park one.
+    waivers: []

@@ -1,0 +1,139 @@
+# HKNU FullBody as a smpl18 profile: Visual3D joint centres and segment rotations in one .mat
+# per trial, demographics in a workbook, static N-pose and T-pose trials per subject.
+# INTERNAL: this profile lives in the SOMA project, not in the smpl18 package, because the
+# dataset is internal.
+#
+# Parity basis: scripts/poc/generate_hknu_faithful.py (the generator that made
+# hknu_smpl24_paired) and scripts/diagnostics/hknu_retarget_probe.py (the correspondence,
+# centres, rescale tables and root placement it imports), 2026-09-15. Every value cites the
+# file and line it came from.
+schema: smpl18_profile_v1
+id: hknu
+description: HKNU FullBody Visual3D exports (.mat per trial, DatasetInfo.xlsx demographics)
+source_kind: joint_centres
+format: mat
+
+layout:
+  subject: "Dataset_Processed/{subject}"                         # generate_hknu_faithful.py:258; probe :375
+  trial: "Dataset_Processed/{subject}/{subject}_{trial}.mat"     # generate_hknu_faithful.py:266-268
+  exclude: ["*_SubjectInfo.mat"]                                 # generate_hknu_faithful.py:268
+  # Gender, mass and height per subject come from the workbook's Subject sheet
+  # (generate_hknu_faithful.py:95-110 subjects_from_workbook; probe :508-522).
+  subject_table:
+    file: MATLAB/DatasetInfo.xlsx
+    format: xlsx
+    sheet: Subject
+    id: SubjectID
+    columns: {gender: Gender, mass_kg: BodyMass, stature_m: BodyHeight}
+
+bindings:
+  gender:
+    # The workbook's Gender column through normalise_biological_sex: first initial m or f,
+    # no fallback (generate_hknu_faithful.py:106; shape_fit.py:114-129).
+    field: Gender
+    map: {m: male, male: male, f: female, female: female}
+  stature_m: {field: BodyHeight}    # generate_hknu_faithful.py:108, used as stature_m (:161)
+  mass_kg: {field: BodyMass}        # generate_hknu_faithful.py:107, used as mass_kg (:162)
+  # Every Landmark field is a centre (stored (3, T), read as (T, 3)); segment end points supply
+  # the pelvis origin, the neck, the thorax base and the four distal tips
+  # (probe :164-182 centres_from; distal centres on by default, :106-123).
+  centres:
+    all_fields_of: Landmark
+    extra:
+      PELVIS: [Segment, PV, ProxEndPos]       # PV's cranial end, +81 mm above the hips (probe :69)
+      NECK: [Segment, TA, ProxEndPos]         # TA's cranial end (probe :70)
+      THORAX_BASE: [Segment, TA, DistEndPos]  # TA's caudal end, at spine3's height (probe :88)
+      LTOE: [Segment, LFT, DistEndPos]        # probe :179-182
+      RTOE: [Segment, RFT, DistEndPos]
+      LHAND: [Segment, LHA, DistEndPos]
+      RHAND: [Segment, RHA, DistEndPos]
+  # Segment world rotations, Segment.<body>.SegRot stored (3, 3, T) (probe :155-156,344-349).
+  rotations:
+    field: [Segment, "{body}", SegRot]
+    layout: "3,3,T"
+    aliases: {torso: TA}            # probe :58 TRUNK_ALIAS, :348: pose_fit reads the trunk as "torso"
+  time: {field: [Info, Time]}       # probe :443 frame count
+  fps: {field: [Info, SamplingRate]}   # generate_hknu_faithful.py:276
+  static_trials: [Npose, Tpose]     # generate_hknu_faithful.py:92 STATIC_TRIALS (converted too; no raw IMU stream)
+
+conventions:
+  up_axis: z                        # the source is already Z-up (generate_hknu_faithful.py passes world_rotation=eye(3))
+  length_unit: m
+  angle_unit: rad
+  up_axis_check: none
+
+correspondence: ../correspondence/visual3d_hknu.yaml
+
+shape:
+  method: bone_lengths              # generate_hknu_faithful.py:159-163 fit_betas on N-pose segment lengths
+  landmark_offsets: none            # generate_hknu_faithful.py:159-163 passes none
+  # Ten betas cannot reach this cohort's hip and shoulder separations, so the rest skeleton is
+  # scaled onto the measured lengths afterwards, directions untouched
+  # (generate_hknu_faithful.py:140-142,164-166; probe :209-254; shape_fit.py:301-334).
+  rescale_to_measured:
+    bones:                          # probe :211-218 RESCALE_BONES (SMPL edge -> two N-pose centres)
+      left_hip/left_knee: [LHJC, LKJC]
+      right_hip/right_knee: [RHJC, RKJC]
+      left_knee/left_ankle: [LKJC, LAJC]
+      right_knee/right_ankle: [RKJC, RAJC]
+      left_ankle/left_foot: [LAJC, LTOE]
+      right_ankle/right_foot: [RAJC, RTOE]
+      left_shoulder/left_elbow: [LSJC, LEJC]
+      right_shoulder/right_elbow: [RSJC, REJC]
+      left_elbow/left_wrist: [LEJC, LWJC]
+      right_elbow/right_wrist: [REJC, RWJC]
+      left_wrist/left_hand: [LWJC, LHAND]
+      right_wrist/right_hand: [RWJC, RHAND]
+    chains:                         # probe :220-223 RESCALE_CHAINS: the trunk as one path
+      pelvis/neck: [PELVIS, NECK]
+    spans:                          # probe :225-233 RESCALE_SPANS: separations, about the midpoint
+      left_hip/right_hip: [LHJC, RHJC]
+      left_shoulder/right_shoulder: [LSJC, RSJC]
+  pool_per_subject: false
+  from_trials: [Npose]              # generate_hknu_faithful.py:259-261: bone lengths from the N-pose
+  use_stature: true                 # generate_hknu_faithful.py:161
+  use_mass: true                    # generate_hknu_faithful.py:162 (when the model has faces)
+
+root:
+  placement: pelvis_centre
+  # Two hip offsets cannot separate a displacement of the pelvis origin from a rotation about
+  # the hip axis, so the pelvis constant comes from anatomical directions and the translation
+  # from the hip centres (generate_hknu_faithful.py:143-145; probe :290-341 root_placement_from).
+  alignment: directions
+  directions:
+    - {smpl: [left_hip, right_hip], source: [LHJC, RHJC]}   # lateral: rest[1]-rest[2] vs LHJC-RHJC (probe :332,336)
+    - {smpl: [neck, pelvis], source: [NECK, PELVIS]}         # superior: rest[12]-rest[0] vs TA.ProxEndPos-PV.ProxEndPos (probe :333-336)
+  anchor: {smpl: [left_hip, right_hip], source: [LHJC, RHJC]}   # probe :338-339
+  # The translation is solved every frame against these joints' centres (probe :257-287
+  # TRACKED_JOINTS; generate_hknu_faithful.py:146-154,172-173).
+  tracked: [left_hip, right_hip, left_knee, right_knee, left_ankle, right_ankle,
+            left_shoulder, right_shoulder]
+  from_trial: Npose                 # directions read off the static N-pose (probe :317-320; generator :259,172)
+  recover_frozen: false
+
+pose:
+  method: segment_rotation_transfer # generate_hknu_faithful.py:167-175 fit_pose with the source's segment rotations
+  # The N-pose's mean segment rotations are the neutral configuration
+  # (generate_hknu_faithful.py:262-263; probe :388-394 on why N rather than T).
+  reference: {trial: Npose, aggregate: mean_rotation}
+  place_unfitted_from_reference: true    # pose_fit.py:177-216; the head has no child to aim at
+  lumbar_zero_from_reference: true       # generate_hknu_faithful.py:146-147,174; PV and TA frames are not parallel when neutral
+
+provenance:
+  restrict_to_driven: none
+
+repairs:
+  wrap: none
+  resample: none                    # native 100 Hz, asserted (generate_hknu_faithful.py:276-278)
+  # Applied to the unified8 INDEX by the project's generator (source_pipelines_v1.yaml:184-186).
+  discontinuity: {settings_key: discontinuity, action: flag}
+
+skip:
+  # One non-finite value in a centre or rotation skips the trial rather than being filled
+  # (generate_hknu_faithful.py:113-126,279-287).
+  trials_with_nonfinite_input: true
+  trials_with_fps_other_than: 100   # generate_hknu_faithful.py:276-278
+
+# The package's shared engine settings; resolved from the smpl18 package configs (or from
+# $SHARED_DATASET_PATH/smpl18/settings/ once published there).
+settings: settings/default.yaml

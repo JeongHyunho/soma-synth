@@ -1,0 +1,25 @@
+# The canonical environment the pipeline's outputs are checked against.
+# Interpreter: CPython 3.13.5 (64-bit). pip cannot pin the interpreter; create the venv with it
+# (py -3.13 -m venv .venv) and check `python --version` before installing.
+# Use: .venv\Scripts\python -m pip install -c constraints.txt -e packages/smpl18 -e .
+numpy==2.2.6
+scipy==1.16.2
+PyYAML==6.0.2
+openpyxl==3.1.5
+protobuf==6.33.2
+# smpl18's own dependency (.c3d marker files), installed with -e packages/smpl18.
+ezc3d==1.7.2
+# The dev extra: the test runner the suite is checked with.
+pytest==9.1.1
+# The viewer extra: the plotting library the viewer's IMU-plot tests run against, and the image
+# and video tools of scripts/poc (viewer_verify_pixels, assemble_mesh_video), pinned to the
+# versions the viewer tools are checked against; the two tools use only imread/imdecode.
+# opencv-python is pinned because an unpinned install resolves 5.x, which the viewer tools are
+# not checked against.
+matplotlib==3.10.8
+opencv-python==4.11.0.86
+# imageio-ffmpeg: pinned to the version the viewer tools are checked against (only
+# assemble_mesh_video.py imports it).
+imageio-ffmpeg==0.6.0
+# smpl18's dev extra (pip install -c constraints.txt -e "packages/smpl18[dev]"): its linter.
+ruff==0.16.7

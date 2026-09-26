@@ -1,0 +1,68 @@
+# PRISM as a smpl18 profile: SMPL parameters inside per-take pickles, one directory per subject.
+# INTERNAL: this profile lives in the SOMA project, not in the smpl18 package, because the
+# dataset is internal.
+#
+# Parity basis: scripts/poc/generate_prism_faithful.py (load_prism_safe, build) and
+# generate_prism_faithful_all.py (enumeration, gender by subject), 2026-09-15. Every value cites
+# the file and line it came from.
+schema: smpl18_profile_v1
+id: prism
+description: PRISM per-take pickles (SMPL poses/betas/trans, info.subj_info, info.data_info)
+source_kind: smpl_parameters
+format: pickle
+
+layout:
+  # generate_prism_faithful_all.py:35,48: every directory under the root is a subject (the
+  # project prefixes its id with "prism_", which is the project's naming, not the source's).
+  subject: "{subject}"
+  trial: "{subject}/{trial}.pkl"    # generate_prism_faithful_all.py:50-51: <take>.pkl, take_id = stem
+
+bindings:
+  # raw["smpl_params"]["poses"] is [N, 72] and is reshaped to [N, 24, 3]
+  # (generate_prism_faithful.py:317,325).
+  poses: {field: [smpl_params, poses], layout: "T,J*3"}
+  # Betas are stored per frame; the first frame of the take is the subject's shape
+  # (generate_prism_faithful.py:417 betas[win_start] with window None -> 0;
+  # generate_prism_faithful_all.py:112 betas[0]).
+  betas: {field: [smpl_params, betas], frame: first}
+  # The SMPL translation as stored. The accepted usage policy binds world translation to
+  # `trans` with add_root_offset false (configs/datasets/prism_usage_policy_v1.yaml:62-68;
+  # prism_field_registry_v4.yaml:96-101). Note that the faithful generator's Large artifact
+  # takes its pelvis trajectory from imu_gt.Pelvis.pos_world instead
+  # (generate_prism_faithful.py:328,410), which is the pelvis joint's position, not `trans`;
+  # the two differ by the rest pelvis offset (registry: pelvis_vs_trans_median_norm 0.132 m).
+  trans: {field: [smpl_params, trans]}
+  fps: {field: [info, data_info, fps]}   # generate_prism_faithful.py:314; asserted 100 Hz (:315)
+  gender:
+    # Read once per subject from the first take's info.subj_info.gender
+    # (generate_prism_faithful_all.py:31-41); the generator then selects the model by the
+    # first initial, m or f only, anything else an error (scripts/poc/anthro_smpl.py:81-88).
+    field: [info, subj_info, gender]
+    map: {m: male, male: male, f: female, female: female}
+    # smpl_params.gender must agree on the first initial (generate_prism_faithful.py:418-420).
+    cross_check: [smpl_params, gender]
+
+conventions:
+  up_axis: z                        # PRISM world is Z-up (generate_prism_faithful.py:15-17,61; registry world_frame.up_axis_index 2)
+  length_unit: m
+  angle_unit: rad
+
+shape:
+  method: parameters                # betas come from the source; no fit
+
+root:
+  placement: source_translation
+
+repairs:
+  wrap: none
+  # A no-op at the native 100 Hz, kept so the corpus rate is stated
+  # (generate_prism_faithful.py:60,314-315).
+  resample: {fps: 100, rotations: slerp, translation: linear}
+  discontinuity: {settings_key: discontinuity, action: flag}
+
+skip:
+  trials_with_fps_other_than: 100   # generate_prism_faithful.py:315 assert fps == TARGET_RATE_HZ
+
+# The package's shared engine settings; resolved from the smpl18 package configs (or from
+# $SHARED_DATASET_PATH/smpl18/settings/ once published there).
+settings: settings/default.yaml

@@ -1,0 +1,111 @@
+{
+  "config_id": "gaitex_sensor_sites_v1",
+  "version": "1.0.0",
+  "schema_version": "1.0.0",
+  "created_date": "2026-09-03",
+  "activation_state": "non_authorizing",
+  "distribution_scope": "internal_only",
+  "source": "gaitex",
+  "description": "Proposal. Virtual sensor sites derivable from the GAITEX marker set, declared as data so that neither the repository's canonical six nor the external specification's eight is fixed in code while that divergence is unresolved. Lifts no hold and authorises no generation. See reports/source_parsing/2026-09-03-gaitex-plan-governance-conflict.md.",
+
+  "divergence_note": "The parent project's invariants fix the canonical order as six sensors (chest, wrist_l, wrist_r, foot_l, foot_r, head) plus pelvis and 15 joints. The external Small/Large specification (small/00_sensors.qmd) describes eight channels and 18 motion joints. Both sets are declared below. Choosing between them requires a contract change and an ADR under the parent project's contract-change rule; this file deliberately does not choose.",
+
+  "site_sets": {
+    "repo_canonical_six": ["chest", "wrist_l", "wrist_r", "foot_l", "foot_r", "head"],
+    "external_spec_eight": ["back_T4", "wrist_l", "wrist_r", "shank_l", "shank_r", "occiput", "foot_l", "foot_r"]
+  },
+
+  "sites": {
+    "chest": {
+      "markers": ["THOR1", "THOR2", "THOR3", "THOR4"],
+      "offset": {"kind": "plate_normal", "depth_m": 0.014, "in_plane_offset_m": [0.0, 0.0]},
+      "inward_reference": {"markers": ["L_IPS", "R_IPS"]},
+      "measured_counterpart": "XSens_Sternum",
+      "position_provenance": "source_derived",
+      "rotation_provenance": "source_derived",
+      "note": "The GAITEX sternum plate carries a real sensor, so this site coincides with one. The inward reference uses the posterior superior iliac spines because they are unambiguously behind the sternum, which is what fixes the plate normal's sign. Depth is the hardware constant declared in gaitex_synthesis_v1.yaml and is not observable from this dataset."
+    },
+
+    "shank_l": {
+      "markers": ["L_SHIN1", "L_SHIN2", "L_SHIN3", "L_SHIN4"],
+      "offset": {"kind": "plate_normal", "depth_m": 0.014, "in_plane_offset_m": [0.0, 0.0]},
+      "inward_reference": {"markers": ["L_FLE", "L_FME", "L_FAL", "L_TAM"]},
+      "measured_counterpart": "XSens_LowerLeg_Left",
+      "position_provenance": "source_derived",
+      "rotation_provenance": "source_derived",
+      "note": "GAITEX mounts this plate laterally; the specification's shank channel is anterior. The mounting differs even though the segment matches, and that difference belongs in the comparison, not in this file. The inward reference averages the knee and ankle landmarks, giving a point on the tibial axis medial to a lateral plate."
+    },
+
+    "shank_r": {
+      "markers": ["R_SHIN1", "R_SHIN2", "R_SHIN3", "R_SHIN4"],
+      "offset": {"kind": "plate_normal", "depth_m": 0.014, "in_plane_offset_m": [0.0, 0.0]},
+      "inward_reference": {"markers": ["R_FLE", "R_FME", "R_FAL", "R_TAM"]},
+      "measured_counterpart": "XSens_LowerLeg_Right",
+      "position_provenance": "source_derived",
+      "rotation_provenance": "source_derived",
+      "note": "As shank_l."
+    },
+
+    "foot_l": {
+      "markers": ["L_FOOT1", "L_FOOT2", "L_FOOT3", "L_FOOT4"],
+      "offset": {"kind": "plate_normal", "depth_m": 0.014, "in_plane_offset_m": [0.0, 0.0]},
+      "inward_reference": {"markers": ["L_FCC", "L_FAL", "L_TAM"]},
+      "measured_counterpart": "XSens_Foot_Left",
+      "position_provenance": "source_derived",
+      "rotation_provenance": "source_derived",
+      "note": "GAITEX mounts this plate on the dorsum; the specification's foot channel is embedded in an insole. Same segment, different mounting. The calcaneus and both malleoli sit below the dorsal plate, which fixes the normal's sign."
+    },
+
+    "foot_r": {
+      "markers": ["R_FOOT1", "R_FOOT2", "R_FOOT3", "R_FOOT4"],
+      "offset": {"kind": "plate_normal", "depth_m": 0.014, "in_plane_offset_m": [0.0, 0.0]},
+      "inward_reference": {"markers": ["R_FCC", "R_FAL", "R_TAM"]},
+      "measured_counterpart": "XSens_Foot_Right",
+      "position_provenance": "source_derived",
+      "rotation_provenance": "source_derived",
+      "note": "As foot_l."
+    },
+
+    "wrist_l": {
+      "markers": ["L_HLE", "L_RSP", "L_USP"],
+      "offset": {"kind": "unresolved", "unresolved_reason": "GAITEX mounts no sensor at the wrist, so there is no plate to measure a depth against. The forearm rigid body is observed from the lateral epicondyle and both styloids, but where a wrist-worn sensor would sit relative to it is an anthropometric model choice that has not been made or reviewed. Open item; not yet decided."},
+      "inward_reference": {"markers": ["L_HUM"]},
+      "position_provenance": "unavailable",
+      "rotation_provenance": "source_derived",
+      "note": "Rotation is available now; position is not. Marker availability also varies sharply by trial -- L_USP is absent for 57.8 percent of frames in the worst trial -- so this site needs a per-trial admission rule as well as an offset."
+    },
+
+    "wrist_r": {
+      "markers": ["R_HLE", "R_RSP", "R_USP"],
+      "offset": {"kind": "unresolved", "unresolved_reason": "GAITEX mounts no sensor at the wrist, so there is no plate to measure a depth against. The forearm rigid body is observed from the lateral epicondyle and both styloids, but where a wrist-worn sensor would sit relative to it is an anthropometric model choice that has not been made or reviewed. Open item; not yet decided."},
+      "inward_reference": {"markers": ["R_HUM"]},
+      "position_provenance": "unavailable",
+      "rotation_provenance": "source_derived",
+      "note": "As wrist_l. R_RSP is absent for 35.6 percent of frames in the worst trial."
+    },
+
+    "head": {
+      "markers": ["R_HEAD", "L_HEAD", "SGL"],
+      "offset": {"kind": "unresolved", "unresolved_reason": "GAITEX mounts no head sensor. The head rigid body is observed with essentially no dropout (0.00 percent mean, 0.07 percent worst), but the canonical head channel's position on that body is an anthropometric model choice that has not been made or reviewed. Open item; not yet decided."},
+      "position_provenance": "unavailable",
+      "rotation_provenance": "source_derived",
+      "note": "The three head markers give a clean rigid body; only the offset is missing."
+    },
+
+    "occiput": {
+      "markers": ["R_HEAD", "L_HEAD", "SGL"],
+      "offset": {"kind": "unresolved", "unresolved_reason": "As head, and more specifically: the specification places this channel at the occiput, which carries no marker at all. Open item; not yet decided."},
+      "position_provenance": "unavailable",
+      "rotation_provenance": "source_derived",
+      "note": "Shares the head rigid body with the canonical head site; the two differ only in where on it the sensor is taken to sit, which is exactly the undetermined quantity."
+    },
+
+    "back_T4": {
+      "markers": ["THOR1", "THOR2", "THOR3", "THOR4"],
+      "offset": {"kind": "unresolved", "unresolved_reason": "The specification places this channel on the posterior thorax at the T4 level. GAITEX has no marker there: the THOR plate is anterior on the sternum, and MAI, the nearest posterior trunk marker, sits about 223 mm lower. The offset is therefore a model choice that has not been made or reviewed. Open item; not yet decided."},
+      "position_provenance": "unavailable",
+      "rotation_provenance": "source_derived",
+      "note": "Shares the thoracic rigid body with the canonical chest site. Rotation is as good as chest's; position is not derivable without a model."
+    }
+  }
+}

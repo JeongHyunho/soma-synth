@@ -1,0 +1,43 @@
+{
+  "config_id": "gaitex_joint_ranges_v1",
+  "version": "1.0.0",
+  "schema_version": "1.0.0",
+  "created_date": "2026-09-05",
+  "activation_state": "non_authorizing",
+  "distribution_scope": "internal_only",
+  "source": "gaitex",
+  "description": "Anatomical bounds on the OpenSim coordinates GAITEX publishes, used to measure how much of a trial the source's own inverse kinematics failed to solve. Declared as data because these are thresholds, and MASTERPLAN.md:93 forbids fixing threshold values as code constants. Lifts no hold and authorises no generation.",
+
+  "why_this_exists": "On 2026-09-05 it was found that at least four published trials carry joint angles no human body can produce -- katee/gwo sweeps knee_angle_r through a full revolution, -180 to +180 degrees, and marquise/ng reaches -117.6. The unified8 L2 validator bounds gyroscope magnitude, which a joint traversing a revolution smoothly can pass. Nothing else looked. A units guard written earlier sampled austra and ziri, both of which are clean, so it could not have seen this either.",
+
+  "policy": {
+    "action": "measure_and_record",
+    "note": "Frames outside these bounds are COUNTED and written onto the artifact; they are not dropped and the take is not refused. Dropping them would change which frames a take contains without the manifest saying so, and would reopen the non-uniform-time-step defect that longest_solved_span exists to prevent. A consumer decides what to do with a take whose knee left the body; the generator's duty is to say that it did."
+  },
+
+  "two_measurements_not_one": "A bound on the VALUE alone conflates two unrelated things. katee/gwo sweeps a knee from -180 to +180 -- a span of 360 degrees, which is a failed solve under any interpretation. elodie/rd holds its lumbar between -77.5 and -36.8 -- outside the same bound on 97 per cent of frames, but a span of only 41 degrees, which is ordinary trunk motion sitting at an offset. The first is broken data; the second is a posture, a task, or a convention difference in where the model puts zero. Flagging them alike would make the gate cry wolf and be ignored. So both are measured: `limits_deg` bounds the value, `span_limits_deg` bounds max minus min, and a take is only called a failed solve when its SPAN is impossible.",
+
+  "limits_deg": {
+    "knee_angle_r": {"min": -15.0, "max": 155.0},
+    "knee_angle_l": {"min": -15.0, "max": 155.0},
+    "ankle_angle_r": {"min": -60.0, "max": 60.0},
+    "ankle_angle_l": {"min": -60.0, "max": 60.0},
+    "hip_flexion_r": {"min": -40.0, "max": 140.0},
+    "hip_flexion_l": {"min": -40.0, "max": 140.0},
+    "lumbar_extension": {"min": -60.0, "max": 60.0}
+  },
+
+  "span_limits_deg": {
+    "knee_angle_r": 170.0,
+    "knee_angle_l": 170.0,
+    "ankle_angle_r": 120.0,
+    "ankle_angle_l": 120.0,
+    "hip_flexion_r": 180.0,
+    "hip_flexion_l": 180.0,
+    "lumbar_extension": 120.0
+  },
+
+  "calibration_note": "Deliberately generous, and wider than gait. GAITEX includes conditions beyond level walking, so a bound tight enough to be interesting for one condition would flag normal motion in another. These are the limits of the joint, not of the task: a knee that passes 155 degrees of flexion or hyperextends past 15 is outside the joint under any condition, and the same for an ankle at 60 or a lumbar spine at 60. The span limits are looser still -- a knee cannot traverse more than about 170 degrees in one trial even from full hyperextension to full flexion, so exceeding that is not a posture but a solve that came apart. A coordinate absent from these tables is not checked, which is recorded rather than hidden -- pelvis rotations and the coupled knee betas have no useful fixed bound.",
+
+  "provenance": "The bounds are conventional anatomical ranges of motion, widened. They are not measured from this corpus and are not fitted to it; a bound derived from the data it screens would pass whatever the data contained. They are a declared judgement, and this file is where to argue with it."
+}

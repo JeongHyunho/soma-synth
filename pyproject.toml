@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soma-synth"
+version = "0.1.0"
+description = "Synthetic IMU dataset generation pipeline (qmd_unified8_smpl18): generators, retarget corpora, validation, README rendering and the local catalog"
+readme = "README.md"
+requires-python = ">=3.12"
+# smpl18 is not listed: it is the submodule at packages/smpl18 and is installed from there
+# (`pip install -e packages/smpl18 -e .`); it is not on any package index.
+# The versions the pipeline is checked against are pinned in constraints.txt.
+dependencies = [
+    "numpy>=2.2,<3",
+    # The HKNU generator reads the source's DatasetInfo.xlsx.
+    "openpyxl>=3.1",
+    # The AddBiomechanics reader decodes .b3d through the vendored NimblePhysics bindings.
+    "protobuf>=6.30,<8",
+    # The pipeline registry, the dataset profiles and the limitations config are YAML.
+    "PyYAML>=6",
+    "scipy>=1.11,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+# The Small/Large viewer and the plotting/video tools in scripts/poc (docs/guides/small_large_viewer.md).
+# Blender 4.5 (with the SMPL-X add-on) is external: it is installed separately and found by
+# $BLENDER_EXE, never by pip.
+viewer = [
+    "matplotlib>=3.8",
+    "opencv-python>=4.8",
+    "imageio-ffmpeg>=0.4",
+]
+
+[project.scripts]
+soma-synth = "soma_synth.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"soma_synth.vendor.nimblephysics" = [
+  "SubjectOnDisk.proto",
+  "UPSTREAM.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# "." puts the repository root ahead of site-packages so the local `tests` package wins;
+# "tests/validation" is where several suites import the dataset fixture builder from;
+# "packages/smpl18/src" is the smpl18 submodule (`git submodule update --init`; without it
+# `import smpl18` fails).
+pythonpath = [".", "src", "tests/validation", "packages/smpl18/src"]
+filterwarnings = ["error"]
+addopts = "--strict-markers -p no:cacheprovider"

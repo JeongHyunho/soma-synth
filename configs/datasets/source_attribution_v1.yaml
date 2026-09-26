@@ -1,0 +1,139 @@
+# Where each source came from, and on whose record.
+#
+# ADR-0040 D1 promoted `source_attribution` to a universal manifest field but did not say what
+# goes in it, and the two bundles that carry one disagree: gaitex writes eight keys, addbio six.
+# `required_keys` below pins the five they share; anything beyond that is declared per source in
+# `dataset_profiles_v1.yaml` under `additive.source_attribution_keys`.
+#
+# These are values, not code: a config value must not become a temporary code constant, so
+# they live here rather than inside the backfill script that reads them.
+#
+# Every field traces to a line in a record a reader can open. `evidence` on each source names it.
+# A source whose interpretation is still pending carries `status: pending_user_confirmation` and
+# a `proposed` block instead of a `value` block; the backfill tool refuses to write those, which
+# is the point. An attribution is a rights assertion that travels with the bundle wherever it is
+# shared, and the licence records for such sources mark the interpretation as awaiting the
+# owner's confirmation (`INTERPRETATION_PENDING_USER_CONFIRMATION`).
+
+schema: source_attribution_v1
+
+# The minimum every bundle's source_attribution must carry. Derived by intersecting the two
+# bundles that already have one (gaitex 8 keys, addbio 6, overlapping in these 5).
+required_keys:
+  - dataset_citation
+  - publication
+  - license_id
+  - stable_source_id
+  - changes_made
+
+sources:
+
+  hknu:
+    status: resolved
+    evidence: >-
+      hknu_unified8/DATA_DESCRIPTION_EN.md section 8 (the retired hknu_unified8_v1 said the same
+      in its section 7), which the bundle ships with itself;
+      internal-use authority is 2026-08-21 decision SOMA-S2R-DEC-20260821-HKNU, recorded in
+      the HKNU usage authorization of 2026-08-21 (kept outside this repository) with
+      rights state cc_by_4_0_user_confirmed_internal_use.
+    value:
+      source_name: hknu
+      source_version: >-
+        not fingerprinted; the project's copy was downloaded 2026-08-17 and the record's latest
+        version at review time was v2 (2026-04-24), so the concept DOI is cited instead
+      stable_source_id: hknu_lee_2026
+      dataset_citation: >-
+        Lee, C. J. and Lee, J. K. (Hankyong National University), A Multimodal Dataset of
+        Full-Body Kinematics and Kinetics from Laboratory- and Wearable-Based Systems, Zenodo,
+        concept DOI https://doi.org/10.5281/zenodo.17188465
+      publication: https://doi.org/10.1038/s41597-026-07595-4
+      license_id: CC-BY-4.0
+      changes_made: >-
+        true; retargeted onto SMPL-24 (hknu_smpl24_paired, with the 2026-09-08
+        body-fit repair), reduced to the 18-joint model, and eight IMU channels synthesised from
+        the SMPL body. The measured IMU, force plates and insoles of the source are not in this
+        bundle.
+      attribution_note: >-
+        CC BY 4.0 obliges naming the authors, the DOI, the licence and the changes; the four
+        fields above carry them. dataset_citation cites the Zenodo concept DOI because the
+        downloaded version was never fingerprinted; publication names the Scientific Data
+        article, which is a different object. The 2026-08-21 decision authorises internal
+        research and derivatives only, not public redistribution.
+
+  amass:
+    status: resolved
+    approved: >-
+      Confirmed as proposed by the project owner on 2026-09-09. Two points were open: that
+      `license_id` names the bundled licence text rather than an SPDX identifier, and that
+      `publication` is recorded as NOT_ESTABLISHED because no record names one. The
+      confirmation covers this interpretation, not any wider right: distribution_scope stays
+      internal_only and external redistribution remains denied.
+    evidence: >-
+      research/datasets/licenses/ds-amass.md (last verified 2026-07-23). That record carries
+      no bibliographic citation and no SPDX licence: it records a bundled licence text whose
+      SHA-256 is D9A7A1DA491E0856FA0C44EE59907A3000A6DCA0518467C597A8081B543FF6B2, a persistent
+      LICENSE_TEXT_CONFLICT flag, confidence B, third-party authority NOT_ESTABLISHED, and
+      activation status INTERPRETATION_PENDING_USER_CONFIRMATION. Internal-use authority is
+      research/decisions/2026-07-27_three_source_internal_use_authorization.md, which records
+      that the licence wording difference was checked by the project owner.
+    was_blocked_on: >-
+      `publication` had no source in any record, and the 2026-07-27 authorisation section 5
+      puts filling an unavailable value with a plausible one outside what was approved.
+      `license_id` was an interpretation the licence record itself marked as pending
+      confirmation. Both were confirmed as proposed on 2026-09-09; the entry is kept so that a
+      reader of these values can see what was open about them.
+    value:
+      source_name: amass
+      stable_source_id: ds-amass
+      dataset_citation: >-
+        AMASS: Archive of Motion Capture as Surface Shapes, https://amass.is.tue.mpg.de/
+        (collections registered for this bundle: BMLmovi, TotalCapture, Transitions, KIT, CMU)
+      publication: NOT_ESTABLISHED
+      license_id: amass_bundled_noncommercial_no_redistribution
+      changes_made: >-
+        true; SMPL-H pose parameters retargeted onto SMPL-24, reduced to the 18-joint model,
+        and eight IMU channels synthesised from the SMPL body
+      attribution_note: >-
+        The bundled licence text (SHA-256 D9A7A1DA...F6B2) permits derivative works for
+        non-commercial scientific research and forbids redistribution and commercial use; the
+        2026-07-23 portal text omits the derivative-grant bullet, which is the recorded
+        LICENSE_TEXT_CONFLICT. license_id names that bundled text rather than an SPDX
+        identifier, because no SPDX licence applies. publication is NOT_ESTABLISHED because no
+        record names one.
+
+  prism:
+    status: resolved
+    approved: >-
+      Confirmed as proposed by the project owner on 2026-09-09: `dataset_citation` states that
+      the dataset is not publicly citable rather than citing it, and `license_id` names the
+      access form's scope rather than an SPDX identifier. The confirmation covers this
+      interpretation only -- distribution_scope stays internal_only.
+    evidence: >-
+      research/datasets/licenses/ds-prism.md (last verified 2026-07-23). No official licence,
+      DUA or provider authorisation was obtained; third-party authority NOT_ESTABLISHED,
+      persistent flag DERIVATIVE_NOT_EXPLICIT, confidence C, activation status
+      INTERPRETATION_PENDING_USER_CONFIRMATION. The dataset arrived through a form
+      ("PRISM Dataset Access Request", public viewform SHA-256
+      60CC383F159CA55397A7CB1DFEA9B5861ACBD8C15663AA1C521C6DE078B6F6AF). Internal-use authority
+      is research/decisions/2026-07-27_three_source_internal_use_authorization.md.
+    was_blocked_on: >-
+      PRISM has no public DOI and no citable record, so `dataset_citation` cannot carry a
+      citation; the value below states that in words instead, a claim about the dataset's
+      standing that needed the owner's confirmation. `publication` has no source. Both were
+      confirmed as proposed on 2026-09-09; the entry is kept so that a reader of these values
+      can see what was open about them.
+    value:
+      source_name: prism
+      stable_source_id: ds-prism
+      dataset_citation: >-
+        Form-scoped internal dataset (PRISM Dataset Access Request); not publicly citable
+      publication: NOT_ESTABLISHED
+      license_id: form_scoped_internal_noncommercial_no_redistribution
+      changes_made: >-
+        true; canonicalised into the faithful-v2 paired form. The IMU channels are the
+        measured signals of the source, not synthesised.
+      attribution_note: >-
+        No official licence, DUA or provider authorisation exists for this source. The terms
+        are those visible on the access form: non-commercial academic research only, no
+        redistribution, no commercial purpose. license_id names that form scope rather than an
+        SPDX identifier. publication is NOT_ESTABLISHED because no record names one.
