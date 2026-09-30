@@ -17,7 +17,8 @@ because a literal is one machine's layout, not the pipeline's:
     those models rather than the default folder's.
 
 A fourth variable, ``SOMA_SHARED_DRIVE_NAMES``, names no location the generators use: it lists the
-folder names of team shared drives, which output is refused inside (:func:`on_shared_drive`).
+folder names of team shared drives, which output written inside draws a warning
+(:func:`on_shared_drive`, :func:`warn_if_synced`).
 
 Nothing here reads the environment at import time. A module that imports this one stays
 importable on a machine where none of the three is set, and the first call that needs a location
@@ -32,6 +33,7 @@ extracted.
 from __future__ import annotations
 
 import os
+import sys
 import unicodedata
 from collections.abc import Iterable
 from pathlib import Path, PurePath, PurePosixPath
@@ -55,7 +57,6 @@ __all__ = [
     "body_model_dir",
     "body_model_override",
     "check_bundle_dir",
-    "check_not_synced",
     "check_output_dir",
     "check_readme_root",
     "check_record_dir",
@@ -75,6 +76,7 @@ __all__ = [
     "source_root",
     "source_root_override",
     "synced_location",
+    "warn_if_synced",
 ]
 
 DATA_ROOT_ENV = "SOMA_DATA_ROOT"
@@ -115,8 +117,9 @@ RUN_RECORDS = "_runs"
 #: data root and an inventory of its source archives). Absent ones are simply not there to protect.
 PROTECTED_DATA_FILES = ("README.md", "MASTER.md", "state/local_archive_inventory.json")
 
-#: A path component that marks a cloud-synchronised folder. Output there is refused: the sync
-#: client rewrites files underneath a running generator and copies internal-only data off the PC.
+#: A path component that marks a cloud-synchronised folder. Output there draws a warning
+#: (:func:`warn_if_synced`): the sync client can rewrite files underneath a running generator and
+#: copies internal-only data off the PC.
 #: Dropbox, OneDrive, Google Drive (the desktop client's top-level folders in English and Korean:
 #: "My Drive" / "내 드라이브", "Shared drives" / "공유 드라이브", "Other computers" /
 #: "다른 컴퓨터", and the older "Google Drive" folder), Synology Drive ("SynologyDrive") and
@@ -479,7 +482,7 @@ def synced_location(path: str | os.PathLike[str]) -> str | None:
 def shared_drive_names() -> tuple[str, ...]:
     """``SOMA_SHARED_DRIVE_NAMES``: the folder names of team shared drives, comma-separated, as
     :func:`_folded` compares them. Empty when unset or blank, so only the sync-client folders of
-    :func:`synced_location` are refused then. Read when called, never at import."""
+    :func:`synced_location` draw a warning then. Read when called, never at import."""
     value = os.environ.get(SHARED_DRIVE_NAMES_ENV) or ""
     return tuple(dict.fromkeys(_folded(name.strip()) for name in value.split(",") if name.strip()))
 
@@ -496,29 +499,43 @@ def on_shared_drive(path: str | os.PathLike[str]) -> bool:
     return any(_folded(part) in names for part in parts)
 
 
-def check_not_synced(path: str | os.PathLike[str]) -> Path:
-    """Refuse a path inside a cloud-synchronised folder or on a team shared drive; return it.
+#: The paths :func:`warn_if_synced` has warned about in this process, so each is named once.
+_WARNED_SYNCED: set[str] = set()
 
-    The first of :func:`check_output_dir`'s refusals, on its own: it needs no environment, so the
-    runner applies it to the locations it writes itself (the bundle directory, the run records,
-    the catalog) before it opens a run record there. The path is judged as written (made
-    absolute) and as resolved, so a link into a synchronised folder is refused too
-    (:func:`synced_location`, :func:`on_shared_drive`).
+
+def warn_if_synced(path: str | os.PathLike[str]) -> Path:
+    """Warn about a path inside a cloud-synchronised folder or on a team shared drive; return it.
+
+    Writing there is allowed (owner decision, 2026-09-30) but not recommended, so the path is
+    never refused: one warning line goes to stderr, once per distinct path in a process. A sync
+    client can lock, delay or partially upload a file while it is written, and a bundle written
+    into a synchronised or shared folder may be shared beyond this PC, which needs separate
+    approval. The path is judged as written (made absolute) and as resolved, so a link into a
+    synchronised folder is noticed too (:func:`synced_location`, :func:`on_shared_drive`). A
+    plain line rather than :mod:`warnings`, which a caller may have turned into errors.
+
+    It needs no environment, so the runner applies it (through :func:`check_output_dir` and
+    :func:`check_record_dir`) to the locations it writes itself before it opens a run record.
     """
     target = Path(path)
+    where = None
     for spelled in (target.absolute(), target.resolve()):
         marker = synced_location(spelled)
         if marker is not None:
-            raise OutputLocationRefused(
-                f"refusing to write {target}: it is inside the cloud-synchronised folder "
-                f"{marker!r}; put outputs under {DATA_ROOT_ENV} on a local disk"
-            )
+            where = f"inside the cloud-synchronised folder {marker!r}"
+            break
         if on_shared_drive(spelled):
-            raise OutputLocationRefused(
-                f"refusing to write {target}: it is on a team shared drive "
-                f"({SHARED_DRIVE_NAMES_ENV}); generate locally and share as a separate, "
-                "approved step"
-            )
+            where = f"on a team shared drive ({SHARED_DRIVE_NAMES_ENV})"
+            break
+    if where is not None:
+        key = os.path.normcase(str(target.absolute()))
+        if key not in _WARNED_SYNCED:
+            _WARNED_SYNCED.add(key)
+            print(f"warning: {target} is {where}; writing there is allowed but not recommended: "
+                  "sync clients can lock, delay or partially upload files while they are written, "
+                  "and bundles written there may be shared beyond this PC (sharing needs separate "
+                  f"approval). A local disk under {DATA_ROOT_ENV} is recommended",
+                  file=sys.stderr, flush=True)
     return target
 
 
@@ -542,11 +559,13 @@ def check_output_dir(
     * the containers themselves: the data root, ``<data root>/runs``,
       ``<data root>/runs/experimental_generation_poc_demo`` (which holds one directory per lineage
       and is never a bundle) and
-      ``SOMA_SOURCE_ROOT``;
-    * anything inside a cloud-synchronised folder (Dropbox, OneDrive, Google Drive in English or
-      Korean, Synology Drive, iCloud Drive; on macOS anything under ``~/Library/CloudStorage``,
-      on Linux a gvfs Google Drive mount: :func:`synced_location`) or on a team shared drive named
-      in ``SOMA_SHARED_DRIVE_NAMES`` (:func:`on_shared_drive`).
+      ``SOMA_SOURCE_ROOT``.
+
+    Not refused but warned about (:func:`warn_if_synced`): anything inside a cloud-synchronised
+    folder (Dropbox, OneDrive, Google Drive in English or Korean, Synology Drive, iCloud Drive; on
+    macOS anything under ``~/Library/CloudStorage``, on Linux a gvfs Google Drive mount:
+    :func:`synced_location`) or on a team shared drive named in ``SOMA_SHARED_DRIVE_NAMES``
+    (:func:`on_shared_drive`).
 
     The environment is consulted only where it is configured, so a run that passes every location
     explicitly is guarded by those locations alone. A variable that is set but names no folder is
@@ -556,7 +575,7 @@ def check_output_dir(
     (:func:`_configured_locations`); the runner passes its own, because it writes into the
     bundle and corpus directories before a generator's guard runs, or without a generator.
     """
-    target = check_not_synced(path)
+    target = warn_if_synced(path)
     resolved = target.resolve()
     read_only, containers = _configured_locations(root)
     explicit = [Path(p) for p in inputs if p is not None]
@@ -616,8 +635,9 @@ def check_bundle_dir(
     the evidence as live data. Under the data roots the environment and ``root`` name, and
     ``SOMA_SOURCE_ROOT``: a directory inside ``extracted``, ``raw_archives``, the source folders or
     the body-model directories (:func:`check_output_dir`'s read-only folders). With ``writes`` (the
-    command writes into the bundle) everything else :func:`check_output_dir` refuses as well: a
-    cloud-synchronised folder or a team shared drive, and the containers themselves. ``action`` is
+    command writes into the bundle) everything else :func:`check_output_dir` refuses as well: the
+    containers themselves (a cloud-synchronised folder or a team shared drive draws only a
+    warning, :func:`warn_if_synced`). ``action`` is
     the verb a refusal names ("register" for a command that only reads the bundle).
     """
     target = Path(path)
@@ -647,8 +667,8 @@ def check_record_dir(
 ) -> Path:
     """Refuse a folder for run records or a catalog that a run must not write into; return it.
 
-    Narrower than :func:`check_output_dir`, whose refusals are for a bundle. Refused: a
-    cloud-synchronised folder or a team shared drive (:func:`check_not_synced`); anything inside
+    Narrower than :func:`check_output_dir`, whose refusals are for a bundle. A cloud-synchronised
+    folder or a team shared drive draws a warning (:func:`warn_if_synced`). Refused: anything inside
     the read-only folders -- ``extracted``, ``raw_archives``, the source folders under
     ``SOMA_SOURCE_ROOT``, the body-model directories -- and the evidence folders ``_superseded``
     and ``_manifest_backfill``; the containers themselves (the data root, ``runs``,
@@ -659,7 +679,7 @@ def check_record_dir(
     (``<lineage container>/_runs`` is the runner's default); the catalog is
     ``<data root>/experimental/catalog``.
     """
-    target = check_not_synced(path)
+    target = warn_if_synced(path)
     resolved = target.resolve()
     read_only, containers = _configured_locations(root, allow_run_records=True)
     for label, folder in read_only:
@@ -717,15 +737,15 @@ def check_readme_root(
     """Refuse a folder a top-level ``README.md`` must not be written into; return it.
 
     ``soma-synth readme --top-level-root`` and ``soma-synth pipeline --top-level-root`` write
-    ``<folder>/README.md`` across the bundles given. Refused: a cloud-synchronised folder or a team
-    shared drive (:func:`check_not_synced`); a data root itself (the run's and
+    ``<folder>/README.md`` across the bundles given. A cloud-synchronised folder or a team shared
+    drive draws a warning (:func:`warn_if_synced`). Refused: a data root itself (the run's and
     ``SOMA_DATA_ROOT``: its ``README.md`` is the data plane's own and is never overwritten,
     retention rule 1.4) and ``SOMA_SOURCE_ROOT``; and anything inside the read-only folders
     (``extracted``, ``raw_archives``, the source folders, the body-model directories) or the
     evidence folders (``_superseded``, ``_runs``, ``_manifest_backfill``). The lineage container
     ``runs/experimental_generation_poc_demo`` and any folder of one's own stay allowed.
     """
-    target = check_not_synced(path)
+    target = warn_if_synced(path)
     resolved = target.resolve()
     read_only, _ = _configured_locations(root)
     for label, folder in read_only:

@@ -71,8 +71,7 @@ lineage; a sample run (a bundle outside the production lineage, or any selection
 building a corpus inside a production corpus lineage; passthrough arguments that set a flag the
 runner controls (an output, the corpus handed to the bundle, a source location), or that would
 reach no entrypoint (corpus arguments for a source without a corpus stage, any passthrough with
-an explicit generate command); output into a cloud-synchronised folder or a team shared drive;
-writing inside a folder the pipeline never writes into (``extracted``, ``raw_archives``, the
+an explicit generate command); writing inside a folder the pipeline never writes into (``extracted``, ``raw_archives``, the
 source folders, the body-model directories, ``_superseded``, ``_manifest_backfill``, and for a
 bundle or corpus also ``_runs``; the sources and evidence folders are the ones retention rule
 1.4 keeps from deletion) under the run's data root or ``SOMA_DATA_ROOT``; a bundle or
@@ -714,9 +713,10 @@ class PipelineRunner:
           get the generators' guard against this run's data root and ``SOMA_DATA_ROOT``
           (``paths.check_output_dir(root=...)``): nothing inside ``extracted``,
           ``raw_archives``, the ``SOMA_SOURCE_ROOT`` source folders, the body-model
-          directories, ``_superseded``, ``_manifest_backfill`` or ``_runs``, not a container
-          itself, and not a cloud-synchronised folder or a team shared drive. The bundle is also
-          kept off the corpus it reads, as its generator would;
+          directories, ``_superseded``, ``_manifest_backfill`` or ``_runs``, and not a
+          container itself (a cloud-synchronised folder or a team shared drive draws only a
+          warning, ``paths.warn_if_synced``). The bundle is also kept off the corpus it reads,
+          as its generator would;
         * the run records folder and the catalog (when registering) get the narrower
           ``paths.check_record_dir``: ``_runs`` is where records go; everything else above is
           refused, and so are the containers themselves and anything inside a lineage

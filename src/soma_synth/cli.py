@@ -184,8 +184,8 @@ def _cmd_run(args) -> int:
             replace_existing=args.replace_existing,
         )
     except RunnerRefusal as refusal:
-        # refused before its record could be opened (an output in a synchronised folder, or in
-        # a read-only or evidence folder)
+        # refused before its record could be opened (an output in a read-only or evidence
+        # folder; a synchronised folder draws only a warning)
         print(refusal, file=sys.stderr)
         return EXIT_REFUSED
     except (PathConfigError, PipelineError) as error:
@@ -445,8 +445,8 @@ def _location_refusal(plan, ds: Path, data_root: Path | None, *, catalog_dir: Pa
     ``README.md`` into the bundle; so a bundle directory written into gets
     ``paths.check_bundle_dir(root=<data root>)``, as the runner's does: nothing inside an evidence
     folder of any data root, nor inside ``extracted``, ``raw_archives``, the source or body-model
-    folders, not a container, not a synchronised folder. A ledger or report written outside the
-    bundle gets ``paths.check_record_file``: its folder the run records' check (``_runs``
+    folders, not a container (a synchronised folder draws only a warning). A ledger or report
+    written outside the bundle gets ``paths.check_record_file``: its folder the run records' check (``_runs``
     allowed; not a container, not inside a lineage directory, not a read-only or evidence folder),
     and never one of the data plane's own files; the bundle itself is then only read. register
     reads the bundle, which may not be evidence or a read-only folder either
@@ -745,8 +745,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="the list file to write; refused inside the source root, inside "
                          "extracted/ or raw_archives/ of $SOMA_DATA_ROOT, inside an evidence "
                          "folder (_superseded, _runs, _manifest_backfill), the lineage container "
-                         "runs/experimental_generation_poc_demo or a bundle, in a synchronised "
-                         "folder, or over an existing file that is not such a list (see --force)")
+                         "runs/experimental_generation_poc_demo or a bundle, or over an "
+                         "existing file that is not such a list (see --force); a synchronised "
+                         "or shared folder draws a warning")
     hs.add_argument("--force", action="store_true",
                     help="replace an existing --out file that is not a SHA256SUMS list this "
                          "command wrote (the location refusals still apply)")
@@ -765,8 +766,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "synchronised or shared folder). Required unless --verify-only")
     ss.add_argument("--to", default=None,
                     help="the source root to fill (default $SOMA_SOURCE_ROOT, else "
-                         "$SOMA_DATA_ROOT/extracted); not a synchronised folder, not inside an "
-                         "evidence folder, not the data root itself")
+                         "$SOMA_DATA_ROOT/extracted); not inside an evidence folder, not the "
+                         "data root itself; a synchronised or shared folder draws a warning")
     ss.add_argument("--sources", default=None,
                     help="comma-separated source folders to take from the list (default every "
                          "folder it names)")

@@ -141,7 +141,7 @@ take 를 `"skipped"` 로 적어 색인의 `ok` 에서 뺀다)을 러너가 알 �
 | 표본 코퍼스 → 운영 번들 | 번들 폴더가 운영 lineage 인데 코퍼스가 그 옆의 자기 코퍼스 lineage 가 아니다 | 번들도 scratch 폴더로 |
 | 표본 실행 → 운영 코퍼스 생성 | 코퍼스 폴더가 운영 코퍼스 lineage 이고 이번 실행이 그것을 만들거나 다시 만드는데(지문 없음, 또는 `--rebuild-corpus`), 번들이 그 옆의 운영 번들 lineage 가 아니거나 선택 인자가 있다. 끝난 운영 코퍼스를 **재사용**만 하는 표본은 거부하지 않는다 | `--corpus <scratch 폴더>` |
 | 러너가 정하는 플래그 | `--corpus-arg`·`--bundle-arg` 가 코퍼스 출력(`--out`), 번들 출력(`--out`·`--out-root`), 번들에 넘기는 코퍼스 플래그(`--paired`·`--retarget`·`--raw`), 원천 위치(`--source-root`·`--root`·`--hknu-root`·`--amass-root`·`--extracted`), PRISM `--data-root` 를 준다(`--x=v`·argparse 축약 포함; argparse 가 선언된 다른 플래그로 읽는 축약은 통과) | 번들은 `soma-synth run` 의 dataset_dir, 코퍼스는 `--corpus`, 데이터 루트는 `--data-root`, 원천은 `SOMA_SOURCE_ROOT` |
-| 동기화 폴더 | 번들 폴더·코퍼스 폴더(이번 실행이 만들거나 다시 만들 때)·실행 기록 폴더(`--runs-root`)·카탈로그(register 단계가 있을 때)가 Dropbox·OneDrive·Google Drive(`My Drive`·`내 드라이브`·`Shared drives`·`공유 드라이브` 등)·Synology Drive·iCloud Drive 폴더나 `SOMA_SHARED_DRIVE_NAMES` 가 이름을 적은 팀 공유 드라이브(쉼표로 나눈 폴더 이름, 기본값 없음; `paths.on_shared_drive`) 안이다. 폴더 이름은 운영체제와 상관없이 대소문자 없이 맞춘다(`~/Dropbox`·`~/OneDrive*`·`~/Google Drive`·`/Volumes/GoogleDrive*` 포함). macOS 의 `~/Library/CloudStorage/*`(File Provider 동기화 클라이언트 전부)·`~/Library/Mobile Documents`(iCloud), Linux 의 gvfs `google-drive:` 마운트는 POSIX 경로에서만 본다(`paths.synced_location`, `paths.check_not_synced`) | 로컬 디스크의 `SOMA_DATA_ROOT` 아래로 |
+| 동기화 폴더(**거부 아님, 경고만**) | 번들 폴더·코퍼스 폴더(이번 실행이 만들거나 다시 만들 때)·실행 기록 폴더(`--runs-root`)·카탈로그(register 단계가 있을 때)가 Dropbox·OneDrive·Google Drive(`My Drive`·`내 드라이브`·`Shared drives`·`공유 드라이브` 등)·Synology Drive·iCloud Drive 폴더나 `SOMA_SHARED_DRIVE_NAMES` 가 이름을 적은 팀 공유 드라이브(쉼표로 나눈 폴더 이름, 기본값 없음; `paths.on_shared_drive`) 안이다. 폴더 이름은 운영체제와 상관없이 대소문자 없이 맞춘다(`~/Dropbox`·`~/OneDrive*`·`~/Google Drive`·`/Volumes/GoogleDrive*` 포함). macOS 의 `~/Library/CloudStorage/*`(File Provider 동기화 클라이언트 전부)·`~/Library/Mobile Documents`(iCloud), Linux 의 gvfs `google-drive:` 마운트는 POSIX 경로에서만 본다(`paths.synced_location`). 이 경우 실행은 거부되지 않고 계속되며, 경로마다 한 번 표준 오류에 `warning:` 줄이 나온다(`paths.warn_if_synced`; 2026-09-30 소유자 결정). 동기화 클라이언트가 쓰는 중인 파일을 잠그거나 늦추거나 일부만 올릴 수 있고, 그곳의 번들은 이 PC 밖으로 공유될 수 있어(공유는 별도 승인) 로컬 디스크를 권한다. `readme`·`register`·`validate`·`hash-sources --out`·`stage-sources --to` 도 같다 | 경고를 없애려면 로컬 디스크의 `SOMA_DATA_ROOT` 아래로 |
 | 읽기 전용·증거 폴더 | 번들 폴더, 그리고 이번 실행이 만들거나 다시 만드는 코퍼스 폴더가 이 run 의 data root 나 `SOMA_DATA_ROOT` 의 `extracted`·`raw_archives`·바디 모델 폴더(`SOMA_BODY_MODEL_DIR` 포함)·`_superseded`·`_manifest_backfill`·`_runs` 안이거나, `SOMA_SOURCE_ROOT` 의 소스 폴더 안이거나, 컨테이너(data root·`runs`·`runs/experimental_generation_poc_demo`·`SOMA_SOURCE_ROOT`) 자체다. 번들은 읽는 코퍼스 안이나 그것을 담은 폴더일 수 없다(`paths.check_output_dir(root=...)`). 두 루트가 아닌 다른 루트의 증거 폴더(`runs/experimental_generation_poc_demo/{_superseded,_runs,_manifest_backfill}`) 안도 거부한다(`paths.evidence_folder`). 실행 기록 폴더와 카탈로그는 `_runs` 에는 쓸 수 있고 그 밖의 위 폴더 안에는 쓸 수 없으며, 컨테이너 자체와 lineage 폴더(`runs/experimental_generation_poc_demo/<lineage>`, 번들이나 코퍼스가 든다) 안에도 쓸 수 없다(`paths.check_record_dir`) | scratch 폴더나 lineage 폴더로(실행 기록은 `<컨테이너>/_runs`, 카탈로그는 `<data root>/experimental/catalog`) |
 | 다른 운영 폴더 | 번들 폴더나 (이번 실행이 읽는) 코퍼스 폴더가 어느 루트든 `runs/experimental_generation_poc_demo` 바로 아래에 있는데 이 소스의 자기 번들·코퍼스 lineage 가 아니다: 레지스트리가 선언한 다른 lineage(`prism` 을 `amass_faithful_full` 에, `hknu` 번들을 `hknu_smpl24_paired` 에, `hknu` 코퍼스로 `gaitex_smpl24` 를)이든, 아무도 선언하지 않은 폴더(`_dryrun_*`, `my_experiment` 등)이든 (`runner.production_directory_refusal`) | 자기 lineage 폴더나 scratch 폴더로 |
 | 교체 흔적 | 번들 폴더나 코퍼스 폴더 자체가 옆으로 옮긴 폴더나 실패한 교체의 산출(`*.replaced-*`·`*.failed-*`)이다 | 원래 폴더(이름에서 `.replaced-…`·`.failed-…` 를 뗀 것)로 |
@@ -231,7 +231,7 @@ lineage 도 거부한다.
 run identity, 실행 기록 위치다. 단계가 어떻게 끝나든(성공, 실패, 예외, 거부) 지운다. 단 그 파일이 이 실행이 쓴
 그대로일 때만 지운다(운영자가 지운 뒤 다른 실행이 잡은 잠금은 그 실행의 것이다). 코퍼스는 읽기만 하는
 실행도 잠근다. 번들이 읽는 동안 다른 실행이 그것을 다시 만들지 못하게 하려는 것이다. 그래서 같은 코퍼스를
-읽는 두 표본 실행도 동시에 돌지 않는다. 어떤 실행도 쓸 수 없는 곳(증거·읽기 전용·동기화 폴더,
+읽는 두 표본 실행도 동시에 돌지 않는다. 어떤 실행도 쓸 수 없는 곳(증거·읽기 전용 폴더,
 `paths.check_output_dir`)의 코퍼스는 아무도 다시 만들 수 없으므로 잠그지 않고, 그 옆에 아무것도 쓰지 않는다.
 러너는 남의 잠금을 지우지 않는다. 오래된 잠금의 거부 메시지가 주인과 나이, 그리고 그 프로세스가 살아 있는지
 확인하는 명령을 적는다.
@@ -368,7 +368,7 @@ soma-synth stage-sources --from <원천 폴더들을 담은 폴더> [--to <sourc
   `_manifest_backfill`, 어디에 있든 이름으로) 안, lineage 컨테이너 `runs/experimental_generation_poc_demo`
   안(`SOMA_DATA_ROOT` 의 것, 그리고 폴더 이름이 그렇게 이어지는 어느 경로든), 번들이나 코퍼스 안(위쪽
   폴더 어딘가에 `INDEX.json` 이 있으면), data root 자신의 파일(`README.md`, 그리고 있으면 `MASTER.md`·
-  `state/local_archive_inventory.json`), 동기화 폴더에는 쓰지 않는다(종료 코드 3). 이미 있는 파일은 이
+  `state/local_archive_inventory.json`)에는 쓰지 않는다(종료 코드 3). 동기화 폴더는 경고만 한다. 이미 있는 파일은 이
   명령이 쓴 목록으로 읽힐 때만(모든 줄이 원천 폴더의 파일을 적은 `sha256sum` 줄이고, 이름이 겹치지 않고
   정렬돼 있고, 줄바꿈으로 끝난다) 새 목록으로 바꾼다. 그렇지 않은 파일은 `--force` 가 있어야 덮는다
   (`--force` 도 위치 거부는 풀지 않는다). `sha256sum -c` 로도 확인할 수 있다.
@@ -384,7 +384,7 @@ soma-synth stage-sources --from <원천 폴더들을 담은 폴더> [--to <sourc
   폴더(`--sources` 로 고른 것) 아래 남은 것을 `LEFTOVER` 로 보고한다. 지우지는 않는다 — 소유자가 손으로
   지운다. 종료 코드에는 영향이 없다.
 - `--from` 은 동기화 폴더나 공유 드라이브여도 된다(읽기만 한다). `--to` 는 원천 루트가 받는 가드를
-  받는다: 동기화 폴더·공유 드라이브가 아니고, 증거 폴더(`_superseded`·`_runs`·`_manifest_backfill`)
+  받는다(동기화 폴더·공유 드라이브는 경고만 한다): 증거 폴더(`_superseded`·`_runs`·`_manifest_backfill`)
   안이 아니고, data root 자체나 그 `runs`·`raw_archives`·바디 모델 폴더 안이 아니며, `--from` 과 겹치지
   않는다. 반입은 원천 폴더에 **없던 파일을 더하는 일**뿐이다. 이미 있는 원천은 보존 규칙 1.4 대로
   바꾸거나 지우지 않는다.
@@ -845,7 +845,7 @@ register 에 쓴다(`--skip-generate` 또는 `--start-at validate`). 생성기 �
 (1.4), 러너는 원천·바디 모델·증거 폴더 안에 쓰지 않는다(§1.3).
 
 **거부는 성공이 아니다.** 거부된 실행은 실행 기록(`logs/refusal.txt`)을 남기고 `soma-synth run` 은 종료 코드
-3 으로 끝난다(실패한 단계는 1, 경로·레지스트리를 풀지 못한 경우는 2). 동기화 폴더와 읽기 전용·증거 폴더
+3 으로 끝난다(실패한 단계는 1, 경로·레지스트리를 풀지 못한 경우는 2). 읽기 전용·증거 폴더
 거부는 실행 기록을 열기 전이라 기록 없이 종료 코드 3 으로 끝난다(§1.3).
 
 **소스별 소유자 기록은 여전히 유효하다.** 소유자가 `research/decisions/` 에 날짜·소스·

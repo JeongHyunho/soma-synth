@@ -370,37 +370,68 @@ class TestCheckOutputDir:
                                         "My Drive", "Shared drives", "Other computers",
                                         "내 드라이브", "공유 드라이브", "다른 컴퓨터",
                                         "SynologyDrive", "Synology Drive"])
-    def test_a_cloud_synchronised_folder_is_refused(self, data_root, tmp_path, folder):
+    def test_a_cloud_synchronised_folder_is_warned_about_not_refused(self, data_root, tmp_path,
+                                                                     folder, capsys):
         """Google Drive for desktop names its folders in the Windows display language; a
-        Korean-language Windows names them in Korean."""
-        with pytest.raises(paths.OutputLocationRefused, match="cloud-synchronised"):
-            paths.check_output_dir(tmp_path / folder / "project" / "bundle")
+        Korean-language Windows names them in Korean. Writing there is allowed with a warning
+        (owner decision, 2026-09-30)."""
+        target = tmp_path / folder / "project" / "bundle"
+        assert paths.check_output_dir(target) == target
+        err = capsys.readouterr().err
+        assert err.count("warning:") == 1
+        assert "cloud-synchronised" in err and "not recommended" in err
 
-    def test_a_decomposed_korean_folder_name_is_refused_too(self, data_root, tmp_path):
+    def test_a_decomposed_korean_folder_name_is_warned_about_too(self, data_root, tmp_path,
+                                                                capsys):
         decomposed = unicodedata.normalize("NFD", "내 드라이브")
         assert decomposed != "내 드라이브"
-        with pytest.raises(paths.OutputLocationRefused, match="cloud-synchronised"):
-            paths.check_output_dir(tmp_path / decomposed / "bundle")
+        target = tmp_path / decomposed / "bundle"
+        assert paths.check_output_dir(target) == target
+        assert "cloud-synchronised" in capsys.readouterr().err
 
-    def test_a_folder_merely_named_like_one_is_not(self, data_root):
+    def test_a_folder_merely_named_like_one_is_not(self, data_root, capsys):
         target = data_root / "tmp" / "dropbox_notes_backup"
         assert paths.check_output_dir(target) == target
+        assert "warning:" not in capsys.readouterr().err
 
-    def test_a_named_shared_drive_is_refused(self, data_root, clean_env, tmp_path):
+    def test_a_named_shared_drive_is_warned_about(self, data_root, clean_env, tmp_path, capsys):
         target = tmp_path / "Team_Share" / "datasets" / "bundle"
         assert paths.check_output_dir(target) == target        # no shared drive is named
+        assert "warning:" not in capsys.readouterr().err
         clean_env.setenv(paths.SHARED_DRIVE_NAMES_ENV, "Other, team_share")
-        with pytest.raises(paths.OutputLocationRefused, match="shared drive"):
-            paths.check_output_dir(target)
+        assert paths.check_output_dir(target) == target
+        err = capsys.readouterr().err
+        assert err.count("warning:") == 1 and "shared drive" in err
 
-    def test_the_refusal_uses_the_pure_rule(self, data_root, monkeypatch, tmp_path):
-        """check_not_synced judges the path as written and as resolved with synced_location, so
+    def test_the_warning_is_printed_once_per_path(self, data_root, tmp_path, capsys):
+        target = tmp_path / "Dropbox" / "bundle"
+        for _ in range(3):
+            assert paths.warn_if_synced(target) == target
+        assert paths.check_output_dir(target) == target
+        assert capsys.readouterr().err.count("warning:") == 1
+        other = tmp_path / "Dropbox" / "other"
+        paths.warn_if_synced(other)
+        assert capsys.readouterr().err.count("warning:") == 1
+
+    def test_the_other_refusals_still_apply_inside_a_synchronised_folder(self, clean_env,
+                                                                          tmp_path):
+        root = tmp_path / "Dropbox" / "data"
+        (root / "extracted").mkdir(parents=True)
+        clean_env.setenv(paths.DATA_ROOT_ENV, str(root))
+        with pytest.raises(paths.OutputLocationRefused, match="read-only"):
+            paths.check_output_dir(root / "extracted" / "prism" / "bundle")
+        with pytest.raises(paths.OutputLocationRefused, match="itself"):
+            paths.check_output_dir(root)
+
+    def test_the_warning_uses_the_pure_rule(self, data_root, monkeypatch, tmp_path, capsys):
+        """warn_if_synced judges the path as written and as resolved with synced_location, so
         the platform rules tested on pure paths below are the ones a real run meets."""
         seen = []
         monkeypatch.setattr(paths, "synced_location",
                             lambda path: seen.append(path) or "Somewhere")
-        with pytest.raises(paths.OutputLocationRefused, match="'Somewhere'"):
-            paths.check_not_synced(tmp_path / "plain" / "bundle")
+        target = tmp_path / "plain" / "bundle"
+        assert paths.warn_if_synced(target) == target
+        assert "'Somewhere'" in capsys.readouterr().err
         assert seen and seen[0] == (tmp_path / "plain" / "bundle").absolute()
 
 
@@ -745,9 +776,10 @@ class TestCheckRecordDir:
         with pytest.raises(paths.OutputLocationRefused, match="read-only"):
             paths.check_record_dir(root / folder / "_runs", root=root)
 
-    def test_a_synchronised_folder_is_refused(self, clean_env, tmp_path):
-        with pytest.raises(paths.OutputLocationRefused, match="cloud-synchronised"):
-            paths.check_record_dir(tmp_path / "Dropbox" / "_runs", root=tmp_path / "root")
+    def test_a_synchronised_folder_is_warned_about(self, clean_env, tmp_path, capsys):
+        target = tmp_path / "Dropbox" / "_runs"
+        assert paths.check_record_dir(target, root=tmp_path / "root") == target
+        assert "cloud-synchronised" in capsys.readouterr().err
 
     def test_the_configured_data_root_is_guarded_without_a_run_root(self, data_root):
         with pytest.raises(paths.OutputLocationRefused, match="source root"):
@@ -806,8 +838,8 @@ class TestCheckReadmeRoot:
                                                                         tmp_path):
         for folder in (data_root / POC, data_root / "runs", tmp_path / "mine"):
             assert paths.check_readme_root(folder) == folder
-        with pytest.raises(paths.OutputLocationRefused, match="cloud-synchronised"):
-            paths.check_readme_root(tmp_path / "Dropbox" / "x")
+        synced = tmp_path / "Dropbox" / "x"
+        assert paths.check_readme_root(synced) == synced              # warned, not refused
 
 
 class TestCheckBundleDir:
@@ -852,11 +884,17 @@ class TestCheckBundleDir:
             assert paths.check_bundle_dir(bundle, writes=False) == bundle
 
     def test_only_a_command_that_writes_into_the_bundle_gets_the_rest_of_the_output_guard(
-            self, data_root, tmp_path):
+            self, data_root, tmp_path, capsys):
+        container = data_root / POC
+        container.mkdir(parents=True)
+        with pytest.raises(paths.OutputLocationRefused, match="itself"):
+            paths.check_bundle_dir(container)
+        assert paths.check_bundle_dir(container, writes=False) == container
         synced = tmp_path / "Dropbox" / "gaitex_unified8"
-        with pytest.raises(paths.OutputLocationRefused, match="cloud-synchronised"):
-            paths.check_bundle_dir(synced)
         assert paths.check_bundle_dir(synced, writes=False) == synced   # register reads it
+        assert "warning:" not in capsys.readouterr().err
+        assert paths.check_bundle_dir(synced) == synced                 # validate, readme write
+        assert "cloud-synchronised" in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------- import-time behaviour

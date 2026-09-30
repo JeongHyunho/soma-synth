@@ -1813,8 +1813,10 @@ def test_the_resolved_config_names_the_source_root_the_generators_see(fixture_re
 
 @pytest.mark.parametrize("where", ["dataset_dir", "runs_root", "catalog", "corpus_dir"])
 @pytest.mark.parametrize("folder", ["Dropbox", "OneDrive - Org", "Team_Share"])
-def test_outputs_in_a_synchronised_folder_are_refused_before_the_record_opens(
-        fixture_registry, data_root, tmp_path, where, folder):
+def test_outputs_in_a_synchronised_folder_are_warned_about_not_refused(
+        fixture_registry, data_root, tmp_path, where, folder, capsys):
+    """Owner decision (2026-09-30): an output inside a cloud-synchronised folder or on a team
+    shared drive is written, with one warning line on stderr naming it."""
     registry, calls_path = fixture_registry
     synced = tmp_path / folder / "x"
     source = "hknu" if where == "corpus_dir" else "prism"
@@ -1827,46 +1829,41 @@ def test_outputs_in_a_synchronised_folder_are_refused_before_the_record_opens(
     else:
         kwargs[where] = synced / where
     runner = _runner(registry, data_root, source=source, **kwargs)
-    with pytest.raises(runner_mod.RunnerRefusal, match=f"refusing to run {source}"):
-        runner.run(stop_after="register", catalog_dir=catalog, log=_quiet)
-    assert not (tmp_path / folder).exists()
-    assert not (data_root / "tmp").exists()                  # no run record anywhere
-    assert _calls(calls_path) == []
     if where == "catalog":
-        # a run that registers nothing does not write the catalog, and is not refused for it
-        result = runner.run(stop_after="generate", skip_generate=True, catalog_dir=catalog,
-                            log=_quiet)
-        assert [o.status for o in result.outcomes] == ["skipped"]
-    if where == "corpus_dir":
-        # the runner moves a corpus aside for a rebuild and writes its marker and lock itself;
-        # a corpus it only reads is not refused, and gets no lock beside it
-        synced_corpus = kwargs["corpus_dir"]
-        synced_corpus.mkdir(parents=True)
-        (synced_corpus / "SUMMARY.json").write_text('{"synced": true}', encoding="utf-8")
-        with pytest.raises(runner_mod.RunnerRefusal, match="the corpus directory"):
-            runner.run(stop_after="generate", rebuild_corpus=True, replace_existing=True,
-                       log=_quiet)
-        assert sorted(path.name for path in synced_corpus.parent.iterdir()) == [
-            synced_corpus.name]
-        assert sorted(path.name for path in synced_corpus.iterdir()) == ["SUMMARY.json"]
+        # the catalog is checked only when the run registers; it may register there now
+        runner.run(stop_after="register", catalog_dir=catalog, log=_quiet)
+        warned = catalog
+    else:
         result = runner.run(stop_after="generate", log=_quiet)
         assert [o.status for o in result.outcomes] == ["ok"], result.outcomes
-        assert _manifest(result)["corpus"]["action"] == "reused"
-        assert sorted(path.name for path in synced_corpus.parent.iterdir()) == [
-            synced_corpus.name]
+        assert _calls(calls_path) != []
+        warned = kwargs[where]
+        assert warned.is_dir()
+    lines = [line for line in capsys.readouterr().err.splitlines()
+             if line.startswith("warning:")]
+    assert len(lines) == 1, lines
+    assert str(warned) in lines[0] and "not recommended" in lines[0]
+    assert ("shared drive" if folder == "Team_Share" else "cloud-synchronised") in lines[0]
 
 
-def test_the_cli_exits_3_for_a_synchronised_output(fixture_registry, data_root, tmp_path,
-                                                   monkeypatch, capsys):
+def test_the_cli_runs_into_a_synchronised_output_with_one_warning(
+        fixture_registry, data_root, tmp_path, monkeypatch, capsys):
     from soma_synth import cli
 
     registry, calls_path = fixture_registry
     monkeypatch.setattr(stages_mod, "default_registry", lambda: registry)
-    code = cli.main(["run", str(tmp_path / "Dropbox" / "bundle"), "--source", "prism",
+    bundle = tmp_path / "Dropbox" / "bundle"
+    code = cli.main(["run", str(bundle), "--source", "prism",
                      "--data-root", str(data_root), "--stop-after", "generate"])
-    assert code == cli.EXIT_REFUSED
-    assert "cloud-synchronised" in capsys.readouterr().err
-    assert _calls(calls_path) == []
+    assert code == 0
+    lines = [line for line in capsys.readouterr().err.splitlines()
+             if line.startswith("warning:")]
+    # one line per distinct path: the bundle, and the run records beside it (<bundle parent>/_runs)
+    assert [line.split(" is ")[0] for line in lines] == [
+        f"warning: {bundle}", f"warning: {bundle.parent / '_runs'}"]
+    assert all("cloud-synchronised" in line for line in lines)
+    assert _calls(calls_path) != []
+    assert bundle.is_dir()
 
 
 def test_the_intended_basis_and_the_one_the_run_got_are_both_recorded(fixture_registry,

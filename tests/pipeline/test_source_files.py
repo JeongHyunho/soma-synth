@@ -118,13 +118,23 @@ def test_the_list_is_refused_inside_the_sources_or_the_data_roots_read_only_fold
     clean_env.setenv(paths.SHARED_DRIVE_NAMES_ENV, "Team_Share")
     for out in (sources / "SHA256SUMS", sources / "prism" / "SUMS",
                 data / "extracted" / "SUMS", data / "raw_archives" / "SUMS",
-                tmp_path / "Dropbox" / "SUMS", tmp_path / "x" / "Team_Share" / "SUMS",
                 data / "README.md", data / "MASTER.md",
                 data / "state" / "local_archive_inventory.json"):
         with pytest.raises(paths.OutputLocationRefused):
             sf.hash_sources(sources, ["prism"], out, log=lambda _: None)
         assert not out.exists() or out.name in ("README.md", "MASTER.md")
     assert sf.check_sums_output(tmp_path / "lists" / "SUMS", sources) == tmp_path / "lists" / "SUMS"
+
+
+def test_the_list_may_go_into_a_synchronised_or_shared_folder_with_a_warning(
+        sources, tmp_path, clean_env, capsys):
+    clean_env.setenv(paths.SHARED_DRIVE_NAMES_ENV, "Team_Share")
+    for out in (tmp_path / "Dropbox" / "SUMS", tmp_path / "x" / "Team_Share" / "SUMS"):
+        out.parent.mkdir(parents=True)
+        sf.hash_sources(sources, ["prism"], out, log=lambda _: None)
+        assert out.is_file()
+        err = capsys.readouterr().err
+        assert err.count("warning:") == 1 and str(out) in err
 
 
 def test_the_list_is_refused_in_evidence_the_lineage_container_or_a_bundle(sources, tmp_path,
@@ -259,8 +269,7 @@ def test_the_destination_gets_the_source_root_guards(sources, listed, tmp_path, 
     data.mkdir()
     clean_env.setenv(paths.DATA_ROOT_ENV, str(data))
     poc = data / "runs" / "experimental_generation_poc_demo"
-    for to in (tmp_path / "Dropbox" / "extracted", tmp_path / "Google Drive" / "src",
-               poc / "_superseded" / "x", tmp_path / "any" / "_runs" / "x", data,
+    for to in (poc / "_superseded" / "x", tmp_path / "any" / "_runs" / "x", data,
                data / "runs" / "x", data / "raw_archives" / "x", data / "body_models" / "smpl",
                sources / "inner", sources.parent):
         with pytest.raises(paths.OutputLocationRefused):
@@ -269,6 +278,15 @@ def test_the_destination_gets_the_source_root_guards(sources, listed, tmp_path, 
     # the data root's extracted folder is where sources go by default
     result = sf.stage_sources(data / "extracted", listed, from_root=sources, log=lambda _: None)
     assert result.exit_code == 0
+
+
+def test_the_destination_may_be_a_synchronised_folder_with_a_warning(sources, listed, tmp_path,
+                                                                     clean_env, capsys):
+    for to in (tmp_path / "Dropbox" / "extracted", tmp_path / "Google Drive" / "src"):
+        result = sf.stage_sources(to, listed, from_root=sources, log=lambda _: None)
+        assert result.exit_code == 0 and result.copied
+        err = capsys.readouterr().err
+        assert err.count("warning:") == 1 and "cloud-synchronised" in err
 
 
 def test_the_source_may_be_on_a_synchronised_or_shared_drive(tmp_path, clean_env):

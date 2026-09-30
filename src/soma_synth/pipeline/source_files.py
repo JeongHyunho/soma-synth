@@ -10,7 +10,7 @@ the run record's source tracing (``source_trace.py``) lists files the same way:
     format (``<sha256>  <folder>/<relative posix path>``, one line per file, sorted by name), so
     ``sha256sum -c`` can check it too. It only reads the sources, and refuses a list written into
     the source root, into ``extracted/`` or ``raw_archives/`` of the data root, over one of the data
-    root's own files, or into a synchronised folder.
+    root's own files (a list written into a synchronised folder draws a warning).
 ``soma-synth stage-sources`` (:func:`stage_sources`)
     Copies every listed file that is missing under the source root from a folder that holds the
     source folders (only read; it may be a synchronised or shared folder): each copy goes to a
@@ -251,8 +251,8 @@ def _lineage_container_parts() -> tuple[str, ...]:
 def check_sums_output(out: Path | str, source_root: Path | str, *, force: bool = False) -> Path:
     """Refuse a ``SHA256SUMS`` destination the list must not be written to; return it.
 
-    Refused: a synchronised folder or a team shared drive (``paths.check_not_synced``); anything
-    inside the source root the list describes; anything inside ``extracted/`` or ``raw_archives/``
+    A synchronised folder or a team shared drive draws a warning (``paths.warn_if_synced``).
+    Refused: anything inside the source root the list describes; anything inside ``extracted/`` or ``raw_archives/``
     of ``SOMA_DATA_ROOT`` when it is set (retention rule 1.4: they are never written); anything
     inside an evidence folder (``_superseded``, ``_runs``, ``_manifest_backfill``, wherever it is),
     inside the lineage container ``runs/experimental_generation_poc_demo`` (of any data root: the
@@ -262,7 +262,7 @@ def check_sums_output(out: Path | str, source_root: Path | str, *, force: bool =
     and, unless ``force``, an existing file that is not a list this command wrote
     (:func:`is_sums_list`).
     """
-    target = paths_mod.check_not_synced(out)
+    target = paths_mod.warn_if_synced(out)
     if target.is_dir():
         raise paths_mod.OutputLocationRefused(f"refusing to write {target}: it is a folder; name "
                                               "the list file")
@@ -314,12 +314,12 @@ def check_sums_output(out: Path | str, source_root: Path | str, *, force: bool =
 def check_staging_root(to: Path | str, from_root: Path | str | None = None) -> Path:
     """Refuse a destination source root that staging must not write into; return it.
 
-    The guards a source root gets: not a synchronised folder or a team shared drive; not inside an
-    evidence folder (``_superseded``, ``_runs``, ``_manifest_backfill``, wherever it is); not the
-    data root itself, nor inside its ``runs``, ``raw_archives`` or body-model folder (when
+    The guards a source root gets (a synchronised folder or a team shared drive draws only a
+    warning, ``paths.warn_if_synced``): not inside an evidence folder (``_superseded``,
+    ``_runs``, ``_manifest_backfill``, wherever it is); not the data root itself, nor inside its ``runs``, ``raw_archives`` or body-model folder (when
     ``SOMA_DATA_ROOT`` is set); and not inside, or holding, the folder it copies from.
     """
-    target = paths_mod.check_not_synced(to)
+    target = paths_mod.warn_if_synced(to)
     resolved = target.resolve()
     evidence = {name.casefold() for name in paths_mod.EVIDENCE_FOLDERS}
     for part in resolved.parts[1:]:

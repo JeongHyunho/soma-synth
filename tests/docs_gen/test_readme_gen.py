@@ -46,3 +46,20 @@ def test_cli_readme(tmp_path: Path) -> None:
     rc = cli.main(["readme", str(a), str(p), "--top-level-root", str(tmp_path)])
     assert rc == 0
     assert (a / "README.md").exists() and (p / "README.md").exists() and (tmp_path / "README.md").exists()
+
+
+def test_cli_readme_into_a_synchronised_folder_warns_once(tmp_path: Path, capsys) -> None:
+    """A synchronised folder is written with a warning, not refused (owner decision,
+    2026-09-30); each path is named once."""
+    synced = tmp_path / "OneDrive - Example" / "datasets"
+    a = make_dataset(synced / "amass_x", n=1)
+    capsys.readouterr()
+    rc = cli.main(["readme", str(a), "--top-level-root", str(synced)])
+    assert rc == 0
+    assert (a / "README.md").exists() and (synced / "README.md").exists()
+    lines = [line for line in capsys.readouterr().err.splitlines() if line.startswith("warning:")]
+    assert [line.split(" is ")[0] for line in lines].count(f"warning: {a}") == 1
+    assert all("cloud-synchronised" in line and "not recommended" in line for line in lines)
+    rc = cli.main(["readme", str(a)])
+    assert rc == 0
+    assert "warning:" not in capsys.readouterr().err       # already named in this process

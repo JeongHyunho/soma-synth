@@ -99,12 +99,14 @@ export SOMA_DATA_ROOT="$HOME/soma_data"
 mkdir -p "$SOMA_DATA_ROOT"
 ```
 
-**데이터 루트는 로컬 디스크에 둔다.** 동기화 폴더 안에는 쓰지 않는다: Dropbox, OneDrive, Google Drive
-(`My Drive`·`내 드라이브`·`Shared drives`·`공유 드라이브`, `/Volumes/GoogleDrive*`), Synology Drive,
-iCloud Drive, macOS 의 `~/Library/CloudStorage/*`, Linux 의 gvfs `google-drive:` 마운트, 그리고
-`SOMA_SHARED_DRIVE_NAMES` 에 적은 팀 공유 드라이브(폴더 이름을 쉼표로 나눠 적는다. 대소문자는 가리지
-않는다. 기본값은 비어 있다). 동기화 클라이언트가 생성 중인 파일을 건드리고, 내부 전용 데이터를 PC 밖으로
-옮기기 때문이다. 원천(`SOMA_SOURCE_ROOT`)과 바디 모델은 읽기만 한다.
+**데이터 루트는 로컬 디스크에 두기를 권한다.** 출력이 동기화 폴더 안이면 거부하지 않고 표준 오류에
+경고(`warning: ... is inside the cloud-synchronised folder ...`)를 한 번 찍은 뒤 계속한다: Dropbox,
+OneDrive, Google Drive(`My Drive`·`내 드라이브`·`Shared drives`·`공유 드라이브`, `/Volumes/GoogleDrive*`),
+Synology Drive, iCloud Drive, macOS 의 `~/Library/CloudStorage/*`, Linux 의 gvfs `google-drive:` 마운트,
+그리고 `SOMA_SHARED_DRIVE_NAMES` 에 적은 팀 공유 드라이브(폴더 이름을 쉼표로 나눠 적는다. 대소문자는
+가리지 않는다. 기본값은 비어 있다). 그래도 로컬 디스크를 권하는 이유는 동기화 클라이언트가 생성 중인
+파일을 잠그거나 늦추거나 일부만 올릴 수 있고, 그곳에 쓴 번들은 이 PC 밖으로 공유될 수 있기 때문이다(공유는
+별도 승인 사안이다). 원천(`SOMA_SOURCE_ROOT`)과 바디 모델은 읽기만 한다.
 
 ```powershell
 $env:SOMA_SHARED_DRIVE_NAMES = "<공유 드라이브 폴더 이름>"      # 예: 팀 공유 드라이브의 최상위 폴더 이름
@@ -334,13 +336,14 @@ soma-synth validate $env:SOMA_DATA_ROOT\runs\experimental_generation_poc_demo\hk
 
 | 메시지의 요지 | 풀어 주는 것 |
 |---|---|
-| `cloud-synchronised folder` / `team shared drive` | 데이터 루트·출력을 로컬 디스크로 |
 | `inside ... which is read-only` (`extracted`, `raw_archives`, 소스 폴더, 바디 모델, `_superseded`, `_manifest_backfill`) | 출력을 lineage 폴더나 scratch 로 |
 | `it already holds ...` (번들·코퍼스 폴더가 비어 있지 않다) | `--replace-existing`(코퍼스는 `--rebuild-corpus` 도), 또는 빈 폴더 |
 | `selects part of the source ... production lineage directory` | 표본은 scratch 폴더로(§6) |
 | `sets --out, which the runner controls` | 출력은 `dataset_dir`, 코퍼스는 `--corpus`, 원천은 `SOMA_SOURCE_ROOT` 로 |
 | `no _superseded/<이름>_* folder ... holds a copy` | 운영 폴더를 교체하기 전에 증거를 `_superseded/` 에(보존 규칙 1.2) |
 | `its generation did not finish -- .generating is there` | 그 번들은 끝나지 않았다. `--replace-existing` 으로 다시 만든다 |
+
+`warning: ... cloud-synchronised folder` / `team shared drive` 는 거부가 아니라 경고다. 실행은 계속되며, 없애려면 데이터 루트·출력을 로컬 디스크로 옮긴다.
 
 **잠금** — generate 단계는 번들(과 코퍼스) 폴더 옆에 `<폴더>.lock` 을 만들고 끝나면 지운다. 다른 실행이
 돌고 있으면 거부된다. 메시지가 그 잠금의 pid·호스트·시작 시각을 적는다. 그 프로세스가 없으면
