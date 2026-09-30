@@ -29,18 +29,18 @@ def render_table(registry: stages_mod.PipelineRegistry | None = None) -> str:
     lines = [
         BEGIN,
         "",
-        f"> 생성물이다. 원본은 [`{reg.path.name}`](../../configs/datasets/{reg.path.name}) 이고,",
-        "> `soma-synth pipeline-doc --render` 가 이 블록을 다시 쓴다. 손으로 고치지 말 것.",
+        f"> Generated. The source is [`{reg.path.name}`](../../configs/datasets/{reg.path.name});",
+        "> `soma-synth pipeline-doc --render` rewrites this block. Do not edit it by hand.",
         "",
     ]
     if v2:
         lines += [
-            "| source | `small_mode` | emitter | 재개 판정 | 병렬 | 진입점 | 번들 lineage | 코퍼스 | smpl18 프로파일 |",
+            "| source | `small_mode` | emitter | resume predicate | parallel | entry point | bundle lineage | corpus | smpl18 profile |",
             "|---|---|---|---|---|---|---|---|---|",
         ]
     else:
         lines += [
-            "| source | `small_mode` | emitter | 재개 판정 | 병렬 | 진입점 | smpl18 프로파일 |",
+            "| source | `small_mode` | emitter | resume predicate | parallel | entry point | smpl18 profile |",
             "|---|---|---|---|---|---|---|",
         ]
     for name in sorted(reg.sources):
@@ -53,7 +53,7 @@ def render_table(registry: stages_mod.PipelineRegistry | None = None) -> str:
             row += f"`{source.bundle_lineage}` | {corpus} | "
         lines.append(row + f"{profile} |")
 
-    lines += ["", "**재개 판정의 뜻**", ""]
+    lines += ["", "**What the resume predicates mean**", ""]
     for key in sorted(reg.resume_predicates):
         lines.append(f"- `{key}` — {reg.resume_predicates[key]['description']}")
 
@@ -61,12 +61,12 @@ def render_table(registry: stages_mod.PipelineRegistry | None = None) -> str:
     shared = sorted(n for n in reg.sources if reg.for_source(n).uses_shared_emitter())
     lines += [
         "",
-        (f"**공유 emitter 사용**: {', '.join(f'`{n}`' for n in shared)} — "
-         f"**미사용(자체 구현)**: {', '.join(f'`{n}`' for n in inline)}"),
+        (f"**Shared emitter**: {', '.join(f'`{n}`' for n in shared)} — "
+         f"**Own implementation**: {', '.join(f'`{n}`' for n in inline)}"),
     ]
 
     if v2:
-        lines += ["", "**생성 단계 (코퍼스 → 번들 → 후처리)**", ""]
+        lines += ["", "**Generation stages (corpus → bundle → post-steps)**", ""]
         for name in sorted(reg.sources):
             source = reg.for_source(name)
             entry = source.entrypoint
@@ -74,39 +74,39 @@ def render_table(registry: stages_mod.PipelineRegistry | None = None) -> str:
             if source.corpus:
                 corpus = source.corpus
                 parts.append(
-                    f"코퍼스 `{Path(corpus.script).name} {corpus.output_arg} <{corpus.lineage}>` "
-                    f"(지문 `{corpus.fingerprint}`, 번들에 `{corpus.bundle_arg}` 로 전달)"
+                    f"corpus `{Path(corpus.script).name} {corpus.output_arg} <{corpus.lineage}>` "
+                    f"(fingerprint `{corpus.fingerprint}`, passed to the bundle as `{corpus.bundle_arg}`)"
                 )
             parts.append(
-                f"번들 `{Path(entry.script).name} {entry.output_arg} <{source.bundle_lineage}>`")
+                f"bundle `{Path(entry.script).name} {entry.output_arg} <{source.bundle_lineage}>`")
             for step in source.post_steps:
-                parts.append(f"후처리 `{Path(step.script).name} {' '.join(step.args)}`")
+                parts.append(f"post-step `{Path(step.script).name} {' '.join(step.args)}`")
             lines.append(f"- `{name}` — " + " → ".join(parts))
-        lines += ["", "**읽는 환경 변수**", ""]
+        lines += ["", "**Environment variables read**", ""]
         for name in sorted(reg.sources):
             lines.append(f"- `{name}` — {_code(reg.for_source(name).reads_env)}")
 
-    lines += ["", "**바디 모델 세트**", ""]
+    lines += ["", "**Body model sets**", ""]
     for name in sorted(reg.body_model_sets):
         declared = reg.body_model_sets[name]
         users = sorted(n for n in reg.sources if reg.for_source(n).body_model_set == name)
-        location = f"data root 기준 `{declared.relative_path}`"
+        location = f"`{declared.relative_path}` under the data root"
         if v2:
-            location += " (`SOMA_BODY_MODEL_DIR` 가 있으면 그 폴더, `pipeline.paths.body_model_dir()`)"
+            location += " (or `SOMA_BODY_MODEL_DIR` when set; `pipeline.paths.body_model_dir()`)"
         lines.append(
-            f"- `{name}` — {location}, 성별에 따른 파일 선택은 "
-            f"`{declared.resolver}` 가 정한다. 사용: {', '.join(f'`{n}`' for n in users)}"
+            f"- `{name}` — {location}; the file for each sex is chosen by "
+            f"`{declared.resolver}`. Used by: {', '.join(f'`{n}`' for n in users)}"
         )
 
     policy = reg.generation_policy
     if policy is not None:
         lines += [
             "",
-            "**생성 정책 (`generation_policy`)**",
+            "**Generation policy (`generation_policy`)**",
             "",
-            (f"- 근거: `{policy.basis}` — {policy.adr} (`{policy.adr_path}`), "
-             f"결정 기록 `{policy.decision_record}` {policy.decision_section}"),
-            (f"- 등급 `{policy.artifact_class}`, 배포 범위 `{policy.distribution_scope}`, "
+            (f"- Basis: `{policy.basis}` — {policy.adr} (`{policy.adr_path}`), "
+             f"decision record `{policy.decision_record}` {policy.decision_section}"),
+            (f"- Class `{policy.artifact_class}`, distribution scope `{policy.distribution_scope}`, "
              f"`releases_holds: {str(policy.releases_holds).lower()}`"),
         ]
     lines += ["", END]

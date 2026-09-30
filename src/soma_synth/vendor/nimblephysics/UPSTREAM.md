@@ -1,6 +1,6 @@
 # NimblePhysics B3D schema pin
 
-| 항목 | 값 |
+| Item | Value |
 |---|---|
 | Repository | `keenon/nimblephysics` |
 | Commit | `c405b056fc35068027e03e0c384e84e12870b475` |
@@ -19,18 +19,18 @@ not duplicate protobuf field numbers manually.
 
 ## Regeneration
 
-저장소 루트에서 `libprotoc 3.21.9` 의 `protoc` 로 다음 명령을 실행한다. 셸은 무엇이든 된다.
+From the repository root, run the following with the `protoc` of `libprotoc 3.21.9`. Any shell works.
 
 ```
 protoc --proto_path=src/soma_synth/vendor/nimblephysics --python_out=src/soma_synth/vendor/nimblephysics src/soma_synth/vendor/nimblephysics/SubjectOnDisk.proto
 ```
 
-생성 직전에 `protoc --version`이 `libprotoc 3.21.9`인지 확인하고, 생성
-후 `SubjectOnDisk_pb2.py` SHA-256을 위 표와 비교한다.
+Just before generating, check that `protoc --version` is `libprotoc 3.21.9`; after
+generating, compare the SHA-256 of `SubjectOnDisk_pb2.py` with the table above.
 
 ## Outer B3D framing evidence
 
-| 항목 | 값 |
+| Item | Value |
 |---|---|
 | Upstream source | `dart/biomechanics/SubjectOnDisk.cpp` |
 | Commit | `c405b056fc35068027e03e0c384e84e12870b475` |
@@ -38,5 +38,5 @@ protoc --proto_path=src/soma_synth/vendor/nimblephysics --python_out=src/soma_sy
 | SHA-256 | `EEDAC7833CD553E3E328463C187DB00ED3D13D9174DCCD019734D8BB0F451C8D` |
 | Evidence use | signed little-endian header length, fixed sensor/pass frame widths, trial offset formula |
 
-Upstream C++의 framing logic과 vendored protobuf schema를 함께 사용한다.
-`.proto`만으로는 outer file layout을 유도하지 않는다.
+The upstream C++ framing logic and the vendored protobuf schema are used together.
+The outer file layout is not derived from the `.proto` alone.

@@ -308,14 +308,14 @@ def test_the_run_manifest_says_it_is_not_the_take_manifest(tmp_path: Path):
 def test_the_standard_declares_itself_subordinate_to_the_sealed_document():
     text = STANDARD.read_text(encoding="utf-8")
     assert "PIPELINE_GOVERNANCE.md" in text
-    assert "봉인" in text
+    assert "sealed document" in text
 
 
 def test_the_standard_records_the_sealed_documents_stale_scope_rather_than_editing_it():
     """§0 of the pinned document still says three sources, 6 IMU and 15 joints. The pinned
     document is not edited from this repository, so the standard records the discrepancy itself."""
     text = STANDARD.read_text(encoding="utf-8")
-    assert "8채널" in text and "18관절" in text
+    assert "8-channel" in text and "18-joint" in text
 
 
 def test_the_per_source_table_is_generated_and_matches_the_registry():

@@ -1,404 +1,437 @@
-# 생성 파이프라인 표준 — 실행 명세
+# Generation pipeline standard — execution specification
 
-| 항목 | 값 |
+| Item | Value |
 |---|---|
 | Document ID | `SOMA-GENERATION-PIPELINE-STANDARD-001` |
-| Version | `1.1.0` |
-| 개정 이력 | `1.0.0` (2026-09-09) 최초. `1.1.0` (2026-09-25) `ADR-0041`(상위 프로젝트: `docs/adr/ADR-0041-soma-synth-split-and-teammate-generation.md`) 반영: 레지스트리 v2(코퍼스 단계·후처리·생성 정책·`selection_args`), §1.3 모든 생성은 빈 폴더에 하고 재개는 없다(비어 있지 않은 폴더는 `--replace-existing` 이 있어야 옆으로 옮기고 새 폴더에 만든다: 성공하면 운영 폴더의 것만 남기고 지우고, 실패하면 되돌린다; `force_arg` 없음; 죽은 실행은 처음부터 다시 만든다는 맞바꿈 선언), 끝난 세대를 담은 운영 폴더 교체에 `_superseded` 증거 요구, generate 단계의 잠금(`<폴더>.lock`), 읽기 전용·증거 폴더 거부, 다른 운영 폴더 거부, 쓸 곳 없는 인자 거부, 끝나지 않은 생성 단계의 `.generating` 표지, `pipeline`·`validate`·`readme`·`register`·push 의 같은 거부), §2.1 설치, §3.1 `resolved_config_sha256` 채움, §4.1 추적 기록과 그 빈틈, §6 동일성, §9 생성 정책(`pipeline` generate 거부, 모든 PC 에 같은 조건: 2026-09-25 결정), §10 불일치 두 줄 |
-| 상태 | `ACTIVE_BASELINE` |
-| 기준일 | `2026-09-25` |
-| Authority | 봉인 문서 `PIPELINE_GOVERNANCE.md`(상위 프로젝트: `docs/guides/PIPELINE_GOVERNANCE.md`) §5.1·§10.1·§10.2 의 **실행 명세**. 그 문서를 개정하지 않으며, 어떤 hold 도 해제하지 않는다. 생성의 근거는 이 문서가 아니라 §9 가 적는 결정 기록이다 |
-| 상위 문서 | `PIPELINE_GOVERNANCE.md`(상위 프로젝트: `docs/guides/PIPELINE_GOVERNANCE.md`), `MASTERPLAN.md`(상위 프로젝트: `docs/architecture/MASTERPLAN.md`) |
-| 기계 판독본 | [`configs/datasets/source_pipelines_v2.yaml`](../../configs/datasets/source_pipelines_v2.yaml) (기본값). v1 [`source_pipelines_v1.yaml`](../../configs/datasets/source_pipelines_v1.yaml) 은 쓰인 설정이라 그대로 두며 여전히 읽힌다 |
-| 짝 문서 | `ADR-0040`(상위 프로젝트: `docs/adr/ADR-0040-dataset-profiles-registry-and-envelope-conformance.md`) — 산출물 쪽 규격 |
-| 근거 | `ADR-0041`(상위 프로젝트: `docs/adr/ADR-0041-soma-synth-split-and-teammate-generation.md`) |
+| Version | `1.1.1` |
+| Revision history | `1.0.0` (2026-09-09) first issue. `1.1.0` (2026-09-25) applies `ADR-0041` (parent project: `docs/adr/ADR-0041-soma-synth-split-and-teammate-generation.md`): registry v2 (corpus stage, post-steps, generation policy, `selection_args`); §1.3 every generation writes into an empty folder and there is no resume (a non-empty folder needs `--replace-existing`, which moves it aside and builds in a fresh folder: on success only a production folder's old generation is kept and everything else is deleted, on failure it is restored; no `force_arg`; the declared trade-off that a dead run is rebuilt from scratch), a `_superseded` evidence requirement for replacing a production folder that holds a finished generation, the generate-stage lock (`<folder>.lock`), refusal of read-only and evidence folders, refusal of other production folders, refusal of arguments that have nowhere to go, the `.generating` marker of an unfinished generate stage, and the same refusals in `pipeline`, `validate`, `readme`, `register` and push; §2.1 installation; §3.1 `resolved_config_sha256` filled in; §4.1 the tracing record and its gaps; §6 identity; §9 generation policy (`pipeline` generate refused, the same conditions on every PC: decision of 2026-09-25); §10 two mismatch rows. `1.1.1` (2026-09-30) translated into English; §11 operator reference (exit codes, common refusals, locks, leftovers) moved here from the README |
+| Status | `ACTIVE_BASELINE` |
+| Baseline date | `2026-09-25` |
+| Authority | The **execution specification** of §5.1, §10.1 and §10.2 of the sealed document `PIPELINE_GOVERNANCE.md` (parent project: `docs/guides/PIPELINE_GOVERNANCE.md`). It does not amend that document and releases no hold. The basis for generating is not this document but the decision record that §9 names |
+| Parent documents | `PIPELINE_GOVERNANCE.md` (parent project: `docs/guides/PIPELINE_GOVERNANCE.md`), `MASTERPLAN.md` (parent project: `docs/architecture/MASTERPLAN.md`) |
+| Machine-readable twin | [`configs/datasets/source_pipelines_v2.yaml`](../../configs/datasets/source_pipelines_v2.yaml) (default). v1 [`source_pipelines_v1.yaml`](../../configs/datasets/source_pipelines_v1.yaml) is a configuration that was used, so it stays as it is and can still be read |
+| Companion document | `ADR-0040` (parent project: `docs/adr/ADR-0040-dataset-profiles-registry-and-envelope-conformance.md`) — the output-side specification |
+| Basis | `ADR-0041` (parent project: `docs/adr/ADR-0041-soma-synth-split-and-teammate-generation.md`) |
 
-> **이 문서는 새 정책이 아니다.** `PIPELINE_GOVERNANCE.md` 가 이미 요구하는 것을 **어떻게
-> 이행하는지** 적는다. 그 문서는 M0 evaluator 에 sha-pin 된 봉인 파일이므로 여기서 고치지
-> 않는다. 둘이 어긋나면 봉인 문서를 따르고 이 문서를 고친다.
+> **This document is not a new policy.** It records **how** the requirements already in
+> `PIPELINE_GOVERNANCE.md` are met. That document is a sealed file, SHA-pinned by the M0 evaluator, so it
+> is not edited here. If the two disagree, follow the sealed document and fix this one.
 >
-> **이 저장소.** 이 문서는 soma-synth 저장소에 있다. 2026-09-25 분리 때 생성 파이프라인과
-> 함께 상위 프로젝트에서 옮겨 왔다. 봉인 문서(`PIPELINE_GOVERNANCE.md`, `MASTERPLAN.md`,
-> `LOCAL_DATA_PLANE.md`), ADR, `research/decisions` 의 결정 기록, 보존 규칙은 상위 프로젝트에
-> 남아 있다. 이 문서는 그것들을 링크하지 않고 "상위 프로젝트: `<경로>`" 처럼 상위 프로젝트 루트 기준
-> 경로를 글로 적는다. 이 저장소가 상위 프로젝트에 `packages/soma-synth` 로 마운트돼 있어도 이 문서에서
-> 상위 프로젝트 파일로 가는 상대 링크는 열리지 않기 때문이다. 링크는 이 저장소 안의 파일만 가리키며,
-> `src/soma_synth/`, `scripts/`, `configs/`, `tests/`, `packages/smpl18` 은 이 저장소 기준이다. 보존 규칙은
-> 같은 번호와 뜻으로 [`RETENTION_RULES.md`](RETENTION_RULES.md) 에 옮겨 둔다(상위 프로젝트 규칙과 어긋나면 그
-> 규칙이 이긴다). 이 저장소의 메시지가 적는 "retention rule 1.x" 는 그 번호의 규칙이다.
+> **This repository.** This document lives in the soma-synth repository. It moved here from the parent
+> project together with the generation pipeline at the 2026-09-25 split. The sealed documents
+> (`PIPELINE_GOVERNANCE.md`, `MASTERPLAN.md`, `LOCAL_DATA_PLANE.md`), the ADRs, the decision records in
+> `research/decisions` and the retention rules stay in the parent project. This document does not link to
+> them; it writes their path relative to the parent project root as text, as in "parent project: `<path>`",
+> because a relative link from this document to a parent-project file does not open even when this
+> repository is mounted in the parent project as `packages/soma-synth`. Links point only at files in this
+> repository, and `src/soma_synth/`, `scripts/`, `configs/`, `tests/` and `packages/smpl18` are relative to
+> this repository. The retention rules are carried over with the same numbers and meaning in
+> [`RETENTION_RULES.md`](RETENTION_RULES.md) (if they disagree with the parent project's rules, those rules
+> win). "retention rule 1.x" in this repository's messages is the rule with that number.
 
 ---
 
-## 0. 왜 이 문서가 필요한가
+## 0. Why this document is needed
 
-`PIPELINE_GOVERNANCE.md` 는 2026-08-03 부터 §5.1 에서 adapter 의 7단계 분리를, §10.1 에서 run
-디렉터리 7종을, §10.2 에서 provenance 10항목을 요구해 왔다. 2026-09-09 에 실측한 결과는 다음과
-같다.
+Since 2026-08-03 `PIPELINE_GOVERNANCE.md` has required a seven-stage adapter split in §5.1, the seven
+run-directory artifacts in §10.1 and ten provenance items in §10.2. Measured on 2026-09-09:
 
-| 규정 | 실측 |
+| Requirement | Measured |
 |---|---|
-| §5.1 7단계 분리 | 구현 0. 생성기 11개가 각자 흐름을 갖는다 |
-| §10.1 run 디렉터리 7종 | 5개 번들 전부 **0종** |
-| §10.2 provenance 10항목 | **4항목**만 존재 |
-| §10.1 `run_id` = config·code·source 해시 | `run_id` 는 take 라벨(`gaitex-austra-gwo-unified8-marker`) |
+| §5.1 seven-stage split | Not implemented. Each of 11 generators has its own flow |
+| §10.1 seven run-directory artifacts | **None** in all 5 bundles |
+| §10.2 ten provenance items | Only **4 items** present |
+| §10.1 `run_id` = hash of config, code and source | `run_id` is a take label (`gaitex-austra-gwo-unified8-marker`) |
 
-**기록된 것만으로는 어떤 번들도 재현할 수 없다.** 어느 코드 리비전으로, 어느 SMPL 모델로
-만들었는지가 없다. 이 문서와 그 짝인 코드가 그 공백을 메운다.
+**No bundle can be reproduced from what was recorded.** Neither the code revision nor the SMPL model
+that made it is known. This document and the code that goes with it fill that gap.
 
-### 0.1 왜 지금까지 이행되지 않았는가
+### 0.1 Why this was not implemented earlier
 
-구현 의지의 문제가 아니라 **구현할 자리가 없었다.** 생성기들은 공유 코드를 import 하지 않고
-파일 경로로 런타임 로드한다(`spec_from_file_location`, 12개 파일). 한 생성기가 다른 생성기의
-라이브러리다 — `generate_amass_faithful_all.py` 는 `generate_amass_faithful.py` 를 경로로 읽어
-실행한다. 따라갈 import 그래프가 없고, 단계를 걸 모듈 경계가 없다.
+It was not a lack of will; **there was nowhere to implement it.** The generators do not import shared
+code; they load it at run time by file path (`spec_from_file_location`, 12 files). One generator is
+another generator's library — `generate_amass_faithful_all.py` reads `generate_amass_faithful.py` by path
+and runs it. There is no import graph to follow and no module boundary to hang stages on.
 
-이 문서는 그 구조를 **당장 걷어내지 않는다**. `amass` 와 `prism` 은 지금 검증을 통과한 두
-번들을 만든 코드이고, 옮기다 산출이 달라지면 재현성을 잃는다. 대신 러너가 기존 진입점을
-**감싸고**, 표준이 요구하는 것을 그 바깥에서 채운다.
+This document **does not tear that structure out now**. `amass` and `prism` are the code that made the
+two bundles that currently pass validation; if their output changed in a move, reproducibility would be
+lost. Instead the runner **wraps** the existing entry points and supplies what the standard requires from
+the outside.
 
 ---
 
-## 1. 정규 단계
+## 1. Canonical stages
 
-앞의 일곱은 `PIPELINE_GOVERNANCE.md` §5.1 의 이름을 그대로 쓴다. 뒤의 여덟은 이 lineage 가 그
-뒤에 더하는 합성·방출이다.
+The first seven use the names in `PIPELINE_GOVERNANCE.md` §5.1 as they are. The last eight are the
+synthesis and emission this lineage adds after them.
 
-| # | 단계 | 하는 일 | 오늘 어디에 있나 |
+| # | Stage | What it does | Where it is today |
 |---|---|---|---|
-| 1 | `register_asset` | 원천 자산 등록, SHA-256 확보 | `SourceIdentity.asset_sha256` |
-| 2 | `inspect_native` | 디코드 없이 형태·개수 확인 | 생성기 `main()` 의 순회 |
-| 3 | `validate_license` | 이용 조건·gate 확인 | `configs/gates/source_gates_v1_3.yaml`(생성기 밖) |
-| 4 | `load_native` | 원천 형식으로 읽기 | 생성기 `convert()` 앞부분 |
-| 5 | `validate_native` | 원천 QC | 부분적, 소스마다 다름 |
-| 6 | `convert_intermediate` | SMPL-24 리타깃 | 별도 코퍼스 생성 단계 — 레지스트리 v2 의 `corpus`, 러너가 실행(§1.3) |
-| 7 | `emit_source_qc_and_provenance` | 원천 QC·provenance 방출 | `SourceIdentity`(31필드) |
-| 8 | `fit_shape` | betas·rest skeleton | `addbio_retarget.shape_fit` |
-| 9 | `build_large` | 18관절 kinematics | `unified8_emit.build_bundle`; 축소는 `pipeline.reduced_model`(§2.2) |
-| 10 | `build_anthro` | rest 상수 | `unified8_emit.build_bundle` |
-| 11 | `synthesise_small` | 8채널 IMU | **소스별로 갈리는 유일한 단계** |
-| 12 | `resample_100hz` | 100 Hz 격자 | `unified8_emit.build_bundle` |
-| 13 | `emit_take` | 5종 산출물 + take manifest | `unified8_emit.write_bundle` |
-| 14 | `emit_bundle` | INDEX·설명서·README | `unified8_emit.write_data_description` |
-| 15 | `close_run` | run 디렉터리 7종 확정 | **없음 — 이 표준이 신설** |
+| 1 | `register_asset` | Register the source asset, obtain its SHA-256 | `SourceIdentity.asset_sha256` |
+| 2 | `inspect_native` | Check shape and counts without decoding | The loop in each generator's `main()` |
+| 3 | `validate_license` | Check terms of use and gates | `configs/gates/source_gates_v1_3.yaml` (outside the generators) |
+| 4 | `load_native` | Read the native format | Start of each generator's `convert()` |
+| 5 | `validate_native` | Source QC | Partial, differs per source |
+| 6 | `convert_intermediate` | SMPL-24 retarget | Separate corpus generation stage — `corpus` in registry v2, run by the runner (§1.3) |
+| 7 | `emit_source_qc_and_provenance` | Emit source QC and provenance | `SourceIdentity` (31 fields) |
+| 8 | `fit_shape` | betas, rest skeleton | `addbio_retarget.shape_fit` |
+| 9 | `build_large` | 18-joint kinematics | `unified8_emit.build_bundle`; the reduction is `pipeline.reduced_model` (§2.2) |
+| 10 | `build_anthro` | rest constants | `unified8_emit.build_bundle` |
+| 11 | `synthesise_small` | 8-channel IMU | **The only stage that differs per source** |
+| 12 | `resample_100hz` | 100 Hz grid | `unified8_emit.build_bundle` |
+| 13 | `emit_take` | Five outputs + take manifest | `unified8_emit.write_bundle` |
+| 14 | `emit_bundle` | INDEX, description, README | `unified8_emit.write_data_description` |
+| 15 | `close_run` | Finalise the seven run-directory artifacts | **None — introduced by this standard** |
 
-### 1.1 소스별로 갈리는 단계는 하나뿐이다
+### 1.1 Only one stage differs per source
 
-`synthesise_small` 만 `small_mode` 에 따라 경로가 다르다.
+Only `synthesise_small` takes a different path depending on `small_mode`.
 
-| `small_mode` | 소스 | 경로 |
+| `small_mode` | Source | Path |
 |---|---|---|
-| `measured_physical` | prism | 착용 센서의 실측값 |
+| `measured_physical` | prism | Values measured by the worn sensors |
 | `synthetic_from_smpl` | amass · hknu · addbiomechanics | SMPL forward kinematics |
-| `synthetic_from_markers` | gaitex | 마커 클러스터 강체 적합 (ADR-0039) |
+| `synthetic_from_markers` | gaitex | Rigid-body fit of marker clusters (ADR-0039) |
 
-나머지 열네 단계는 모든 소스가 같은 일을 한다. **규격화의 여지는 여기에 있다.**
+The other fourteen stages do the same work for every source. **That is where standardisation is possible.**
 
-### 1.2 `unified8_emit` 이 이미 공통 척추다
+### 1.2 `unified8_emit` is already the common spine
 
-`scripts/poc/unified8_emit.py` 가 `build_bundle`·`write_bundle`·`write_data_description` 과
-`SourceIdentity`(31필드)를 제공하고, `addbiomechanics`·`gaitex`·`hknu` 가 그것을 쓴다.
-`amass` 와 `prism` 은 쓰지 않는다 — 그쪽이 먼저 있었기 때문이다.
+`scripts/poc/unified8_emit.py` provides `build_bundle`, `write_bundle`, `write_data_description` and
+`SourceIdentity` (31 fields), and `addbiomechanics`, `gaitex` and `hknu` use it. `amass` and `prism` do not —
+they came first.
 
-그 모듈의 docstring 이 이유를 이미 적어 두었다: `generate_amass_faithful.build` 를 리팩터링하지
-않은 것은 "그 함수가 카탈로그에 등록된 L4-PASS 데이터셋 둘을 만들고, 편의를 위해 그것을 위험에
-빠뜨릴 수 없기" 때문이며, 대신 **동등성 테스트**(`tests/poc/test_unified8_emit.py`, 6건)가 두
-경로를 같은 SMPL 입력에 돌려 배열을 비교한다.
+That module's docstring already records why: `generate_amass_faithful.build` was not refactored because
+"that function builds two catalogued L4-PASS datasets and cannot be put at risk for convenience"; instead
+an **equivalence test** (`tests/poc/test_unified8_emit.py`, 6 cases) runs both paths on the same SMPL input
+and compares the arrays.
 
-**이 표준은 그 판단을 뒤집지 않고 채택한다.** 통합의 조건은 "동등성을 먼저 증명한다"이고, 그
-장치는 이미 있다.
+**This standard adopts that judgement rather than reversing it.** The condition for unification is "prove
+equivalence first", and the means for that already exist.
 
-### 1.3 생성 단계는 코퍼스 → 번들 → 후처리다 (레지스트리 v2, 2026-09-25)
+### 1.3 Generation is corpus → bundle → post-steps (registry v2, 2026-09-25)
 
-`hknu`·`gaitex`·`addbiomechanics` 는 원천을 먼저 SMPL-24 리타깃 코퍼스로 바꾸고, 번들은 그
-코퍼스에서 만든다. 코퍼스는 지금까지 주어진 입력이었다. 새 PC 에는 코퍼스가 없고, 있던 코퍼스도
-지워질 수 있다. 그래서 레지스트리 v2 가 각 소스의 `corpus`
-블록(진입점, lineage, 출력 플래그, 지문 파일, 번들에 넘기는 플래그)을 선언하고, 러너가 그것을
-실행한다.
+`hknu`, `gaitex` and `addbiomechanics` first turn the source into an SMPL-24 retarget corpus, and the
+bundle is built from that corpus. Until now the corpus was a given input. A new PC has no corpus, and an
+existing corpus can be deleted. So registry v2 declares a `corpus` block for each source (entry point,
+lineage, output flag, fingerprint file, the flag passed to the bundle) and the runner runs it.
 
-| 순서 | 무엇 | 언제 |
+| Order | What | When |
 |---|---|---|
-| 1 | 코퍼스 진입점 → `<data root>/runs/experimental_generation_poc_demo/<corpus lineage>` (또는 `--corpus`) | 그 폴더에 끝난 코퍼스(지문 파일, `.generating` 없음)가 없을 때, 또는 `--rebuild-corpus`. 끝난 코퍼스는 재사용한다(읽기만) |
-| 2 | 번들 진입점, 코퍼스는 선언된 플래그(`--paired`·`--retarget`·`--raw`)로 | 항상 |
-| 3 | 후처리(`post_steps`) — `prism` 의 `synthesize_insole_heading.py <번들>` | 번들이 끝난 뒤, `KNOWN_LIMITATIONS.json` 렌더 전 |
+| 1 | Corpus entry point → `<data root>/runs/experimental_generation_poc_demo/<corpus lineage>` (or `--corpus`) | When that folder holds no finished corpus (fingerprint file, no `.generating`), or with `--rebuild-corpus`. A finished corpus is reused (read only) |
+| 2 | Bundle entry point, given the corpus through the declared flag (`--paired`, `--retarget`, `--raw`) | Always |
+| 3 | Post-steps (`post_steps`) — `prism`'s `synthesize_insole_heading.py <bundle>` | After the bundle is finished, before `KNOWN_LIMITATIONS.json` is rendered |
 
-**모든 생성은 빈 폴더에 한다. 재개는 없다.** 번들 진입점과 코퍼스 진입점은 언제나 없거나 빈 폴더에 쓴다.
-러너는 폴더를 제자리에서 덮지도, 끝나지 않은 폴더를 이어 만들지도 않는다(아래 "교체는 새 폴더에 만든다").
-그래서 몇 시간 돈 실행이 죽거나 멈추면 **처음부터 다시 만든다.** 이것이 선언한 맞바꿈이다. 한 번들에 두
-실행(또는 두 코퍼스)의 take 가 섞이지 않고, 생성기마다 다른 재개 판정(§7)과 재개의 손실(`prism` 은 건너뛴
-take 를 `"skipped"` 로 적어 색인의 `ok` 에서 뺀다)을 러너가 알 필요가 없는 대신, 끊긴 긴 실행의 시간을 잃는다.
-생성기 자신의 `--resume`·`--force` 는 운영자가 `--corpus-arg`·`--bundle-arg` 로 넘길 수 있지만, 빈 폴더에는
-건너뛸 것이 없다. 러너는 다음을 실행 전에 거부한다.
+**Every generation writes into an empty folder. There is no resume.** The bundle and corpus entry points
+always write into a folder that is absent or empty. The runner neither overwrites a folder in place nor
+continues an unfinished one (see "A replacement is built in a fresh folder" below). So when a run of
+several hours dies or stops, it is **rebuilt from the start.** That is the declared trade-off. Takes from
+two runs (or two corpora) never mix in one bundle, and the runner does not need to know each generator's
+resume predicate (§7) or the losses of resuming (`prism` records skipped takes as `"skipped"` and drops
+them from the index's `ok`); in exchange, the time of an interrupted long run is lost. An operator can
+still pass a generator's own `--resume` or `--force` with `--corpus-arg` or `--bundle-arg`, but an empty
+folder has nothing to skip. The runner refuses the following before running.
 
-| 거부 | 조건 | 풀어 주는 것 |
+| Refusal | Condition | What clears it |
 |---|---|---|
-| 비어 있지 않은 번들 폴더 | 번들 폴더가 있고 무엇이든 들어 있다: 끝난 번들(`INDEX.json`, `.generating` 없음), 끝나지 않은 생성(`.generating`), 그 밖의 파일. 거부는 무엇이 들어 있는지(표지를 남긴 실행 기록까지) 적는다 | `--replace-existing`(폴더를 옆으로 옮기고 빈 폴더에 만든다), 또는 없거나 빈 폴더 |
-| 비어 있지 않은 코퍼스 폴더 | 코퍼스를 만들어야 하는데(끝난 코퍼스가 없거나 `--rebuild-corpus`) 코퍼스 폴더에 무엇이든 들어 있다: 끝난 코퍼스, 끝나지 않은 생성, 그 밖의 파일. `--rebuild-corpus` 없는 끝난 코퍼스는 재사용하므로 거부하지 않는다 | `--rebuild-corpus --replace-existing` 둘 다, 또는 `--corpus` 로 없거나 빈 폴더 |
-| 운영 폴더의 끝난 세대 교체 | 교체하려는 폴더가 운영 폴더(어느 루트든 `runs/experimental_generation_poc_demo` 바로 아래의 폴더)이고 끝난 세대(`INDEX.json` 또는 코퍼스 지문, `.generating` 없음)를 담고 있다 | 그에 더해 옆의 `_superseded/<이름>_*` 한 곳에 그 `INDEX.json`(또는 지문)과 SHA-256 이 같은 사본과 `SUPERSEDED.md` (상위 프로젝트 보존 규칙 1.2 (1)). 끝나지 않은 생성에는 대조할 끝난 세대가 없으므로 묻지 않는다 |
-| 한 번에 한 세대 | 폴더를 옆으로 옮겨야 하는데 그 옆에 `<폴더>.replaced-*`·`<폴더>.failed-*` 가 있다 | 거부가 방법을 적는다. `.replaced-*` 는 지금 폴더의 세대를 받아들이면 지우고(운영 폴더의 것은 소유자 승인으로, 상위 프로젝트 보존 규칙 1.5), 옛 세대로 돌아가려면 지금 폴더를 치우고 `.replaced-*` 의 이름을 되돌린다. `.failed-*` 는 살펴본 뒤 지운다 |
-| 잠금 | 번들 폴더 옆에, 또는 (러너가 쓸 수 있는 곳의) 코퍼스 폴더 옆에 `<폴더>.lock` 이 있다: 다른 generate 단계가 그 폴더를 만들거나 읽는 중이다 | 그 실행이 끝나기를 기다린다. 거부가 잠금의 주인(pid·호스트·run identity)과 나이, 그 프로세스가 살아 있는지 확인하는 명령(`tasklist /FI "PID eq <pid>"`·`ps -p <pid>`)을 적는다. 죽은 실행이 남긴 잠금은 손으로 지운다. 러너는 잠금을 지우지 않는다 |
-| 쓸 곳 없는 인자 | `--corpus-arg` 인데 소스에 코퍼스 단계가 없다(`amass`·`prism`), 또는 명시적 생성 명령(`generate_cmd`)과 함께 `--corpus-arg`·`--bundle-arg` 를 받았다. 버려지면 표본 선택이 사라져 원천 전체가 돈다 | 번들 인자는 `--bundle-arg` 로(선택 인자는 운영 lineage 검사를 거친다) |
-| 표본 인자 | 출력이 운영 lineage 폴더(이 run 의 data root 아래이든, 다른 루트의 `runs/experimental_generation_poc_demo/<lineage>` 모양이든)인데 레지스트리의 `selection_args`(`--subjects`·`--trials`·`--only` 등, `--subjects=S04`·축약형 포함)를 받았다 | 출력을 scratch 폴더로 |
-| 표본 코퍼스 → 운영 번들 | 번들 폴더가 운영 lineage 인데 코퍼스가 그 옆의 자기 코퍼스 lineage 가 아니다 | 번들도 scratch 폴더로 |
-| 표본 실행 → 운영 코퍼스 생성 | 코퍼스 폴더가 운영 코퍼스 lineage 이고 이번 실행이 그것을 만들거나 다시 만드는데(지문 없음, 또는 `--rebuild-corpus`), 번들이 그 옆의 운영 번들 lineage 가 아니거나 선택 인자가 있다. 끝난 운영 코퍼스를 **재사용**만 하는 표본은 거부하지 않는다 | `--corpus <scratch 폴더>` |
-| 러너가 정하는 플래그 | `--corpus-arg`·`--bundle-arg` 가 코퍼스 출력(`--out`), 번들 출력(`--out`·`--out-root`), 번들에 넘기는 코퍼스 플래그(`--paired`·`--retarget`·`--raw`), 원천 위치(`--source-root`·`--root`·`--hknu-root`·`--amass-root`·`--extracted`), PRISM `--data-root` 를 준다(`--x=v`·argparse 축약 포함; argparse 가 선언된 다른 플래그로 읽는 축약은 통과) | 번들은 `soma-synth run` 의 dataset_dir, 코퍼스는 `--corpus`, 데이터 루트는 `--data-root`, 원천은 `SOMA_SOURCE_ROOT` |
-| 동기화 폴더(**거부 아님, 경고만**) | 번들 폴더·코퍼스 폴더(이번 실행이 만들거나 다시 만들 때)·실행 기록 폴더(`--runs-root`)·카탈로그(register 단계가 있을 때)가 Dropbox·OneDrive·Google Drive(`My Drive`·`내 드라이브`·`Shared drives`·`공유 드라이브` 등)·Synology Drive·iCloud Drive 폴더나 `SOMA_SHARED_DRIVE_NAMES` 가 이름을 적은 팀 공유 드라이브(쉼표로 나눈 폴더 이름, 기본값 없음; `paths.on_shared_drive`) 안이다. 폴더 이름은 운영체제와 상관없이 대소문자 없이 맞춘다(`~/Dropbox`·`~/OneDrive*`·`~/Google Drive`·`/Volumes/GoogleDrive*` 포함). macOS 의 `~/Library/CloudStorage/*`(File Provider 동기화 클라이언트 전부)·`~/Library/Mobile Documents`(iCloud), Linux 의 gvfs `google-drive:` 마운트는 POSIX 경로에서만 본다(`paths.synced_location`). 이 경우 실행은 거부되지 않고 계속되며, 경로마다 한 번 표준 오류에 `warning:` 줄이 나온다(`paths.warn_if_synced`; 2026-09-30 소유자 결정). 동기화 클라이언트가 쓰는 중인 파일을 잠그거나 늦추거나 일부만 올릴 수 있고, 그곳의 번들은 이 PC 밖으로 공유될 수 있어(공유는 별도 승인) 로컬 디스크를 권한다. `readme`·`register`·`validate`·`hash-sources --out`·`stage-sources --to` 도 같다 | 경고를 없애려면 로컬 디스크의 `SOMA_DATA_ROOT` 아래로 |
-| 읽기 전용·증거 폴더 | 번들 폴더, 그리고 이번 실행이 만들거나 다시 만드는 코퍼스 폴더가 이 run 의 data root 나 `SOMA_DATA_ROOT` 의 `extracted`·`raw_archives`·바디 모델 폴더(`SOMA_BODY_MODEL_DIR` 포함)·`_superseded`·`_manifest_backfill`·`_runs` 안이거나, `SOMA_SOURCE_ROOT` 의 소스 폴더 안이거나, 컨테이너(data root·`runs`·`runs/experimental_generation_poc_demo`·`SOMA_SOURCE_ROOT`) 자체다. 번들은 읽는 코퍼스 안이나 그것을 담은 폴더일 수 없다(`paths.check_output_dir(root=...)`). 두 루트가 아닌 다른 루트의 증거 폴더(`runs/experimental_generation_poc_demo/{_superseded,_runs,_manifest_backfill}`) 안도 거부한다(`paths.evidence_folder`). 실행 기록 폴더와 카탈로그는 `_runs` 에는 쓸 수 있고 그 밖의 위 폴더 안에는 쓸 수 없으며, 컨테이너 자체와 lineage 폴더(`runs/experimental_generation_poc_demo/<lineage>`, 번들이나 코퍼스가 든다) 안에도 쓸 수 없다(`paths.check_record_dir`) | scratch 폴더나 lineage 폴더로(실행 기록은 `<컨테이너>/_runs`, 카탈로그는 `<data root>/experimental/catalog`) |
-| 다른 운영 폴더 | 번들 폴더나 (이번 실행이 읽는) 코퍼스 폴더가 어느 루트든 `runs/experimental_generation_poc_demo` 바로 아래에 있는데 이 소스의 자기 번들·코퍼스 lineage 가 아니다: 레지스트리가 선언한 다른 lineage(`prism` 을 `amass_faithful_full` 에, `hknu` 번들을 `hknu_smpl24_paired` 에, `hknu` 코퍼스로 `gaitex_smpl24` 를)이든, 아무도 선언하지 않은 폴더(`_dryrun_*`, `my_experiment` 등)이든 (`runner.production_directory_refusal`) | 자기 lineage 폴더나 scratch 폴더로 |
-| 교체 흔적 | 번들 폴더나 코퍼스 폴더 자체가 옆으로 옮긴 폴더나 실패한 교체의 산출(`*.replaced-*`·`*.failed-*`)이다 | 원래 폴더(이름에서 `.replaced-…`·`.failed-…` 를 뗀 것)로 |
+| Non-empty bundle folder | The bundle folder exists and holds anything: a finished bundle (`INDEX.json`, no `.generating`), an unfinished generation (`.generating`), or other files. The refusal says what is there (including the run record that left the marker) | `--replace-existing` (moves the folder aside and builds in an empty one), or an absent or empty folder |
+| Non-empty corpus folder | The corpus must be built (no finished corpus, or `--rebuild-corpus`) and the corpus folder holds anything: a finished corpus, an unfinished generation, or other files. A finished corpus without `--rebuild-corpus` is reused, so it is not refused | Both `--rebuild-corpus --replace-existing`, or an absent or empty folder via `--corpus` |
+| Replacing a finished generation in a production folder | The folder to be replaced is a production folder (a folder directly under `runs/experimental_generation_poc_demo` in any root) and holds a finished generation (`INDEX.json` or a corpus fingerprint, no `.generating`) | In addition, one `_superseded/<name>_*` folder beside it must hold a copy with the same SHA-256 as that `INDEX.json` (or fingerprint) and a `SUPERSEDED.md` (parent project retention rule 1.2 (1)). An unfinished generation has no finished generation to compare, so this is not asked |
+| One generation at a time | The folder must be moved aside but a `<folder>.replaced-*` or `<folder>.failed-*` is beside it | The refusal says how. Delete `.replaced-*` if you accept the generation now in the folder (for a production folder, with owner approval, parent project retention rule 1.5); to go back to the old generation, clear the current folder and rename `.replaced-*` back. Inspect `.failed-*`, then delete it |
+| Lock | A `<folder>.lock` is beside the bundle folder, or beside the corpus folder (where the runner can write): another generate stage is building or reading that folder | Wait for that run to finish. The refusal gives the lock's owner (pid, host, run identity), its age and a command that checks whether the process is alive (`tasklist /FI "PID eq <pid>"`, `ps -p <pid>`). Delete a lock left by a dead run by hand. The runner never deletes a lock |
+| Argument with nowhere to go | `--corpus-arg` for a source that has no corpus stage (`amass`, `prism`), or `--corpus-arg`/`--bundle-arg` together with an explicit generation command (`generate_cmd`). If they were dropped, the sample selection would vanish and the whole source would run | Give bundle arguments with `--bundle-arg` (selection arguments go through the production-lineage check) |
+| Sample argument | The output is a production lineage folder (under this run's data root, or shaped like `runs/experimental_generation_poc_demo/<lineage>` under another root) and it received a registry `selection_args` flag (`--subjects`, `--trials`, `--only` and so on, including `--subjects=S04` and abbreviations) | Send the output to a scratch folder |
+| Sample corpus → production bundle | The bundle folder is a production lineage but the corpus is not its own corpus lineage beside it | Send the bundle to a scratch folder too |
+| Sample run → production corpus build | The corpus folder is a production corpus lineage and this run builds or rebuilds it (no fingerprint, or `--rebuild-corpus`), while the bundle is not the production bundle lineage beside it or selection arguments are present. A sample that only **reuses** a finished production corpus is not refused | `--corpus <scratch folder>` |
+| Flags the runner sets | `--corpus-arg`/`--bundle-arg` sets the corpus output (`--out`), the bundle output (`--out`, `--out-root`), the corpus flag passed to the bundle (`--paired`, `--retarget`, `--raw`), a source location (`--source-root`, `--root`, `--hknu-root`, `--amass-root`, `--extracted`) or PRISM's `--data-root` (including `--x=v` and argparse abbreviations; an abbreviation that argparse reads as another declared flag passes) | The bundle is `soma-synth run`'s dataset_dir, the corpus is `--corpus`, the data root is `--data-root`, the sources are `SOMA_SOURCE_ROOT` |
+| Synchronised folder (**not a refusal, a warning only**) | The bundle folder, the corpus folder (when this run builds or rebuilds it), the run-record folder (`--runs-root`) or the catalog (when there is a register stage) is inside a Dropbox, OneDrive, Google Drive (`My Drive`, `Shared drives` and their localised names, such as the Korean ones), Synology Drive or iCloud Drive folder, or inside a team shared drive named in `SOMA_SHARED_DRIVE_NAMES` (comma-separated folder names, no default; `paths.on_shared_drive`). Folder names match case-insensitively on every OS (including `~/Dropbox`, `~/OneDrive*`, `~/Google Drive`, `/Volumes/GoogleDrive*`). macOS `~/Library/CloudStorage/*` (every File Provider sync client), `~/Library/Mobile Documents` (iCloud) and Linux gvfs `google-drive:` mounts are checked on POSIX paths only (`paths.synced_location`). The run is not refused and continues; a `warning:` line is printed to standard error once per path (`paths.warn_if_synced`; owner decision of 2026-09-30). A local disk is recommended because a sync client can lock, delay or partially upload files being written, and a bundle there can be shared off this PC (sharing needs separate approval). `readme`, `register`, `validate`, `hash-sources --out` and `stage-sources --to` behave the same | To silence the warning, use a `SOMA_DATA_ROOT` on a local disk |
+| Read-only and evidence folders | The bundle folder, or a corpus folder this run builds or rebuilds, is inside `extracted`, `raw_archives`, the body model folder (including `SOMA_BODY_MODEL_DIR`), `_superseded`, `_manifest_backfill` or `_runs` of this run's data root or of `SOMA_DATA_ROOT`, or inside a source folder of `SOMA_SOURCE_ROOT`, or is a container itself (the data root, `runs`, `runs/experimental_generation_poc_demo`, `SOMA_SOURCE_ROOT`). A bundle cannot be inside, or be a folder containing, the corpus it reads (`paths.check_output_dir(root=...)`). An evidence folder under any other root (`runs/experimental_generation_poc_demo/{_superseded,_runs,_manifest_backfill}`) is refused too (`paths.evidence_folder`). The run-record folder and the catalog may be written in `_runs` but not inside the other folders above, and not in a container itself or inside a lineage folder (`runs/experimental_generation_poc_demo/<lineage>`, which holds a bundle or corpus) (`paths.check_record_dir`) | A scratch folder or the lineage folder (run records in `<container>/_runs`, the catalog in `<data root>/experimental/catalog`) |
+| Another production folder | The bundle folder, or the corpus folder this run reads, is directly under `runs/experimental_generation_poc_demo` in any root but is not this source's own bundle or corpus lineage: whether another lineage the registry declares (`prism` into `amass_faithful_full`, an `hknu` bundle into `hknu_smpl24_paired`, `gaitex_smpl24` as the `hknu` corpus) or a folder nobody declares (`_dryrun_*`, `my_experiment` and so on) (`runner.production_directory_refusal`) | The source's own lineage folder or a scratch folder |
+| Replacement leftovers | The bundle or corpus folder is itself a folder moved aside or the output of a failed replacement (`*.replaced-*`, `*.failed-*`) | The original folder (the name without `.replaced-…` or `.failed-…`) |
 
-마지막 네 줄의 거부는 실행 기록을 열기 **전에** 한다. 실행 기록이 바로 그 폴더나 그 옆에 쓰이기 때문이다(기본값은
-`<번들의 부모>/_runs`). 그래서 기록은 남지 않고 `soma-synth run` 이 종료 코드 3 으로 끝나며 사유를 표준 오류에
-쓴다. 나머지 거부는 실행 기록의 `logs/refusal.txt` 에 남는다. 읽기 전용·증거 폴더 거부가 필요한 까닭은 러너
-자신의 쓰기다. 폴더를 옆으로 옮기는 일, 실행 기록, validate·readme 가 쓰는
-`VALIDATION_REPORT.json`·`validation_ledger.json`·`README.md`, `KNOWN_LIMITATIONS.json` 은 생성기의 가드보다
-먼저이거나 생성기 없이(`--skip-generate`, `--start-at validate`) 일어나고, 생성기의 가드는 러너가 넘긴 data
-root 만 본다.
+The last four refusals happen **before** the run record is opened, because the run record would be
+written into or beside that very folder (the default is `<bundle parent>/_runs`). So no record is left,
+`soma-synth run` ends with exit code 3 and writes the reason to standard error. The other refusals are
+left in the run record's `logs/refusal.txt`. The read-only and evidence-folder refusal exists because of
+the runner's own writes: moving a folder aside, the run record, and the `VALIDATION_REPORT.json`,
+`validation_ledger.json`, `README.md` and `KNOWN_LIMITATIONS.json` that validate and readme write all
+happen before the generator's guard or without a generator (`--skip-generate`, `--start-at validate`), and
+the generator's guard only looks at the data root the runner passed.
 
-옛 `soma-synth pipeline` 명령도 같은 거부를 한다. validate·readme 가 번들 폴더에 쓰면 그 폴더에
-`paths.check_output_dir(root=<data root>)`, 번들 밖에 쓰는 `--ledger`·`--report` 에는 `paths.check_record_file`
-(그 폴더에 `check_record_dir`, 그리고 data root 의 `README.md` 와, 있으면 `MASTER.md`·`state/local_archive_inventory.json`
-은 덮지 않는다), register 가 있으면 카탈로그에 `paths.check_record_dir`, readme 의 `--top-level-root` 에는
-`paths.check_readme_root`(data root 나 `SOMA_SOURCE_ROOT` 자체, 읽기 전용·증거 폴더 안은 거부하고 lineage
-컨테이너는 허용한다. `<data root>/README.md` 는 덮지 않는다, [보존 규칙](RETENTION_RULES.md) 1.4)를 걸고,
-`--source` 의 번들이 아닌 다른 lineage 도 거부한다. 거부되면 아무것도 쓰기 전에 종료 코드 3 으로 끝난다.
-`soma-synth readme --top-level-root` 도 같은 `check_readme_root` 를 건다.
+The old `soma-synth pipeline` command refuses the same way. When validate or readme writes into the bundle
+folder it applies `paths.check_output_dir(root=<data root>)` to that folder; `--ledger` and `--report`
+written outside the bundle get `paths.check_record_file` (`check_record_dir` on the folder, and it does not
+overwrite the data root's `README.md` or, if present, `MASTER.md` and `state/local_archive_inventory.json`);
+with register, the catalog gets `paths.check_record_dir`; readme's `--top-level-root` gets
+`paths.check_readme_root` (it refuses the data root or `SOMA_SOURCE_ROOT` itself and anything inside a
+read-only or evidence folder, allows the lineage container, and does not overwrite `<data root>/README.md`,
+[retention rule](RETENTION_RULES.md) 1.4); and any lineage other than `--source`'s bundle is refused. A
+refusal ends with exit code 3 before anything is written. `soma-synth readme --top-level-root` applies the
+same `check_readme_root`.
 
-`soma-synth validate`·`readme`·`register` 를 따로 부를 때도 같다. 번들 폴더에 쓰는 명령 —
-`readme`, 그리고 `--report`·`--ledger` 가 번들 안을 가리키는 `validate` — 은 그 폴더에
-`paths.check_bundle_dir(root=<data root>)` 를 건다: `check_output_dir` 전부에 더해, 어느 루트든
-`runs/experimental_generation_poc_demo/{_superseded,_runs,_manifest_backfill}` 안이면(`paths.evidence_folder`;
-`SOMA_DATA_ROOT` 가 그 루트를 가리키지 않아도) 거부한다. `_superseded/<이름>/` 에는 교체한 세대의
-`INDEX.json`·`README.md`·검증 보고서가 보관돼 있으므로 `readme` 는 그 `README.md` 를 덮지 않는다.
-`register` 는 번들에 쓰지 않지만 보관된 증거를 살아 있는 자산으로 올리지 않도록 같은
-증거 폴더와 읽기 전용 폴더(`extracted`·`raw_archives`·소스·바디 모델 폴더)를 거부하고
-(`check_bundle_dir(writes=False)`), `--catalog` 에 `check_record_dir` 를 건다. `pipeline` 도 register 만 하는
-실행(`--start-at register`)에서 같은 번들 검사를 한다. 번들 밖에 쓰는 `--report`·`--ledger` 는 `check_record_file`
-을 받고, 그때 번들은 읽기만 하므로 거부하지 않는다. `--report`·`--ledger` 없는 `validate` 는 아무것도 쓰지
-않으므로 위치를 묻지 않는다. 거부는 종료 코드 3 이고, 아무것도 쓰기 전이다.
+The same holds when `soma-synth validate`, `readme` and `register` are called on their own. The commands
+that write into a bundle folder — `readme`, and `validate` when `--report` or `--ledger` points inside the
+bundle — apply `paths.check_bundle_dir(root=<data root>)` to that folder: everything in `check_output_dir`,
+plus a refusal inside `runs/experimental_generation_poc_demo/{_superseded,_runs,_manifest_backfill}` in any
+root (`paths.evidence_folder`; even when `SOMA_DATA_ROOT` does not point at that root). `_superseded/<name>/`
+keeps the replaced generation's `INDEX.json`, `README.md` and validation report, so `readme` does not
+overwrite that `README.md`. `register` does not write into the bundle, but so that archived evidence is not
+promoted to a live asset it refuses the same evidence folders and read-only folders (`extracted`,
+`raw_archives`, source and body model folders) (`check_bundle_dir(writes=False)`) and applies
+`check_record_dir` to `--catalog`. `pipeline` applies the same bundle check to a register-only run
+(`--start-at register`). `--report` and `--ledger` written outside the bundle get `check_record_file`, and
+then the bundle is only read, so it is not refused. `validate` without `--report` or `--ledger` writes
+nothing, so it does not check locations. A refusal is exit code 3, before anything is written.
 
-**끝나지 않은 번들은 넘겨받지 않는다.** `soma-synth validate`·`readme`·`register`·`pipeline`, 러너의
-validate·readme·register 단계, 상위 프로젝트의 `scripts/push_sample_data.py` 는 다음을 거부한다(종료 코드 3, 다시 만드는 명령을
-적는다): `.generating` 이 있는 번들(`soma-synth run --source <소스> <번들> --replace-existing` 으로 처음부터 다시
-만든다), 그리고 이름이 `*.replaced-*`(옆으로 옮긴 옛 세대)·`*.failed-*`(실패한 교체의 산출)인 폴더(번들이
-아니다. 원래 폴더를 쓴다). `register`·`pipeline` 은 `--source` 의 번들 lineage 가 아닌, 레지스트리가 선언한 다른
-lineage 도 거부한다.
+**An unfinished bundle is never taken over.** `soma-synth validate`, `readme`, `register` and `pipeline`,
+the runner's validate, readme and register stages, and the parent project's `scripts/push_sample_data.py`
+refuse the following (exit code 3, naming the command that rebuilds it): a bundle with `.generating`
+(rebuild it from the start with `soma-synth run --source <source> <bundle> --replace-existing`), and a
+folder named `*.replaced-*` (an old generation moved aside) or `*.failed-*` (the output of a failed
+replacement) (these are not bundles; use the original folder). `register` and `pipeline` also refuse any
+other registry-declared lineage that is not `--source`'s bundle lineage.
 
-`--compress`·`--resume`·`--force` 처럼 일부를 고르지 않는 인자는 운영 lineage 에도 넘어간다. 운영 lineage 를
-바꾸는 것은 어느 PC 에서든 [보존 규칙](RETENTION_RULES.md) 1.2 의 순서(증거를 `_superseded/` 로 → 소유자 승인 삭제 →
-재생성)를 따른다. 그 순서대로 해서 삭제 뒤의 폴더가 없거나 비어 있으면 `--replace-existing` 이 필요 없다.
-`--replace-existing` 은 그 순서를 대신하지 않는다. 끝난 세대를 담은 운영 폴더에 주면 러너는 그 폴더 옆
-`_superseded/<이름>_*` 가운데 한 곳이 지금 바꾸려는 `INDEX.json`(또는 코퍼스 지문)과 SHA-256 이 같은 사본과
-`SUPERSEDED.md` 를 가질 때만, 곧 1.2 (1) 을 이 세대에 대해 마쳤을 때만 진행한다. 코퍼스 지문에는
-`generated_utc` 가 없으므로 폴더 날짜가 아니라 내용으로 찾는다. scratch 폴더는 이 확인 없이 바꾼다. 재사용한
-코퍼스는 `--corpus-arg` 를 받지 않는다. 로그와 `manifest.json` `corpus.corpus_args_used: false` 가 그것을
-적는다(같은 명령으로 표본 실행을 다시 돌릴 수 있게 거부하지는 않는다).
+Arguments that do not select a part, such as `--compress`, `--resume` and `--force`, are passed on to a
+production lineage too. Changing a production lineage follows the order of [retention rule](RETENTION_RULES.md)
+1.2 on any PC (evidence to `_superseded/` → owner-approved deletion → regeneration). Done in that order, the
+folder after the deletion is absent or empty and `--replace-existing` is not needed. `--replace-existing`
+does not replace that order. Given for a production folder that holds a finished generation, the runner
+proceeds only when one of the `_superseded/<name>_*` folders beside it holds a copy with the same SHA-256 as
+the `INDEX.json` (or corpus fingerprint) being replaced and a `SUPERSEDED.md`, that is, only when 1.2 (1)
+has been done for this generation. A corpus fingerprint has no `generated_utc`, so the match is by content,
+not by folder date. A scratch folder is replaced without this check. A reused corpus does not receive
+`--corpus-arg`; the log and `manifest.json` `corpus.corpus_args_used: false` say so (it is not refused, so
+that the same command can re-run a sample).
 
-**교체는 새 폴더에 만든다.** 비어 있지 않은 폴더를 `--replace-existing`(코퍼스는 `--rebuild-corpus` 와 함께)으로
-바꿀 때, 러너는 폴더 전체를 같은 볼륨의 `<폴더>.replaced-<run>` 으로 이름만 바꾸고(`os.replace`, 복사하지
-않는다), `os.replace` 가 돌아오는 즉시 그 옆 폴더를 이 실행이 되돌릴 목록에 올린다. 그다음 작은 증거
-파일(`INDEX.json`·`INDEX_shard_*.json`·`SUMMARY.json`·`_run.json`·`VALIDATION_REPORT.json`·
-`validation_ledger.json`·`KNOWN_LIMITATIONS.json`·`README.md`·`DATA_DESCRIPTION_EN.md`·`reduced_model_fit.json`·
-코퍼스 지문 등, `runner.REPLACED_EVIDENCE_FILES`)을 실행 기록의 `replaced/<bundle|corpus>/` 에 복사해
-`manifest.json` `replaced.<bundle|corpus>` 에 SHA-256 과 폴더가 담고 있던 것(`found`), 옮긴 곳과 함께 적은 뒤,
-진입점을 빈 폴더에 돌린다. `<run>` 은 run identity 앞 12자다(같은 identity 를 반복한 실행이면 기록 폴더처럼
-`-2` 가 붙는다). 그래서 옛 세대의 take·샤드 색인·검증 보고서·코퍼스 파일이 새 세대에 남을 수 없고, 진입점에
-건너뛴 take 를 다시 만들라는 플래그를 줄 필요도 없다. 레지스트리 v2 는 그런 플래그(`force_arg`)도 재개에 관한
-필드도 두지 않으며, 연산자가 `--bundle-arg=--force` 로 준 것은 다른 인자처럼 넘어간다. 빈 폴더에 만들므로
-`amass` 가 `reduced_model_fit.json` 의 subject fit 을 다시 쓰던 일도 없다. 번들 폴더는 코퍼스 단계와 그 등급
-검사가 끝난 뒤, 번들 진입점 바로 앞에서 옮긴다. 코퍼스 단계가 실패하면 번들은 손대지 않은 그대로다.
+**A replacement is built in a fresh folder.** When a non-empty folder is replaced with `--replace-existing`
+(for a corpus, together with `--rebuild-corpus`), the runner only renames the whole folder to
+`<folder>.replaced-<run>` on the same volume (`os.replace`, no copy), and as soon as `os.replace` returns it
+puts the moved folder on the list this run will restore. It then copies the small evidence files
+(`INDEX.json`, `INDEX_shard_*.json`, `SUMMARY.json`, `_run.json`, `VALIDATION_REPORT.json`,
+`validation_ledger.json`, `KNOWN_LIMITATIONS.json`, `README.md`, `DATA_DESCRIPTION_EN.md`,
+`reduced_model_fit.json`, the corpus fingerprint and so on, `runner.REPLACED_EVIDENCE_FILES`) to the run
+record's `replaced/<bundle|corpus>/`, writes them in `manifest.json` `replaced.<bundle|corpus>` with their
+SHA-256, what the folder held (`found`) and where it was moved, and then runs the entry point on an empty
+folder. `<run>` is the first 12 characters of the run identity (a run that repeats the same identity gets
+`-2` and so on, as the record folder does). So the old generation's takes, shard indexes, validation
+reports and corpus files cannot remain in the new generation, and the entry point never needs a flag to
+rebuild skipped takes. Registry v2 has no such flag (`force_arg`) and no resume fields, and a
+`--bundle-arg=--force` given by the operator is passed on like any other argument. Because it builds in an
+empty folder, `amass` no longer rewrites the subject fits in `reduced_model_fit.json`. The bundle folder is
+moved after the corpus stage and its class check are finished, just before the bundle entry point. If the
+corpus stage fails, the bundle is left untouched.
 
-- **성공하면** 생성 단계 전체(진입점, 후처리, 등급 검사, `KNOWN_LIMITATIONS.json`, `source_manifest.json`)가
-  끝난 뒤 옆으로 옮긴 폴더를 지운다(`replaced.<what>.outcome: deleted`). 단 운영 폴더 — 어느 루트든
-  `runs/experimental_generation_poc_demo` 바로 아래의 폴더, 레지스트리가 선언한 lineage 만이 아니다 — 의 것은
-  지우지 않는다. 운영 payload 삭제는 소유자 승인 사항이므로([보존 규칙](RETENTION_RULES.md) 1.5) 그 자리에 두고, generate 단계의
-  결과가 그 경로를 적는다(`kept_production_directory`).
-- **실패하면** 이번 실행이 쓴 표지 하나 말고는 아무것도 지우지 않는다. 새 폴더는 `<폴더>.failed-<run>` 으로
-  이름을 바꾸고(표지밖에 없으면 지운다), 옆으로 옮긴 폴더를 `<폴더>` 로 되돌린다. 이전 상태가 바이트 그대로
-  돌아온다(`outcome: restored`, `failed_output_relative`). 코퍼스와 번들을 함께 옮긴 실행이면 둘 다 되돌린다.
-  단계가 예외로 죽어도 같다. 옆으로 옮긴 직후 증거 파일을 복사하다 예외가 나도 같다. 되돌리지 못하면(파일이
-  잠겼다 등) 결과가 옛 세대가 있는 경로를 적고 손으로 되돌리라고 한다.
-- **한 번에 한 세대.** `<폴더>.replaced-*` 나 `<폴더>.failed-*` 가 옆에 있는 동안 그 폴더는 다시 교체하지
-  않는다(위 표). 운영 폴더의 교체가 성공하면 옛 세대가 옆에 남으므로, 다음 교체는 소유자가 그것을 승인해 지운
-  뒤에만 된다.
-- **죽은 실행.** 프로세스가 죽어 실패 처리를 못 하면 새 폴더에 `.generating` 이, 그 옆에 `<폴더>.replaced-<run>`
-  과 잠금 파일이 남는다. 어떤 실행도 그것을 넘겨받거나 이어 만들지 않는다. 잠금이 있는 동안은 잠금 때문에
-  거부되고, 잠금을 손으로 지운 뒤에는 폴더가 끝나지 않은 생성이라 `--replace-existing` 없이 거부되며, 주어도 옆
-  폴더 때문에 거부된다. 그 거부가 되돌리는 법(지금 폴더를 치우고 `.replaced-*` 의 이름을 되돌린다)과 정리하는
-  법을 적는다.
+- **On success**, after the whole generate stage (entry point, post-steps, class check,
+  `KNOWN_LIMITATIONS.json`, `source_manifest.json`) is finished, the folder moved aside is deleted
+  (`replaced.<what>.outcome: deleted`). A production folder's — a folder directly under
+  `runs/experimental_generation_poc_demo` in any root, not only a registry-declared lineage — is not
+  deleted. Deleting a production payload needs owner approval ([retention rule](RETENTION_RULES.md) 1.5), so
+  it stays where it is and the generate stage's result names its path (`kept_production_directory`).
+- **On failure**, nothing is deleted except the one marker this run wrote. The new folder is renamed to
+  `<folder>.failed-<run>` (deleted if it holds only the marker) and the folder moved aside is renamed back
+  to `<folder>`. The previous state comes back byte for byte (`outcome: restored`, `failed_output_relative`).
+  A run that moved both a corpus and a bundle restores both. The same holds when a stage dies with an
+  exception, including an exception while copying the evidence files right after the move. If the restore
+  fails (a locked file and so on) the result names the path of the old generation and asks for a manual
+  restore.
+- **One generation at a time.** While `<folder>.replaced-*` or `<folder>.failed-*` is beside it, the folder
+  is not replaced again (table above). A successful replacement of a production folder leaves the old
+  generation beside it, so the next replacement is possible only after the owner approves and deletes it.
+- **A dead run.** If the process dies before its failure handling, the new folder keeps `.generating`, and
+  `<folder>.replaced-<run>` and the lock file stay beside it. No run takes them over or continues them.
+  While the lock is there, runs are refused because of the lock; after the lock is deleted by hand, the
+  folder is an unfinished generation and is refused without `--replace-existing`, and with it, refused
+  because of the folder beside it. That refusal says how to restore (clear the current folder and rename
+  `.replaced-*` back) and how to clean up.
 
-**잠금.** generate 단계는 폴더를 살피기 전에 번들 폴더 옆, 그리고 코퍼스 단계가 있으면 코퍼스 폴더 옆에
-`<폴더>.lock` 을 `O_CREAT | O_EXCL` 로 만든다. 먼저 만든 실행 하나만 성공한다. 내용은 pid, 호스트, 시작 시각,
-run identity, 실행 기록 위치다. 단계가 어떻게 끝나든(성공, 실패, 예외, 거부) 지운다. 단 그 파일이 이 실행이 쓴
-그대로일 때만 지운다(운영자가 지운 뒤 다른 실행이 잡은 잠금은 그 실행의 것이다). 코퍼스는 읽기만 하는
-실행도 잠근다. 번들이 읽는 동안 다른 실행이 그것을 다시 만들지 못하게 하려는 것이다. 그래서 같은 코퍼스를
-읽는 두 표본 실행도 동시에 돌지 않는다. 어떤 실행도 쓸 수 없는 곳(증거·읽기 전용 폴더,
-`paths.check_output_dir`)의 코퍼스는 아무도 다시 만들 수 없으므로 잠그지 않고, 그 옆에 아무것도 쓰지 않는다.
-러너는 남의 잠금을 지우지 않는다. 오래된 잠금의 거부 메시지가 주인과 나이, 그리고 그 프로세스가 살아 있는지
-확인하는 명령을 적는다.
+**Lock.** Before inspecting any folder, the generate stage creates `<folder>.lock` with
+`O_CREAT | O_EXCL` beside the bundle folder and, when there is a corpus stage, beside the corpus folder.
+Only the first run to create it succeeds. It holds the pid, host, start time, run identity and run-record
+location. It is deleted however the stage ends (success, failure, exception, refusal), but only if the file
+is still exactly what this run wrote (a lock taken by another run after the operator deleted this one
+belongs to that run). A corpus is locked even by a run that only reads it, so that no other run rebuilds it
+while a bundle reads it; as a result two sample runs that read the same corpus do not run at the same
+time. A corpus in a place no run can write (an evidence or read-only folder, `paths.check_output_dir`)
+cannot be rebuilt by anyone, so it is not locked and nothing is written beside it. The runner never deletes
+another run's lock. The refusal for a stale lock gives its owner and age and a command that checks whether
+the process is alive.
 
-**끝나지 않은 생성 단계.** 생성기는 `INDEX.json` 을 쓰고 끝나지만, 생성 단계는 그 뒤에 후처리(`prism` 의
-`synthesize_insole_heading.py`), `KNOWN_LIMITATIONS.json`, `source_manifest.json` 이 남아 있다. 그래서 러너는 빈
-폴더에 만들기 시작할 때(번들 진입점 앞) `.generating`(어느 실행이 만드는지: 실행 기록 위치, run identity, 시작
-시각)을 쓰고, 이 모두가 끝난 뒤에만 지운다. 코퍼스 단계도 코퍼스 진입점 앞에 코퍼스 폴더에 같은 표지를 쓰고,
-지문과 등급 검사가 끝난 뒤에 지운다. 표지는 무엇을 이어 만들지 적지 않는다. 쓰임은 거부뿐이다. 표지가 있는
-코퍼스는 재사용하지 않는다. 후처리가 실패하면 번들에는 새 `INDEX.json` 과 `.generating` 이 함께 남는다. 이
-번들은 끝난 번들이 아니다. validate·readme·register(러너의 단계든 `--skip-generate`·`--start-at validate` 든
-`soma-synth` 명령이든)·`pipeline`·push(상위 프로젝트의 스크립트) 가 다시 만드는 명령을 적어 거부하고(`logs/refusal.txt`, 종료 코드 3),
-다음 generate 단계도 `--replace-existing` 없이는 거부한다. 주면 폴더를 옆으로 옮겨 처음부터 만든다. 그
-`INDEX.json` 은 끝난 실행이 쓴 것이 아니므로 `_superseded` 와 대조하지 않는다(운영 폴더면 옮긴 폴더는 남기고
-결과에 적는다). 생성기가 시작도 못 하고 실패해 폴더에 표지만 남으면 표지를 지우고, 이번 실행이 만든 폴더면
-폴더째 지운다(코퍼스도 같다).
+**An unfinished generate stage.** The generator ends by writing `INDEX.json`, but the generate stage still
+has post-steps (`prism`'s `synthesize_insole_heading.py`), `KNOWN_LIMITATIONS.json` and
+`source_manifest.json` after that. So when the runner starts building in an empty folder (before the bundle
+entry point) it writes `.generating` (which run is building it: run-record location, run identity, start
+time) and deletes it only after all of these are finished. The corpus stage writes the same marker into the
+corpus folder before the corpus entry point and deletes it after the fingerprint and class check. The
+marker does not say what to continue; its only use is refusal. A corpus with the marker is not reused. If a
+post-step fails, the bundle holds both a new `INDEX.json` and `.generating`. That bundle is not finished.
+validate, readme and register (the runner's stages, `--skip-generate`, `--start-at validate`, or the
+`soma-synth` commands), `pipeline` and push (the parent project's script) refuse it, naming the command that
+rebuilds it (`logs/refusal.txt`, exit code 3), and the next generate stage refuses it without
+`--replace-existing`. With it, the folder is moved aside and built from the start. That `INDEX.json` was
+not written by a finished run, so it is not compared with `_superseded` (for a production folder, the
+folder moved aside is kept and named in the result). If the generator fails before it starts and the
+folder holds only the marker, the marker is deleted, and a folder this run created is deleted entirely
+(the same for a corpus).
 
-**코퍼스 등급.** 코퍼스 지문 파일이 `artifact_class`·`distribution_scope` 를 적으면 번들과 같은 검사를 한다.
-`hknu`·`gaitex` 의 지문은 두 필드를 적는다. `addbiomechanics` 의 `SUMMARY.json` 은 적지 않으므로(각 artifact 가
-적는다) `corpus.class_check.declared: false` 로 남는다.
+**Corpus class.** When a corpus fingerprint file records `artifact_class` and `distribution_scope`, the
+same check as for bundles is applied. The `hknu` and `gaitex` fingerprints record both fields.
+`addbiomechanics`'s `SUMMARY.json` does not (each artifact records them), so it is left as
+`corpus.class_check.declared: false`.
 
 ---
 
-## 2. 단계 간 계약
+## 2. Contracts between stages
 
-- 각 단계는 **앞 단계의 산출만** 입력으로 받는다. 전역 상태를 읽지 않는다.
-- 각 단계는 실패 시 **부분 산출을 남기지 않는다**. take 디렉터리는 완성되거나 존재하지 않는다.
-- `close_run` 을 제외한 모든 단계는 take 단위이며, `close_run` 은 run 단위다.
-- 단계는 건너뛸 수 있으나(재개), **건너뛴 사실이 `metrics.json` 에 남는다.**
+- Each stage takes **only the previous stage's output** as input. It reads no global state.
+- A stage that fails **leaves no partial output**. A take directory is either complete or absent.
+- Every stage except `close_run` works per take; `close_run` works per run.
+- A stage may be skipped (resume), but **the skip is recorded in `metrics.json`.**
 
-### 2.1 실행 환경 — `smpl18` 이 경로에 있어야 한다 (2026-09-16)
+### 2.1 Execution environment — `smpl18` must be on the path (2026-09-16)
 
-SMPL 변환의 규칙(성별별 모델 파일, 골격 정의, 순운동학)은 **별도 저장소**가 소유하고, 이
-저장소는 그것을 `packages/smpl18` 에 **submodule** 로 마운트한다(비공개
-`JeongHyunho/smpl18`, 2026-09-16 교체). 러너와 생성기가 `import smpl18` 로 불러 쓰므로,
-submodule 이 채워져 있어야 하고 그 경로가 실행 환경에 있어야 한다.
+The rules of the SMPL conversion (model file per sex, skeleton definition, forward kinematics) are owned
+by a **separate repository**, which this repository mounts as a **submodule** at `packages/smpl18` (private
+`JeongHyunho/smpl18`, switched on 2026-09-16). The runner and generators use it through `import smpl18`, so
+the submodule must be populated and its path must be in the execution environment.
 
-패키지 이름은 2026-09-16 `smpl24` 에서 `smpl18` 로 바뀌었다 — 그것이 내놓는 코퍼스가 18관절
-축약 모델이기 때문이며(전체 24관절 SMPL 포즈를 거친 뒤 네 관절을 피험자별 상수로 고정하고 손
-관절 둘을 버린다), 원격 저장소도 `JeongHyunho/smpl18` 로 옮겼다. 이전 이름으로 된 경로·import
-는 더 이상 없다.
+The package was renamed from `smpl24` to `smpl18` on 2026-09-16 — the corpus it produces is an 18-joint
+reduced model (after going through the full 24-joint SMPL pose, four joints are fixed to per-subject
+constants and the two hand joints are dropped) — and the remote repository moved to
+`JeongHyunho/smpl18`. No paths or imports under the old name remain.
 
 ```bash
-# 한 번: submodule 을 채운다 (새로 clone 할 때는 git clone --recurse-submodules)
+# Once: populate the submodule (for a fresh clone, git clone --recurse-submodules)
 git submodule update --init
 
-# 설치해 둔다 (둘 다 편집 가능 설치, 기준 환경의 버전은 constraints.txt)
+# Install (both editable; the baseline versions are in constraints.txt)
 python -m pip install -c constraints.txt -e packages/smpl18 -e .
 soma-synth run --source <name> ...
 
-# 설치 없이 개발 실행: 두 소스 트리를 경로에 둔다 (macOS / Linux 는 구분자가 ':')
+# Development run without installing: put both source trees on the path (macOS / Linux separator is ':')
 PYTHONPATH="src:packages/smpl18/src" python -m soma_synth.cli run --source <name> ...
 ```
 
 ```powershell
-# 설치 없이 개발 실행 (Windows PowerShell, 구분자는 ';')
+# Development run without installing (Windows PowerShell, separator is ';')
 $env:PYTHONPATH = "src;packages/smpl18/src"; python -m soma_synth.cli run --source <name> ...
 ```
 
-실행 환경의 기준은 CPython 3.13.5, numpy 2.2.6, scipy 1.16.2 다(§6). 셸의 `python` 이 venv 가 아닌
-인터프리터일 수 있으므로 venv 의 파이썬을 경로로 부르거나 venv 를 켠다. 러너는
-`SOMA_DATA_ROOT` 가 있어야 한다(`--data-root` 로 줄 수도 있다). 원천은 `SOMA_SOURCE_ROOT`(기본
-`<SOMA_DATA_ROOT>/extracted`), 바디 모델은 `SOMA_BODY_MODEL_DIR`(기본
-`<SOMA_DATA_ROOT>/body_models/smpl`)에서 읽는다.
+The baseline environment is CPython 3.13.5, numpy 2.2.6, scipy 1.16.2 (§6). The shell's `python` may not
+be the venv's interpreter, so call the venv's Python by path or activate the venv. The runner needs
+`SOMA_DATA_ROOT` (it can also be given with `--data-root`). Sources are read from `SOMA_SOURCE_ROOT`
+(default `<SOMA_DATA_ROOT>/extracted`) and body models from `SOMA_BODY_MODEL_DIR` (default
+`<SOMA_DATA_ROOT>/body_models/smpl`).
 
-submodule 이 비어 있으면 `import smpl18` 이 실패한다 — 채우지 않은 것과 규칙이 갈라진 것을
-구별하려면 그 실패가 드러나야 한다. 어느 커밋을 쓰는지는 상위 저장소의 gitlink 가 정하며,
-그 값이 곧 재현의 기준이다(§5.2 의 모델 세트 해시와 같은 규율). 러너는 실제로 import 한
-`smpl18` 의 리비전을 코드 리비전 옆에 기록한다: 체크아웃(`packages/smpl18/.git`)이 있으면 그
-HEAD·dirty 여부·패치 해시, 설치본이면 버전과 패키지 파일별 SHA-256(§4.1).
+If the submodule is empty, `import smpl18` fails — that failure must be visible to tell "not populated"
+apart from "the rules have diverged". Which commit is used is set by the parent repository's gitlink, and
+that value is the reproduction baseline (the same discipline as the model-set hash in §5.2). The runner
+records the revision of the `smpl18` it actually imported next to the code revision: with a checkout
+(`packages/smpl18/.git`), its HEAD, dirty state and patch hash; for an installed copy, the version and the
+SHA-256 of each package file (§4.1).
 
-pytest 는 `pyproject.toml` 의 `pythonpath` 로 같은 두 경로를 잡는다. 경로에 없으면
-`import smpl18` 이 실패하며, 이는 조용한 대체 경로 없이 드러나는 편이 낫다 — 모델 선택 규칙이
-두 벌로 갈라졌던 것이 애초의 문제였다.
+pytest picks up the same two paths through `pythonpath` in `pyproject.toml`. If they are not on the path,
+`import smpl18` fails, and it is better that this shows without a silent fallback — the model selection
+rules splitting into two copies was the original problem.
 
-submodule 을 갱신할 때는 그 저장소에서 커밋·push 한 뒤 상위에서 gitlink 를 옮긴다:
+To update the submodule, commit and push in that repository, then move the gitlink in the parent:
 
 ```bash
 cd packages/smpl18 && git commit -am "..." && git push && cd ../..
 git add packages/smpl18 && git commit -m "bump the smpl18 pin"
 ```
 
-### 2.2 18관절 축소 — `smpl18` 이 정하고, 피험자마다 한 번 적합한다 (2026-09-16)
+### 2.2 The 18-joint reduction — `smpl18` defines it, fitted once per subject (2026-09-16)
 
-`large_reference.npz` 의 18관절은 SMPL-24 에서 `spine1`·`spine2`·양 `collar` 를 피험자 상수로
-고정하고 손 관절 둘을 버린 것이다. 무엇을 고정하는지, 그 아래 관절(`spine3`, 양 어깨)이 제거된
-회전을 어떻게 흡수하는지, 네 상수를 어떻게 적합하는지는 모두 `smpl18.reduce` 가 정한다. 이
-저장소는 2026-09-16 까지 같은 계산을 `scripts/poc/anthro_smpl.py` 에 따로 갖고 있었고, 다섯
-소스 중 네 곳(hknu·addbiomechanics·gaitex·amass)은 상수를 **take 마다** 적합했다.
+The 18 joints of `large_reference.npz` are SMPL-24 with `spine1`, `spine2` and both `collar` joints fixed to
+per-subject constants and the two hand joints dropped. What is fixed, how the joints below them (`spine3`,
+both shoulders) absorb the removed rotation, and how the four constants are fitted are all defined by
+`smpl18.reduce`. Until 2026-09-16 this repository had its own copy of the same computation in
+`scripts/poc/anthro_smpl.py`, and four of the five sources (hknu, addbiomechanics, gaitex, amass) fitted the
+constants **per take**.
 
-이제는 `soma_synth.pipeline.reduced_model` 하나를 거친다. 이 모듈이 하는 일은 패키지가
-호출자에게 남긴 두 가지뿐이다.
+Now everything goes through `soma_synth.pipeline.reduced_model`. This module does only the two things the
+package leaves to the caller.
 
-| 무엇 | 어떻게 |
+| What | How |
 |---|---|
-| 어떤 프레임을 모으나 | 한 피험자의 **모든 take** 를 이어 붙인 것처럼 고르게 뽑는다(긴 take 는 길이만큼 반영). 서로 다른 rest skeleton 에 올라간 take 는 섞지 않고 묶음을 나눈다 |
-| 숫자는 어디서 오나 | 레지스트리의 `smpl18_profile` 이 가리키는 프로파일의 `reduce` 절(`sample_frames`·`optimiser`·`max_evaluations`). 코드에 기본값이 없다 |
+| Which frames are pooled | Sampled evenly as if **all takes** of one subject were concatenated (a long take counts in proportion to its length). Takes on different rest skeletons are not mixed; they form separate groups |
+| Where the numbers come from | The `reduce` section (`sample_frames`, `optimiser`, `max_evaluations`) of the profile named by the registry's `smpl18_profile`. The code has no defaults |
 
-소스별로 모으는 단위는 다음과 같다.
+The pooling unit per source:
 
-| source | 적합 묶음 | 적합에 쓰는 프레임 |
+| source | Fit group | Frames used for the fit |
 |---|---|---|
-| `hknu` | 피험자 | 코퍼스의 모든 trial, 원 표본율, 뼈 길이로 보정된 skeleton |
-| `addbiomechanics` | 피험자 | 읽히는 모든 trial, 원 표본율 |
-| `gaitex` | 피험자 | 모든 take 의 pair window 행 — 번들이 싣는 바로 그 행 |
-| `amass` | 피험자 × 성별 모델 × MoSh betas | 묶음의 모든 motion 시퀀스, 원 표본율. 샤드 여럿이 동시에 떠도 적합은 한 번이며(잠금 파일), 나머지 샤드는 그 결과 파일을 읽는다 |
-| `prism` | 피험자 | 모든 take 의 전체 프레임 |
+| `hknu` | subject | Every trial in the corpus, at the native sample rate, on the bone-length-corrected skeleton |
+| `addbiomechanics` | subject | Every readable trial, at the native sample rate |
+| `gaitex` | subject | The pair-window rows of every take — exactly the rows the bundle carries |
+| `amass` | subject × sex model × MoSh betas | Every motion sequence in the group, at the native sample rate. Even when several shards run at once the fit happens once (lock file); the other shards read its result file |
+| `prism` | subject | All frames of every take |
 
-기록은 두 곳에 남는다. 번들 루트의 `reduced_model_fit.json` 은 묶음마다 네 상수(`constants_wxyz`),
-흡수 관절, 적합 전후 잔차(RMS·최대, m), 관절별 RMS, 쓴 프레임 수, 수렴 여부, 설정과 프로파일
-해시를 담고, 각 take 가 어느 묶음의 상수를 썼는지 적는다. 모든 번들이 이 파일을 가져야 한다
-(`dataset_profiles_v1.yaml` `universal.bundle_files`). 각 take 의 `manifest.json` 에는 같은 기록이
-`anthro_reconstruction.reduced_model_fit` 으로 들어가고, 그 take 자체의 잔차는 전과 같이
-`validation.reduced_model_fit_residual_m` 에 있다. 묶음 없이 한 take 만으로 적합한 경우(생성기를
-단독으로 부른 경우)는 기록의 `scope` 가 `take` 로 남는다.
+The record is kept in two places. `reduced_model_fit.json` at the bundle root holds, per group, the four
+constants (`constants_wxyz`), the absorbing joints, the residual before and after the fit (RMS and maximum,
+m), per-joint RMS, the number of frames used, convergence, and the settings and profile hash, and it says
+which group's constants each take used. Every bundle must have this file
+(`dataset_profiles_v1.yaml` `universal.bundle_files`). Each take's `manifest.json` carries the same record
+as `anthro_reconstruction.reduced_model_fit`, and the take's own residual is, as before, in
+`validation.reduced_model_fit_residual_m`. When the fit used a single take without a group (a generator
+called on its own), the record's `scope` is `take`.
 
-### 2.3 원천 준비 — 목록과 반입 (`hash-sources`, `stage-sources`)
+### 2.3 Preparing sources — the list and staging (`hash-sources`, `stage-sources`)
 
-원천 폴더 다섯(`amass`·`prism`·`gaitex`·`hknu_fullbody`·`addbiomechanics`)은 복사로 PC 에 온다. 다섯
-폴더를 담은 폴더(예: 읽기 전용 공유 사본)에서 가져온다. 명령 둘이 그 일을 한다
+The five source folders (`amass`, `prism`, `gaitex`, `hknu_fullbody`, `addbiomechanics`) reach a PC by
+copying, from a folder that holds all five (for example a read-only shared copy). Two commands do that
 (`pipeline/source_files.py`).
 
 ```bash
-# 목록: 원천 폴더의 모든 파일, GNU coreutils 형식("<sha256>  <폴더>/<상대 posix 경로>", 이름 순, 한 줄에 하나)
+# List: every file in the source folders, GNU coreutils format ("<sha256>  <folder>/<relative posix path>", sorted by name, one per line)
 soma-synth hash-sources [--source-root <root>] [--sources hknu,prism] --out <SHA256SUMS> [--force]
 
-# 반입: 목록의 파일 중 없는 것만 복사한다. --verify-only 는 복사 없이 대조만 한다
-soma-synth stage-sources --from <원천 폴더들을 담은 폴더> [--to <source root>] [--sources ...] --sums <SHA256SUMS> [--verify-only]
+# Stage: copy only the listed files that are missing. --verify-only compares without copying
+soma-synth stage-sources --from <folder holding the source folders> [--to <source root>] [--sources ...] --sums <SHA256SUMS> [--verify-only]
 ```
 
-- `hash-sources` 는 원천을 **읽기만** 한다. `--source-root` 의 기본은 `SOMA_SOURCE_ROOT`, 없으면
-  `<SOMA_DATA_ROOT>/extracted`. `--sources` 는 폴더 이름(`hknu` 는 `hknu_fullbody`), 기본은 다섯 모두.
-  목록은 원천 루트 안, `SOMA_DATA_ROOT` 의 `extracted/`·`raw_archives/` 안, 증거 폴더(`_superseded`·`_runs`·
-  `_manifest_backfill`, 어디에 있든 이름으로) 안, lineage 컨테이너 `runs/experimental_generation_poc_demo`
-  안(`SOMA_DATA_ROOT` 의 것, 그리고 폴더 이름이 그렇게 이어지는 어느 경로든), 번들이나 코퍼스 안(위쪽
-  폴더 어딘가에 `INDEX.json` 이 있으면), data root 자신의 파일(`README.md`, 그리고 있으면 `MASTER.md`·
-  `state/local_archive_inventory.json`)에는 쓰지 않는다(종료 코드 3). 동기화 폴더는 경고만 한다. 이미 있는 파일은 이
-  명령이 쓴 목록으로 읽힐 때만(모든 줄이 원천 폴더의 파일을 적은 `sha256sum` 줄이고, 이름이 겹치지 않고
-  정렬돼 있고, 줄바꿈으로 끝난다) 새 목록으로 바꾼다. 그렇지 않은 파일은 `--force` 가 있어야 덮는다
-  (`--force` 도 위치 거부는 풀지 않는다). `sha256sum -c` 로도 확인할 수 있다.
-- `stage-sources` 는 목록에 있고 `--to`(기본 `SOMA_SOURCE_ROOT`, 없으면 `<SOMA_DATA_ROOT>/extracted`)에
-  **없는** 파일만 `--from` 에서 복사한다. 복사본은 목적지 폴더의 임시 이름(`.<이름>.*.staging`)에 쓰고,
-  목록의 SHA-256 과 맞을 때만 제 이름으로 바꾼다(덮어쓰지 않는 rename). 이미 있고 해시가 맞는 파일은
-  건너뛴다. 이미 있는데 해시가 **다른** 파일이 하나라도 있으면 모두 보고하고 **아무것도 복사하지 않고**
-  종료 코드 3 으로 끝난다. 이 명령은 아무것도 지우거나 덮어쓰지 않는다. `--from` 에 없거나 `--from`
-  의 파일이 목록과 다르면(동기화가 덜 된 드라이브) 그 파일은 쓰지 않고 보고하며 종료 코드 1 이다.
-  `--verify-only` 는 복사 없이 없는 것·다른 것을 보고한다(있으면 종료 코드 1).
-- 중단된 반입이 남긴 임시 이름의 복사본(`.<이름>.<무작위>.staging`)은 원천 파일이 아니다. 목록과 원천
-  추적의 열거(`iter_source_files`)가 빼고, `stage-sources` 는 `--verify-only` 를 포함해 매번 목적지의 원천
-  폴더(`--sources` 로 고른 것) 아래 남은 것을 `LEFTOVER` 로 보고한다. 지우지는 않는다 — 소유자가 손으로
-  지운다. 종료 코드에는 영향이 없다.
-- `--from` 은 동기화 폴더나 공유 드라이브여도 된다(읽기만 한다). `--to` 는 원천 루트가 받는 가드를
-  받는다(동기화 폴더·공유 드라이브는 경고만 한다): 증거 폴더(`_superseded`·`_runs`·`_manifest_backfill`)
-  안이 아니고, data root 자체나 그 `runs`·`raw_archives`·바디 모델 폴더 안이 아니며, `--from` 과 겹치지
-  않는다. 반입은 원천 폴더에 **없던 파일을 더하는 일**뿐이다. 이미 있는 원천은 보존 규칙 1.4 대로
-  바꾸거나 지우지 않는다.
-- 운영체제가 남기는 파일(`.DS_Store`·`Thumbs.db`·`desktop.ini`·`._*`)은 원천 파일이 아니어서 목록에
-  넣지 않는다. 실행 기록의 원천 추적(§4.1)도 같은 열거를 쓴다.
+- `hash-sources` only **reads** the sources. `--source-root` defaults to `SOMA_SOURCE_ROOT`, else
+  `<SOMA_DATA_ROOT>/extracted`. `--sources` takes folder names (`hknu` is `hknu_fullbody`), all five by
+  default. The list is never written inside the source root, inside `extracted/` or `raw_archives/` of
+  `SOMA_DATA_ROOT`, inside an evidence folder (`_superseded`, `_runs`, `_manifest_backfill`, matched by name
+  wherever it is), inside the lineage container `runs/experimental_generation_poc_demo` (that of
+  `SOMA_DATA_ROOT`, and any path whose folder names continue that way), inside a bundle or corpus (an
+  `INDEX.json` in some folder above), or over the data root's own files (`README.md` and, if present,
+  `MASTER.md` and `state/local_archive_inventory.json`) (exit code 3). A synchronised folder only warns. An
+  existing file is replaced by the new list only when it reads as a list this command wrote (every line is
+  a `sha256sum` line naming a file in a source folder, the names are unique and sorted, and it ends with a
+  newline). Any other file is overwritten only with `--force` (`--force` does not lift location refusals).
+  The list can also be checked with `sha256sum -c`.
+- `stage-sources` copies from `--from` only the listed files that are **missing** in `--to` (default
+  `SOMA_SOURCE_ROOT`, else `<SOMA_DATA_ROOT>/extracted`). A copy is written under a temporary name in the
+  destination folder (`.<name>.*.staging`) and renamed to its own name only when it matches the listed
+  SHA-256 (a rename that does not overwrite). A file that exists with a matching hash is skipped. If any
+  existing file has a **different** hash, all of them are reported, **nothing is copied**, and it ends with
+  exit code 3. This command never deletes or overwrites anything. A file missing from `--from`, or a file in
+  `--from` that differs from the list (a drive still syncing), is not written; it is reported and the exit
+  code is 1. `--verify-only` reports missing and different files without copying (exit code 1 if any).
+- A copy left under a temporary name by an interrupted staging (`.<name>.<random>.staging`) is not a source
+  file. The enumeration for the list and for source tracing (`iter_source_files`) leaves it out, and
+  `stage-sources`, including `--verify-only`, reports every one left under the destination's source folders
+  (those chosen with `--sources`) as `LEFTOVER` each time. It does not delete them — the owner deletes them
+  by hand. They do not affect the exit code.
+- `--from` may be a synchronised folder or a shared drive (it is only read). `--to` gets the guard the source
+  root gets (a synchronised folder or shared drive only warns): not inside an evidence folder (`_superseded`,
+  `_runs`, `_manifest_backfill`), not the data root itself or inside its `runs`, `raw_archives` or body model
+  folder, and not overlapping `--from`. Staging only **adds files that were missing** to the source folders.
+  Existing sources are neither changed nor deleted, per retention rule 1.4.
+- Files the operating system leaves (`.DS_Store`, `Thumbs.db`, `desktop.ini`, `._*`) are not source files and
+  are not listed. The run record's source tracing (§4.1) uses the same enumeration.
 
 ---
 
 ## 3. run identity
 
-### 3.1 `run_id` 는 그대로 두고 `run_identity` 를 더한다
+### 3.1 Keep `run_id` and add `run_identity`
 
-현재 `run_id` 는 take 라벨이며 manifest 필수 필드다. 의미를 바꾸면 기존 5개 번들의 manifest 가
-달라진다. 따라서 **`run_id` 는 건드리지 않고**, run 단위 식별자를 새 이름으로 더한다.
+Today `run_id` is a take label and a required manifest field. Changing its meaning would change the
+manifests of the existing five bundles. So **`run_id` is left untouched** and a run-level identifier is
+added under a new name.
 
 ```
 run_identity = sha256(
@@ -407,175 +440,191 @@ run_identity = sha256(
         "spec_version":       <spec_version>,
         "source_name":        <source>,
         "entrypoint":         <script path>,
-        "resolved_config":    <resolved_config.yaml 의 sha256>,
-        "code_revision":      <git HEAD sha + dirty 여부>,
-        "input_corpus":       <입력 코퍼스 경로와 그 SUMMARY/INDEX sha256>,
-        "body_model_sha256":  <SMPL 모델 파일 sha256>,
+        "resolved_config":    <sha256 of resolved_config.yaml>,
+        "code_revision":      <git HEAD sha + dirty flag>,
+        "input_corpus":       <input corpus path and the sha256 of its SUMMARY/INDEX>,
+        "body_model_sha256":  <sha256 of the SMPL model files>,
     })
 )[:32]
 ```
 
-§10.1 이 요구하는 "config/code/source identity 를 포함한 hash" 를 그대로 만족한다. 같은 입력은
-같은 `run_identity` 를 준다.
+This meets §10.1's "hash including config/code/source identity" as written. The same inputs give the same
+`run_identity`.
 
-`resolved_config` 항목(`resolved_config_sha256`)은 레지스트리 v2(2026-09-25) 전까지 채워지지 않았다. 그래서
-출력 폴더나 표본 선택, 단계만 다른 두 실행이 같은 identity 를 받았다. 이제 `resolved_config.yaml` 의 `config`
-블록을 canonical JSON 으로 해시해 채운다. data root 와, data root 기준
-상대 경로가 있는 `dataset_dir` 의 절대 경로는 해시에서 뺀다 — 다른 PC 에서 같은 실행은 같은 identity 를
-받는다. 완전히 같은 실행을 되풀이하면 identity 도 같으므로, 러너는 첫 실행 폴더를 덮지 않고
-`run_<identity>-2` 에 기록한다.
+The `resolved_config` item (`resolved_config_sha256`) was not filled in before registry v2 (2026-09-25), so
+two runs that differed only in output folder, sample selection or stages got the same identity. It is now
+filled with the hash of the canonical JSON of `resolved_config.yaml`'s `config` block. The data root, and the
+absolute path of a `dataset_dir` that has a path relative to the data root, are left out of the hash — the
+same run on another PC gets the same identity. Repeating exactly the same run gives the same identity, so
+the runner does not overwrite the first run's folder and records into `run_<identity>-2`.
 
-> **남는 불일치.** §10.1 의 문구는 `run_id` 자체가 그 해시이기를 요구한다. 이 명세는 호환을
-> 위해 새 필드를 쓰므로 문구와 완전히 일치하지 않는다. 봉인 문서를 고칠 수 없으므로 이 차이를
-> 여기 적어 둔다.
+> **Remaining mismatch.** The wording of §10.1 asks that `run_id` itself be that hash. For compatibility
+> this specification uses a new field, so it does not match the wording exactly. The sealed document cannot
+> be edited, so the difference is recorded here.
 
 ---
 
-## 4. run 디렉터리
+## 4. The run directory
 
-`runs/<run_identity>/` 에 §10.1 의 7종을 남긴다.
+`runs/<run_identity>/` holds the seven artifacts of §10.1.
 
-| 파일 | 내용 | 쓰는 시점 |
+| File | Content | Written |
 |---|---|---|
-| `resolved_config.yaml` | 해석된 전체 설정(기본값 포함) | run 시작 |
-| `manifest.json` | run 수준 manifest — `run_identity`, 소스, 단계 목록, 결과 | `close_run` |
-| `environment.lock` | Python·의존성 버전, 플랫폼 | run 시작 |
-| `source_assets.json` | 입력 자산 경로와 SHA-256 | `register_asset` 누적 |
-| `metrics.json` | take 수, 건너뛴 수, 소요 시간, 단계별 집계 | `close_run` |
-| `exclusions.json` | 제외된 take 와 사유 | `close_run` |
-| `logs/` | 실행 로그: `runner.log`(러너가 출력한 것), 자식 단계마다 표준 출력과 표준 오류 — `corpus.log`(코퍼스 진입점), `generate.log`(번들 진입점과 병합; 샤드마다 `generate.shard<i>of<N>.log`), `post_step.<스크립트>.log`(후처리). 명령 줄(`$ ...`)로 시작해 종료 코드(`[exit N]`)로 끝나고, 콘솔에도 그대로 나온다(`pipeline.generate` 가 tee 한다). 거부되면 `refusal.txt`, 예기치 않은 실패면 `error.txt` | 전 구간 |
+| `resolved_config.yaml` | The full resolved configuration (defaults included) | Run start |
+| `manifest.json` | Run-level manifest — `run_identity`, source, stage list, results | `close_run` |
+| `environment.lock` | Python and dependency versions, platform | Run start |
+| `source_assets.json` | Input asset paths and SHA-256 | Accumulated by `register_asset` |
+| `metrics.json` | Take count, skipped count, elapsed time, per-stage totals | `close_run` |
+| `exclusions.json` | Excluded takes and reasons | `close_run` |
+| `logs/` | Run logs: `runner.log` (what the runner printed), and for each child stage its standard output and standard error — `corpus.log` (corpus entry point), `generate.log` (bundle entry point and merge; per shard `generate.shard<i>of<N>.log`), `post_step.<script>.log` (post-steps). Each starts with the command line (`$ ...`) and ends with the exit code (`[exit N]`), and also appears on the console unchanged (`pipeline.generate` tees it). `refusal.txt` for a refusal, `error.txt` for an unexpected failure | Throughout |
 
-take 디렉터리의 `manifest.json`(계약 §12.2)과 run 디렉터리의 `manifest.json`(§10.1)은 **다른
-것**이다. 전자는 take 의 필드 계약이고 후자는 실행의 기록이다.
+A take directory's `manifest.json` (contract §12.2) and the run directory's `manifest.json` (§10.1) are
+**different things**. The first is the take's field contract; the second is the record of the run.
 
-### 4.1 추적 기록 — 라이선스 철회에 대비한다 (ADR-0041, 2026-09-25)
+### 4.1 The tracing record — prepared for a licence withdrawal (ADR-0041, 2026-09-25)
 
-팀원이 만든 번들은 그 PC 에만 있고 중앙 카탈로그에 없다. 원천의 라이선스가 철회되면 실행 기록을
-모아 영향받는 산출물을 찾는다(`PIPELINE_GOVERNANCE.md` §12). 그래서 번들을 만든 실행은 일곱 가지
-외에 다음을 남긴다.
+A bundle a teammate makes lives only on that PC and is not in a central catalog. If a source's licence is
+withdrawn, the run records are collected to find the affected outputs (`PIPELINE_GOVERNANCE.md` §12). So a
+run that makes a bundle leaves the following in addition to the seven artifacts.
 
-| 무엇 | 어디 |
+| What | Where |
 |---|---|
-| 원천 참조 목록 — take manifest 가 적은 모든 `relative_path`(또는 `source_asset_id`)와 그 옆의 해시(`sha256`·`source_asset_sha256`·`source_asset_sha256_take`), 참조별 take·필드, 개수, 합산 해시 | `source_manifest.json` |
-| 원천 파일 전체 해시(코퍼스가 있는 소스) — 이번 실행의 코퍼스 단계·번들 단계가 읽을 수 있었던 모든 원천 파일의 논리 id(`extracted/<폴더>/<경로>`), 크기, **파일 전체**의 SHA-256, 그 파일을 읽을 수 있었던 단계, 단계별 선택 인자, 개수·총 크기·합산 해시·해시에 걸린 시간 | `source_manifest.json` `source_files`, 요약은 `manifest.json` `tracing.source_manifest.source_files` |
-| 코퍼스 — lineage, 이번 실행이 만들었는지(`built`·`rebuilt`·`reused`), 코퍼스 인자를 썼는지(`corpus_args_used`), 지문 파일과 그 SHA-256, 열 때 폴더가 담고 있던 것(`found_at_open`: 없음이면 `null`, 끝난 코퍼스, 끝나지 않은 생성, 그 밖의 파일), 그것을 옆으로 옮겼는지(`moved_aside`) | `manifest.json` `corpus`, `source_assets.json` |
-| `smpl18` 리비전 — 체크아웃의 HEAD·dirty·패치 해시, 또는 버전과 파일별 해시 | `environment.lock`, `manifest.json` `provenance.smpl18_revision` |
-| 생성 근거 — 기준(`standing_decision`·`owner_record`), ADR, 결정 기록 경로와 그 SHA-256, 등급. `--authorized-by` 기록이 허가했으면 그 기록의 SHA-256(`authorization_record_sha256`)과 실행 기록 안의 사본(`authorization/`) | `manifest.json` `generation_decision` |
-| 의도한 생성 근거 — 결정을 묻기 전에 적는다(`generation_basis_intended`; generate 단계가 없거나 `--skip-generate` 면 `null`). 건넨 `--authorized-by` 기록의 SHA-256(`authorized_by_sha256`) | `resolved_config.yaml` |
-| 위 셋의 요약(원천 목록 개수와 합산 해시, 코드·`smpl18` 리비전, 결정 기록 경로와 SHA-256, 실제 근거 `generation_basis` 와 의도한 근거 `generation_basis_intended`). 거부된 실행은 실제 근거가 `null` 이거나 거부 사유(`artifact_class`·`gates`)다 | `manifest.json` `tracing` |
-| 원천 루트 — 생성기가 읽는 곳(`SOMA_SOURCE_ROOT`, 없으면 `<data root>/extracted`)과 그 출처(`source_root_from`) | `resolved_config.yaml` `source_root_relative`·`source_root` |
-| 번들 폴더 — 생성 전에 `INDEX.json` 이 있었는지(`index_present`), 열 때 폴더가 담고 있던 것(`found_at_open`: 없음이면 `null`, 끝난 번들, 끝나지 않은 생성과 그 표지를 남긴 실행, 그 밖의 파일), 그것을 옆으로 옮겼는지(`moved_aside`), 생성 단계를 끝내고 `.generating` 을 지웠는지(`generating_marker_removed`) | `manifest.json` `bundle` |
-| 카탈로그 위치, 그리고 기록된 경로 각각의 data root 기준 상대 경로. 레지스트리 v2 와 함께 더한 경로(카탈로그, `_runs`, 바디 모델 폴더, 파일 단위 모델 재지정, 코퍼스 폴더, `source_manifest.json` 의 번들)는 data root 안이면 **상대 경로만** 적고, 밖일 때만 절대 경로를 적는다. 팀원의 실행 기록은 모아서 읽히므로 그 PC 의 절대 경로를 늘리지 않는다. `dataset_dir`·`data_root` 는 전처럼 절대 경로도 남는다 | `resolved_config.yaml`, `source_assets.json`, `provenance.body_model` |
-| 교체한 것 — 옆으로 옮긴 번들·코퍼스 폴더마다 원래 위치, 옮긴 곳(`aside_relative`·`aside_name`), 담고 있던 것(`found`), 운영 폴더인지(`production_directory`), 작은 증거 파일의 사본 위치와 SHA-256(`evidence`), 그리고 그 결말(`outcome`: 성공하면 `deleted`·`kept_production_directory`, 실패하면 `restored` 와 실패한 산출의 `.failed-*` 위치) | `replaced/`, `manifest.json` `replaced` |
+| Source reference list — every `relative_path` (or `source_asset_id`) the take manifests record and the hash beside it (`sha256`, `source_asset_sha256`, `source_asset_sha256_take`), the take and field of each reference, the count and a combined hash | `source_manifest.json` |
+| Whole-file source hashes (sources with a corpus) — for every source file this run's corpus and bundle stages could read: logical id (`extracted/<folder>/<path>`), size, SHA-256 of the **whole file**, the stages that could read it, the selection arguments of each stage, the count, total size, combined hash and time spent hashing | `source_manifest.json` `source_files`, summary in `manifest.json` `tracing.source_manifest.source_files` |
+| Corpus — lineage, whether this run built it (`built`, `rebuilt`, `reused`), whether corpus arguments were used (`corpus_args_used`), the fingerprint file and its SHA-256, what the folder held when opened (`found_at_open`: `null` for nothing, a finished corpus, an unfinished generation, other files), whether it was moved aside (`moved_aside`) | `manifest.json` `corpus`, `source_assets.json` |
+| `smpl18` revision — the checkout's HEAD, dirty state and patch hash, or the version and per-file hashes | `environment.lock`, `manifest.json` `provenance.smpl18_revision` |
+| Basis for generating — the basis (`standing_decision`, `owner_record`), the ADR, the decision record path and its SHA-256, the class. If an `--authorized-by` record authorised the run, that record's SHA-256 (`authorization_record_sha256`) and a copy in the run record (`authorization/`) | `manifest.json` `generation_decision` |
+| Intended basis — written before the decision is asked (`generation_basis_intended`; `null` without a generate stage or with `--skip-generate`). The SHA-256 of the `--authorized-by` record given (`authorized_by_sha256`) | `resolved_config.yaml` |
+| A summary of the three above (source list count and combined hash, code and `smpl18` revisions, decision record path and SHA-256, the actual basis `generation_basis` and the intended basis `generation_basis_intended`). For a refused run the actual basis is `null` or the reason for refusal (`artifact_class`, `gates`) | `manifest.json` `tracing` |
+| Source root — where the generators read (`SOMA_SOURCE_ROOT`, else `<data root>/extracted`) and where that came from (`source_root_from`) | `resolved_config.yaml` `source_root_relative`, `source_root` |
+| Bundle folder — whether `INDEX.json` existed before generation (`index_present`), what the folder held when opened (`found_at_open`: `null` for nothing, a finished bundle, an unfinished generation and the run that left its marker, other files), whether it was moved aside (`moved_aside`), and whether the generate stage finished and removed `.generating` (`generating_marker_removed`) | `manifest.json` `bundle` |
+| The catalog location, and each recorded path relative to the data root. The paths added with registry v2 (catalog, `_runs`, body model folder, per-file model overrides, corpus folder, the bundle in `source_manifest.json`) are recorded **as relative paths only** when inside the data root, and as absolute paths only when outside. Teammates' run records are collected and read, so they should not multiply that PC's absolute paths. `dataset_dir` and `data_root` keep their absolute paths as before | `resolved_config.yaml`, `source_assets.json`, `provenance.body_model` |
+| What was replaced — for each bundle or corpus folder moved aside: the original location, where it was moved (`aside_relative`, `aside_name`), what it held (`found`), whether it is a production folder (`production_directory`), the location and SHA-256 of the copies of the small evidence files (`evidence`), and the outcome (`outcome`: `deleted` or `kept_production_directory` on success, `restored` and the `.failed-*` location of the failed output on failure) | `replaced/`, `manifest.json` `replaced` |
 
-코퍼스에서 만든 번들(`hknu`·`gaitex`·`addbiomechanics`)의 manifest 는 원천으로 **코퍼스 파일**을
-적는다. 그 코퍼스가 어느 원천 파일에서 왔는지는 코퍼스 자신의 기록에 있고, 실행 기록은 코퍼스의
-지문을 함께 남긴다. `gaitex` 는 small 을 합성한 원천 마커·IMU 파일(`small_synthesis.inputs`)도 적으므로
-그것도 목록에 들어간다.
+The manifests of bundles built from a corpus (`hknu`, `gaitex`, `addbiomechanics`) record **corpus files**
+as their source. Which source files that corpus came from is in the corpus's own record, and the run record
+also keeps the corpus fingerprint. `gaitex` also records the source marker and IMU files the small was
+synthesised from (`small_synthesis.inputs`), so those are in the list too.
 
-**코퍼스 너머의 원천 해시는 실행 기록에 있다.** 코퍼스 자신의 기록은 원천을 이렇게만 적는다.
+**Source hashes beyond the corpus are in the run record.** The corpus's own record describes its sources
+only this way.
 
-| 코퍼스 | 원천을 적는 방식 |
+| Corpus | How it records its sources |
 |---|---|
-| `hknu_smpl24_paired` (`generate_hknu_faithful.py`) | `SUMMARY.json` 과 코퍼스 npz 가 피험자·trial 이름만 적는다. 원천 파일의 해시는 없다 |
-| `gaitex_smpl24`·`addbio_smpl24_raw` | 각 artifact 의 `adapter_hash` 가 원천 파일 **첫 1 MiB** 의 SHA-256 앞 16자리다. 파일 전체의 해시가 아니다 |
+| `hknu_smpl24_paired` (`generate_hknu_faithful.py`) | `SUMMARY.json` and the corpus npz record only subject and trial names. No source file hashes |
+| `gaitex_smpl24`, `addbio_smpl24_raw` | Each artifact's `adapter_hash` is the first 16 hex digits of the SHA-256 of the **first 1 MiB** of the source file. Not a whole-file hash |
 
-이 기록은 npz 멤버·manifest·`pair_id` 로 이어지므로 바꾸지 않는다. 대신 러너가 실행 기록의
-`source_manifest.json` 에 `source_files` 블록을 더한다(`pipeline/source_trace.py`). 파일 전체의 해시는
-거기에 있다.
+This record feeds npz members, manifests and `pair_id`, so it is not changed. Instead the runner adds a
+`source_files` block to the run record's `source_manifest.json` (`pipeline/source_trace.py`). The whole-file
+hashes are there.
 
-- **어느 파일인가.** 실행의 원천 루트(`SOMA_SOURCE_ROOT`, 없으면 `<data root>/extracted`) 아래 그 소스의
-  폴더에서, 이번 실행의 단계가 읽을 수 있었던 파일 전부다. 선택 인자가 있으면 선택된 피험자로 좁힌다.
-  어느 피험자의 것도 아닌 파일(워크북, README, `_provenance`)은 늘 들어간다.
+- **Which files.** Every file in that source's folder under the run's source root (`SOMA_SOURCE_ROOT`, else
+  `<data root>/extracted`) that this run's stages could read. With selection arguments it is narrowed to the
+  selected subjects. Files that belong to no subject (workbooks, README, `_provenance`) are always included.
 
-  | source | 코퍼스 단계(이번 실행이 코퍼스를 만들 때만) | 번들 단계 |
+  | source | Corpus stage (only when this run builds the corpus) | Bundle stage |
   |---|---|---|
-  | `hknu` | `hknu_fullbody`, `--subjects` 로 좁힘(`Dataset_Processed/<S>`·`Dataset_Raw/C3D/<S>`) | `hknu_fullbody`(워크북을 읽는다), 번들의 `--subjects` 로 좁힘 |
-  | `gaitex` | `gaitex`, `--subjects` 로 좁힘(`<subject>/…`) | `gaitex`(take 의 마커·IMU 파일을 읽는다), 번들의 `--subjects` 로 좁힘 |
-  | `addbiomechanics` | `addbiomechanics`, `--only <study>/<subject>` 로 좁히고 `--per-study N` 이면 생성기와 같은 순서·같은 규칙으로 study 마다 비어 있지 않은 `.b3d` 첫 N 개(생성기는 파일을 먼저 담고 개수를 비교하므로 N 이 0 이하여도 첫 1 개) | 원천을 읽지 않는다(코퍼스만 읽는다) |
+  | `hknu` | `hknu_fullbody`, narrowed by `--subjects` (`Dataset_Processed/<S>`, `Dataset_Raw/C3D/<S>`) | `hknu_fullbody` (reads the workbook), narrowed by the bundle's `--subjects` |
+  | `gaitex` | `gaitex`, narrowed by `--subjects` (`<subject>/…`) | `gaitex` (reads each take's marker and IMU files), narrowed by the bundle's `--subjects` |
+  | `addbiomechanics` | `addbiomechanics`, narrowed by `--only <study>/<subject>`; with `--per-study N`, the first N non-empty `.b3d` per study in the generator's order and by its rule (the generator adds a file before comparing the count, so even N of 0 or less gives the first 1) | Reads no sources (reads only the corpus) |
 
-  재사용한 코퍼스의 원천은 그것을 만든 실행의 기록에 있고, 이번 기록에는 그 코퍼스의 지문이 있다.
-  `amass`·`prism` 은 코퍼스가 없고 take manifest 가 원천 파일을 파일 전체의 SHA-256 과 함께 적으므로
-  `source_files` 는 `status: not_recorded` 와 그 이유를 적는다. 명시적 생성 명령(`generate_cmd`)은
-  무엇을 읽었는지 알 수 없어 역시 `not_recorded` 다.
-- **무엇을 적나.** 파일마다 논리 id `extracted/<폴더>/<상대 경로>`, 크기, SHA-256(1 MiB 씩 읽어 파일
-  전체), 그 파일을 읽을 수 있었던 단계. 블록에는 단계별 선택 인자와 좁혔는지(`narrowed`), 원천 루트의
-  data root 기준 위치(`source_root_relative`, 밖이면 절대 경로 `source_root`), 개수·총 바이트·합산 해시
-  (`<relative_path>\t<sha256>` 줄을 정렬해 이은 것의 SHA-256)·해시에 걸린 초가 있다. 읽지 못한 파일은
-  `unreadable` 에 이유와 함께 남고, 원천 폴더가 없으면 `status: unavailable` 이다. 파일은 한 번만 해시한다.
-  열거는 `hash-sources` 와 같다(§2.3): 같은 파일이 같은 순서로, 같은 해시로 나온다.
-- **언제 해시하나.** 생성 단계 끝, `.generating` 을 지우기 전이다. **코퍼스 단계의 원천은 그 코퍼스를
-  만드는 실행에서만 해시한다.** 코퍼스를 재사용하는 실행은 그 원천을 다시 해시하지 않는다: 그 코퍼스를
-  만든 실행이 이미 추적했고(그 실행 기록의 `source_files`), 이번 기록에는 재사용한 코퍼스의 지문이 있다.
-  번들 단계가 원천을 읽는 `hknu`(워크북)·`gaitex`(take 의 마커·IMU 파일)는 번들만 다시 만드는 실행도
-  번들 단계가 읽을 수 있었던 원천을, 선택한 피험자로 좁혀 해시한다.
-- **비용.** 해시 시간은 원천 크기에 비례한다. 여기서 GB 는 10^9 바이트다(`hash-sources` 가 적는 단위).
-  `hknu_fullbody` 는 843 파일 27.88 GB 이고, `hknu` 코퍼스나 번들을 전체로 만드는 실행은 그만큼을 더 읽는다.
-  `gaitex` 는 17.7 GB 다. `addbiomechanics` 의 `.b3d` 1,137 개, 약 568 GB(529 GiB)는 **AddBio 코퍼스를 전체로
-  새로 만드는 실행에서만** 해시된다(그 실행 자체가 몇 시간이므로 받아들인다). `--only`·`--per-study` 표본
-  실행은 고른 `.b3d` 만 해시하고, 코퍼스를 재사용해 번들만 만드는
-  AddBio 실행은 원천을 해시하지 않는다(AddBio 번들 단계는 코퍼스만 읽는다).
+  The sources of a reused corpus are in the record of the run that built it, and this record has that
+  corpus's fingerprint. `amass` and `prism` have no corpus and their take manifests record source files with
+  whole-file SHA-256, so `source_files` records `status: not_recorded` with the reason. An explicit
+  generation command (`generate_cmd`) cannot know what it read, so it is also `not_recorded`.
+- **What is recorded.** Per file: the logical id `extracted/<folder>/<relative path>`, size, SHA-256 (whole
+  file, read 1 MiB at a time) and the stages that could read it. The block holds each stage's selection
+  arguments and whether it was narrowed (`narrowed`), the source root relative to the data root
+  (`source_root_relative`, or the absolute `source_root` when outside), the count, total bytes, combined hash
+  (SHA-256 of the sorted, concatenated `<relative_path>\t<sha256>` lines) and the seconds spent hashing.
+  Unreadable files are kept in `unreadable` with a reason, and a missing source folder gives
+  `status: unavailable`. Each file is hashed once. The enumeration is the same as `hash-sources` (§2.3): the
+  same files, in the same order, with the same hashes.
+- **When it is hashed.** At the end of the generate stage, before `.generating` is removed. **The sources of
+  the corpus stage are hashed only by the run that builds that corpus.** A run that reuses the corpus does
+  not hash its sources again: the run that built it already traced them (in that run record's
+  `source_files`), and this record has the reused corpus's fingerprint. For `hknu` (workbook) and `gaitex`
+  (each take's marker and IMU files), whose bundle stage reads sources, a run that rebuilds only the bundle
+  still hashes the sources the bundle stage could read, narrowed to the selected subjects.
+- **Cost.** Hashing time is proportional to source size. Here GB is 10^9 bytes (the unit `hash-sources`
+  prints). `hknu_fullbody` is 843 files, 27.88 GB, and a run that builds the whole `hknu` corpus or bundle
+  reads that much more. `gaitex` is 17.7 GB. The 1,137 `.b3d` files of `addbiomechanics`, about 568 GB
+  (529 GiB), are hashed **only by a run that builds the whole AddBio corpus afresh** (that run itself takes
+  hours, so this is accepted). An `--only` or `--per-study` sample run hashes only the chosen `.b3d`, and an
+  AddBio run that reuses the corpus and builds only the bundle hashes no sources (the AddBio bundle stage
+  reads only the corpus).
 
-카탈로그의 기본값은 `<data root>/experimental/catalog` 다. 이전 기본값 `<번들의 부모>/catalog` 는
-lineage 컨테이너 안이라 카탈로그가 아니었다. 자산의 `relative_path` 는 **데이터 루트 기준**이다: `run` 은
-러너의 데이터 루트, `pipeline`·`register` 는 `--data-root`, 없으면 `SOMA_DATA_ROOT` 를 쓰고, 둘 다 없으면
-종료 코드 2 로 멈춘다. 데이터 루트 안에 있지 않은 번들도 종료 코드 2 로 거부한다. `<번들의 부모>` 를
-기준으로 하면 경로가 `gaitex_unified8/...` 로 나와 `run` 이 등록한 항목
-(`runs/experimental_generation_poc_demo/gaitex_unified8/...`)과 맞지 않으므로 기준으로 쓰지 않는다.
+The catalog defaults to `<data root>/experimental/catalog`. The old default `<bundle parent>/catalog` was
+inside the lineage container, so it was not a catalog. An asset's `relative_path` is **relative to the data
+root**: `run` uses the runner's data root, `pipeline` and `register` use `--data-root`, else
+`SOMA_DATA_ROOT`, and stop with exit code 2 if neither is set. A bundle that is not inside the data root is
+also refused with exit code 2. Relative to `<bundle parent>`, paths would come out as `gaitex_unified8/...`
+and not match the entries `run` registered (`runs/experimental_generation_poc_demo/gaitex_unified8/...`), so
+that is not used as the base.
 
-카탈로그 파일(`asset_catalog.json`, `<source>/source_manifest.json`)은 이렇게 쓴다(`datasets/catalog.py`).
+The catalog files (`asset_catalog.json`, `<source>/source_manifest.json`) are written this way
+(`datasets/catalog.py`).
 
-- **잠금.** 쓰는 쪽은 읽고-고치고-쓰는 동안 카탈로그 폴더의 `.catalog.lock` 을 잡는다. 잠금은 그 파일의
-  **존재가 아니라** 운영체제 잠금이다(Windows 는 첫 바이트의 `msvcrt.locking`, 그 밖은 `fcntl.flock`). 파일이
-  없으면 만들고, 있으면(다른 writer 가 만든 빈 잠금 파일이 이미 있을 수 있다) 그대로 쓴다.
-  어느 쪽이든 **지우지 않는다**: 남의 잠금일 수 있고, 누군가 막 잡으려는 잠금 파일을 지우면 두 writer 가
-  함께 들어온다. 잠금은 그 프로세스가 끝나면 풀린다. 다른 writer 가 잡고 있으면 기다리다가(기본 900 초)
-  `CatalogLocked` 로 멈춘다. 자산 해시는 잠금 밖에서 먼저 계산한다.
-- **원자적 교체.** 새 내용은 같은 폴더의 임시 파일(`.<이름>.*.tmp`)에 쓰고 flush·fsync 한 뒤 `os.replace` 로
-  바꾼다. 읽는 쪽은 옛 파일이나 새 파일을 보고, 반쯤 쓰인 파일은 보지 않는다. 실패하면 파일은 그대로고
-  임시 파일은 지운다(프로세스가 죽으면 임시 파일이 남을 수 있지만 카탈로그 파일은 멀쩡하다).
-- **변경 기록(journal).** 카탈로그 파일마다 옆에 `_history/<stem>.journal/` 이 있고, 쓸 때마다 그 폴더에
-  작은 gzip JSON 파일 하나 `<순번 8자리>.<UTC 시각>Z.json.gz` 가 더해진다(임시 이름으로 쓰고 fsync 한 뒤
-  아무도 쓰지 않은 이름으로만 링크한다: 덮어쓰기 없음). 기록 하나에는 쓴 시각(`utc`), 쓴 주체
-  (`registered_by`: 도구 이름, 러너가 등록하면 그 실행의 `run_<identity>`), 작업(`operation`), 쓰기 전후 파일의
-  SHA-256·크기(`before`·`after`), 그리고 **바뀐 항목만** 담는다 — 추가·교체·삭제된 항목마다 키(JSON Pointer:
-  자산은 `/assets/<index>`, 그 밖의 필드는 `/<field>`), 옛 항목(추가면 null), 새 항목(삭제면 null). 카탈로그
-  전체 사본은 남기지 않는다: 자산 몇 개를 등록하면 기록은 수 KB 이고, 카탈로그가 수백 MB 여도 같다(자산은
-  위치별로 비교한다. 이 도구의 writer 는 자산을 뒤에 붙이거나 제자리에서 고치기만 한다). `run`·`register`·
-  `pipeline` 이 번들을 처음 등록하면 기록이 번들의 자산 수를 따른다: gzip 으로 자산 하나에 약 55 바이트, `gaitex`
-  360 자산이 약 20 KB, `addbiomechanics` 202,300 자산이 약 11 MB 다. 한 버전 전체의 `supersede_spec_version` 은 옛 항목과 새 항목을 함께 담아 그 두 배쯤이다. 다시 등록은 바뀐
-  자산만큼이고(아래), 바뀐 것이 없으면 기록이 없다. 이 도구는 기록을
-  고치거나 지우지 않는다. 현재 파일과 기록으로 이전 항목이 모두 복원된다: `catalog.catalog_as_of(path, n)`
-  은 n 번 기록이 적용된 직후의 파일을 현재 파일에서 그 뒤 기록들을 거꾸로 되돌려 만들고, 바이트가 기록의
-  SHA-256 과 같은지 알려 준다.
-- **순서와 죽은 쓰기.** 새 내용을 임시 파일에 fsync → 기록을 fsync·링크 → `os.replace`. 기록 전에 죽으면
-  아무것도 바뀌지 않는다. 기록과 교체 사이에 죽거나 교체가 실패하면 파일은 그대로고, 파일이 가진 적 없는
-  `after` 를 적은 기록이 남는다. 그 기록의 `before` 는 현재 파일의 해시이고 다음 쓰기의 `before` 도 같으므로,
-  `catalog.journal_story(path)` 가 적용되지 않은 기록으로 가려낸다(기록 어느 것으로도 설명되지 않는 변경은
-  "기록 밖에서 바뀜"으로 표시한다). 반대 순서(교체 먼저)는 교체된 항목의 옛 값이 기록되기 전에 죽으면
-  영영 잃는다. 이 순서는 아무것도 잃지 않는다. 기록이 없던 때(이 도구 이전)의 카탈로그는 첫 기록의
-  `before` 가 출발점이다.
-- **다시 등록하면 맞춘다.** 제자리에서 다시 만든 번들은 자산 id 와 경로가 그대로고 바이트만
-  바뀐다. 등록이 뒤에 붙이기만 하면 id 마다 살아 있는 항목이 둘 남고, 옛 항목의 SHA-256 은 파일과
-  맞지 않는다.
-  이제 등록은 그 데이터셋의 이전 항목과 맞춘다(`catalog.merge_registration`). 그 데이터셋의 항목이란 살아 있는
-  (`superseded` 가 아닌) 항목 가운데 같은 번들 폴더 아래의 같은 자산 id, 또는 같은 lineage(source·spec_id·
-  spec_version)의 같은 상대 경로를 가진 것이다. 최신 것부터 보아, 지금 등록하는 자산과 똑같은(`catalog.ASSET_FIELDS`
-  여덟 필드가 같다; 다른 writer 가 곁에 더한 `registration_evidence`·`metadata` 는 보지 않는다) 첫 항목은 그대로
-  두고 그 자산은 다시 붙이지 않는다. 나머지는 모두 제자리에서 기존 카탈로그가 이미 쓰는 규약대로 표시한다:
-  `superseded: true`, `supersession_reason: "registration_replaced"`, `superseded_by` 새 항목의 자산 id,
-  `superseded_by_sha256` 새 항목의 SHA-256. 항목은 지우거나 옮기지 않는다. 같은 번들 폴더 아래 같은
-  lineage 의 살아 있는 항목 가운데 지금 등록하는 자산 어느 것도 대신하지 않는 것 — 새 INDEX 에서 더는 `ok`
-  가 아닌 take, 없어진 take 폴더나 역할 파일의 항목 — 도 같은 쓰기에서 표시한다: `superseded: true`,
-  `supersession_reason: "registration_dropped"`, `superseded_by: null`. 제자리 교체 뒤에는 그 파일이 없으므로,
-  살아 있게 두면 없는 파일을 가리킨다. 번들 폴더가 데이터 루트 자체이면 이 규칙은 쓰지 않는다. 표시한
-  항목은 그 쓰기의 기록에 `replaced` 변경(옛 항목 전체와 새 항목)으로, 붙인 항목은 `added` 로 들어가고,
-  기록의 `registered_by` 가 그 실행을 적는다. `operation` 에 `added`·`unchanged`·`superseded`·`dropped`
-  개수가 있다. 아무것도 바꾸지 않을 등록은 쓰지
-  않는다(기록도 없고 파일도 그대로다; `<source>/source_manifest.json` 도 같다). 그래서 뒤에 붙이기만 하던
-  때 등록된 카탈로그는 같은 번들을 다시 등록하면 **기록 하나**로 정리된다: 옛 항목이 표시되고, 살아 있는 id
-  중복이 없어지며, 살아 있는 항목의 SHA-256 이 모두 파일과 맞고, 한 번 더 등록하면 쓰지 않는다. 그 정리
-  명령은 둘 중 하나다. 실행 기록을 남기고 기록의 `registered_by` 에 그 실행 id 가 들어가는 쪽이 앞의 것이다.
+- **Lock.** A writer holds `.catalog.lock` in the catalog folder while it reads, modifies and writes. The lock
+  is an operating-system lock, **not the file's existence** (on Windows `msvcrt.locking` on the first byte,
+  elsewhere `fcntl.flock`). The file is created if missing and used as it is if present (an empty lock file
+  created by another writer may already be there). Either way it is **never deleted**: it may be someone
+  else's lock, and deleting a lock file someone is about to take lets two writers in together. The lock is
+  released when the process ends. If another writer holds it, the writer waits (default 900 seconds) and then
+  stops with `CatalogLocked`. Asset hashes are computed first, outside the lock.
+- **Atomic replacement.** The new content is written to a temporary file in the same folder (`.<name>.*.tmp`),
+  flushed and fsynced, and swapped in with `os.replace`. Readers see the old file or the new one, never a
+  half-written file. On failure the file is unchanged and the temporary file is deleted (if the process dies,
+  a temporary file may remain, but the catalog file is intact).
+- **Change record (journal).** Each catalog file has `_history/<stem>.journal/` beside it, and every write adds
+  one small gzip JSON file `<8-digit sequence>.<UTC time>Z.json.gz` to that folder (written under a temporary
+  name, fsynced, and then linked only to a name nobody has written: no overwriting). A record holds the write
+  time (`utc`), the writer (`registered_by`: the tool name, or the run's `run_<identity>` when the runner
+  registers), the operation (`operation`), the SHA-256 and size of the file before and after (`before`,
+  `after`), and **only the entries that changed** — for each entry added, replaced or deleted: its key (JSON
+  Pointer: `/assets/<index>` for assets, `/<field>` for other fields), the old entry (null when added) and the
+  new entry (null when deleted). No full copy of the catalog is kept: registering a few assets gives a record
+  of a few KB, even when the catalog is hundreds of MB (assets are compared by position; this tool's writers
+  only append assets or modify them in place). When `run`, `register` or `pipeline` registers a bundle for the
+  first time, the record follows the bundle's asset count: about 55 bytes per asset gzipped, about 20 KB for
+  the 360 assets of `gaitex`, about 11 MB for the 202,300 assets of `addbiomechanics`. A
+  `supersede_spec_version` of a whole version holds both the old and new entries, about twice that.
+  Re-registration is as large as the assets that changed (below), and nothing changed means no record. This
+  tool never modifies or deletes a record. Every earlier entry can be restored from the current file and the
+  records: `catalog.catalog_as_of(path, n)` rebuilds the file as it was right after record n was applied by
+  undoing the later records from the current file, and reports whether the bytes match the record's SHA-256.
+- **Order and dead writes.** New content fsynced to the temporary file → record fsynced and linked →
+  `os.replace`. Dying before the record changes nothing. Dying between the record and the swap, or a failed
+  swap, leaves the file unchanged and a record whose `after` the file never had. That record's `before` is the
+  current file's hash, and so is the next write's `before`, so `catalog.journal_story(path)` identifies it as
+  a record that was not applied (a change no record explains is marked "changed outside the record"). The
+  reverse order (swap first) would lose the replaced entries' old values forever if it died before they were
+  recorded. This order loses nothing. For a catalog from before there were records (before this tool), the
+  first record's `before` is the starting point.
+- **Re-registration reconciles.** A bundle rebuilt in place keeps its asset ids and paths; only the bytes
+  change. If registration only appended, each id would have two live entries and the old entry's SHA-256 would
+  not match the file. Registration now reconciles with the dataset's earlier entries
+  (`catalog.merge_registration`). The dataset's entries are the live (not `superseded`) entries with the same
+  asset id under the same bundle folder, or with the same relative path in the same lineage (source, spec_id,
+  spec_version). Looking newest first, the first entry identical to the asset being registered (the eight
+  fields of `catalog.ASSET_FIELDS` are equal; `registration_evidence` and `metadata` added beside them by
+  another writer are ignored) is kept and that asset is not appended again. All others are marked in place by
+  the convention the existing catalog already uses: `superseded: true`,
+  `supersession_reason: "registration_replaced"`, `superseded_by` the new entry's asset id,
+  `superseded_by_sha256` the new entry's SHA-256. Entries are never deleted or moved. Live entries of the same
+  lineage under the same bundle folder that none of the assets being registered replaces — takes no longer
+  `ok` in the new INDEX, entries for take folders or role files that are gone — are marked in the same write:
+  `superseded: true`, `supersession_reason: "registration_dropped"`, `superseded_by: null`. After an in-place
+  replacement that file no longer exists, so leaving the entry live would point at a missing file. This rule
+  is not applied when the bundle folder is the data root itself. The marked entries go into that write's
+  record as `replaced` changes (the whole old entry and the new entry), the appended entries as `added`, and
+  the record's `registered_by` names the run. `operation` has the counts of `added`, `unchanged`,
+  `superseded` and `dropped`. A registration that would change nothing does not write (no record, and the file
+  stays the same; `<source>/source_manifest.json` likewise). So a catalog registered while registration only
+  appended is cleaned up in **one record** by registering the same bundle again: the old entries are marked,
+  duplicate live ids disappear, every live entry's SHA-256 matches its file, and registering once more writes
+  nothing. The clean-up command is either of these. The first one leaves a run record and puts that run's id
+  in the record's `registered_by`.
 
   ```bash
   soma-synth run --source gaitex --start-at register --stop-after register
@@ -583,175 +632,182 @@ lineage 컨테이너 안이라 카탈로그가 아니었다. 자산의 `relative
       --catalog "$SOMA_DATA_ROOT/experimental/catalog" --source gaitex --data-root "$SOMA_DATA_ROOT"
   ```
 
-  어느 쪽이든 `SOMA_DATA_ROOT` 가 그 번들을 담은 데이터 루트여야
-  하고, 출력의 `... earlier entries superseded` 가 대체한 항목 수, `... dropped` 가 번들에 더는 없어 표시한
-  항목 수다. 자산 id 는 폴더를 적지 않으므로 다른 폴더(scratch 표본)의 같은
-  take 는 다른 데이터셋이다: 서로의 항목을 대체하지 않는다. 같은 폴더를 다른 spec_version 으로 등록한 항목도
-  대체하지 않는다(그것은 `supersede_spec_version` 의 일이다).
+  Either way `SOMA_DATA_ROOT` must be the data root that holds the bundle. In the output,
+  `... earlier entries superseded` is the number of entries replaced and `... dropped` the number of entries
+  marked because they are no longer in the bundle. An asset id does not name its folder, so the same take in
+  another folder (a scratch sample) is a different dataset: they do not supersede each other's entries.
+  Entries registering the same folder under a different spec_version are not superseded either (that is
+  `supersede_spec_version`'s job).
 
 ---
 
-## 5. provenance 10항목
+## 5. The ten provenance items
 
-| # | §10.2 항목 | 출처 | 현재 |
+| # | §10.2 item | Source | Now |
 |---|---|---|---|
-| 1 | 코드 리비전 + dirty 해시 | `git rev-parse HEAD` + `git status --porcelain` 해시 | **없음** |
-| 2 | 계약·schema·config 버전 | `spec_id`/`spec_version`/`canonicalization_config` | 있음 |
-| 3 | source asset SHA-256·라이선스 | `SourceIdentity.asset_sha256` + gate 설정 | 있음 |
-| 4 | spec snapshot 해시 | `spec_documents` | 있음 |
-| 5 | Python·의존성 버전 | `importlib.metadata` | prism 만 |
-| 6 | model/checkpoint 해시 | 바디 모델 **세트**의 파일별 SHA-256 — §5.2 | 러너가 기록(2026-09-16) |
-| 7 | seed | — **§5.1 참조** | 해당 없음 |
-| 8 | 호스트 환경(비민감) | OS·아키텍처·CPU 수 | **없음** |
-| 9 | 입출력 artifact 해시 | `emit_take` 가 쓰면서 누적 | **없음** |
-| 10 | pass/warn/reject·quarantine | `quality_gate`·`validation`·`exclusions.json` | 있음 |
+| 1 | Code revision + dirty hash | `git rev-parse HEAD` + hash of `git status --porcelain` | **None** |
+| 2 | Contract, schema and config versions | `spec_id`/`spec_version`/`canonicalization_config` | Present |
+| 3 | Source asset SHA-256 and licence | `SourceIdentity.asset_sha256` + gate settings | Present |
+| 4 | Spec snapshot hash | `spec_documents` | Present |
+| 5 | Python and dependency versions | `importlib.metadata` | prism only |
+| 6 | Model/checkpoint hash | Per-file SHA-256 of the body model **set** — §5.2 | Recorded by the runner (2026-09-16) |
+| 7 | seed | — **see §5.1** | Not applicable |
+| 8 | Host environment (non-sensitive) | OS, architecture, CPU count | **None** |
+| 9 | Input/output artifact hashes | Accumulated by `emit_take` as it writes | **None** |
+| 10 | pass/warn/reject, quarantine | `quality_gate`, `validation`, `exclusions.json` | Present |
 
-**credential·token·cookie·개인식별정보는 기록하지 않는다**(§10.2).
+**Credentials, tokens, cookies and personally identifying information are never recorded** (§10.2).
 
-### 5.1 seed — 채울 것이 없다는 것을 기록한다
+### 5.1 seed — record that there is nothing to fill in
 
-등록된 paired 생성 경로에는 난수가 **0건**이다. 검사는 `scripts/poc/generate_*.py`,
-공통 emitter와 `src/soma_synth/`를 대상으로 하되, 별도 연구용인
-`src/soma_synth/experimental/`만 제외한다. 이 연구 코드의 seed를 paired
-생성의 seed로 혼동하지 않는다. 생성 경로가 이 namespace를 import하면 경계 검사에서
-실패한다. 상대 import와 별칭도 검사하며, 파일 읽기·구문 분석 실패는 통과시키지 않는다.
-이는 정적 소스 검사이지 임의의 동적 실행에 대한 증명은 아니다. 계산된 동적 import
-대상 등은 별도 검토가 필요하다. 실제 생성 코드의 난수 금지 기준은 그대로 유지한다.
+The registered paired generation path has **zero** uses of randomness. The check covers
+`scripts/poc/generate_*.py`, the common emitter and `src/soma_synth/`, excluding only
+`src/soma_synth/experimental/`, which is separate research code. That research code's seeds are not to be
+confused with seeds of paired generation. If the generation path imports that namespace, the boundary check
+fails. Relative imports and aliases are checked too, and a failure to read or parse a file does not pass.
+This is a static source check, not a proof about arbitrary dynamic execution; computed dynamic import targets
+and the like need separate review. The ban on randomness in the actual generation code stays as it is.
 
-따라서 seed 를 발명하지 않고 부재를 명시한다.
+So no seed is invented; its absence is stated.
 
 ```json
 "seeds": {"present": false, "reason": "no stochastic step in the generation path"}
 ```
 
-그리고 **그 주장을 테스트로 지킨다**. 빈칸으로 두면 "없음"과 "안 적음"을 구별할 수 없고,
-나중에 확률적 단계가 들어와도 아무도 모른다.
+And **that claim is guarded by a test**. A blank cannot tell "none" from "not recorded", and nobody would
+notice if a stochastic step came in later.
 
-### 5.2 6번 — 파일 하나가 아니라 세트를 기록한다 (2026-09-16)
+### 5.2 Item 6 — record the set, not one file (2026-09-16)
 
-§10.2 6번은 "model/checkpoint 해시"를 요구하지만, 다섯 생성기는 **피험자마다** 성별에 맞는
-모델을 고른다. 파일 하나를 지목하면 남녀가 섞인 번들을 잘못 서술하므로, 실행 기록에는 **세트
-전체**가 들어간다: 디렉터리, 선택 규칙, 파일별 SHA-256, 그리고 그 해시들을 정렬해 한 번 더
-해시한 `set_digest`. `set_digest` 는 run identity 의 `body_model_sha256` 이기도 해서, 모델이
-하나라도 바뀌면 다른 run identity 가 된다.
+§10.2 item 6 asks for a "model/checkpoint hash", but the five generators choose the model matching each
+**subject's** sex. Naming one file would misdescribe a bundle that mixes men and women, so the run record
+holds the **whole set**: the directory, the selection rule, the SHA-256 of each file, and `set_digest`, the
+hash of those hashes sorted. `set_digest` is also the run identity's `body_model_sha256`, so if any model
+changes, the run identity changes.
 
-두 가지를 각각 한 곳에서 가져온다.
+Two things each come from exactly one place.
 
-| 무엇 | 어디서 |
+| What | From where |
 |---|---|
-| 세트가 있는 위치 | `SOMA_BODY_MODEL_DIR` 가 있으면 그 폴더, 없으면 [`source_pipelines_v2.yaml`](../../configs/datasets/source_pipelines_v2.yaml) `body_model_sets.<이름>.relative_path`, run 의 data root 기준 — 곧 `pipeline.paths.body_model_dir()` |
-| 성별 → 파일 이름 | `smpl18.model.select` (`packages/smpl18`) — 생성기도 같은 함수로 고른다 |
+| Where the set is | The `SOMA_BODY_MODEL_DIR` folder if set, else [`source_pipelines_v2.yaml`](../../configs/datasets/source_pipelines_v2.yaml) `body_model_sets.<name>.relative_path` relative to the run's data root — that is, `pipeline.paths.body_model_dir()` |
+| Sex → file name | `smpl18.model.select` (`packages/smpl18`) — the generators choose with the same function |
 
-코드에서는 `soma_synth.pipeline.body_models` 가 그 둘을 잇고,
-`addbio_retarget/shape_fit.py` 와 `scripts/poc/anthro_smpl.py` 는 파일 이름 규칙을 스스로
-정하지 않고 같은 함수에 위임한다. 세트를 찾지 못하면 해시를 지어내지 않고 `unavailable` 과
-그 이유를 남긴다(§5.1 과 같은 규율).
+In code, `soma_synth.pipeline.body_models` joins the two, and `addbio_retarget/shape_fit.py` and
+`scripts/poc/anthro_smpl.py` do not define the file-name rule themselves but delegate to the same function.
+If the set cannot be found, no hash is invented; `unavailable` and the reason are recorded (the same
+discipline as §5.1).
 
-러너는 생성기와 같은 함수(`paths.body_model_dir`)로 바디 모델 폴더를 정하고, 생성기에 자기 data root 를
-`SOMA_DATA_ROOT` 로 넘기며, 정한 그 폴더를 해시한다. 기록에는 폴더와 그 출처
-(`directory_from`: `SOMA_BODY_MODEL_DIR` 또는 `data_root`)가 남는다. `scripts/poc/anthro_smpl.py`
-(amass·prism 이 거친다)가 받는 파일 단위 재지정 `SOMA_SMPL_MODEL_MALE`·`SOMA_SMPL_MODEL_FEMALE` 는
-그 폴더를 우회하므로, 설정돼 있으면 `resolved_config.yaml` 의 `body_model_file_overrides` 에 경로와
-SHA-256 이 남는다.
-
----
-
-## 6. 결정론
-
-- 파일 순회는 항상 정렬한다. 디렉터리 열거 순서에 의존하지 않는다.
-- 병렬 실행이 결과를 바꾸지 않는다. take 는 서로 독립이며 공유 가변 상태가 없다.
-- 부동소수 연산 순서를 병렬도에 따라 바꾸지 않는다.
-- 프로세스 풀은 모든 플랫폼에서 `spawn` 으로 워커를 시작한다(`multiprocessing.get_context("spawn")`,
-  `ProcessPoolExecutor(mp_context=...)`). Windows 는 `spawn` 뿐이고 Linux 의 기본은 `fork` 여서, 부모의
-  모듈·`sys.path` 편집·열린 파일을 물려받는 워커가 PC 에 따라 다르게 돌 수 있기 때문이다. 지금 풀을 쓰는
-  것은 `addbiomechanics` 의 `--jobs` 두 곳(`generate_addbio_unified8.py`, `generate_addbio_faithful.py`)이고,
-  `tests/pipeline/test_process_start_method.py` 가 `src/`·`scripts/` 를 AST 로 훑어 `spawn` 없이 만든 풀을
-  거부한다. 러너의 `--jobs` 샤드는 `subprocess` 로 생성기 프로세스를 띄우므로 해당하지 않는다.
-
-### 6.1 바이트 동일성은 같은 PC, 같은 고정 환경에서만 주장한다 (ADR-0041)
-
-- **같은 PC 와 같은 버전 고정 환경**(CPython 3.13.5, numpy 2.2.6, scipy 1.16.2, 같은 `smpl18`
-  리비전)에서는 산출이 바이트 단위로 같아야 한다. 이것을 하네스(`scripts/harness/`,
-  `run_harness.py` → `hash_outputs.py` → `compare_hashes.py`)로 확인한다. npz 는 멤버별 배열 해시로,
-  JSON 은 파싱한 뒤 시각 필드를 가리고 비교한다. 기준은 같은 PC 에서 수정 전 코드로 만든 기준 해시 파일이다
-  (이 저장소에 싣지 않고, `compare_hashes.py` 에 경로로 준다).
-- **PC 가 다르면 허용 오차로 판정한다.** CPU, BLAS, numpy, zlib, 줄바꿈이 결과에 영향을 준다. 기계를
-  건너 약 1 float32 ulp 차이가 관측된 바 있다. 팀원 번들은 그 PC 에만 두므로(§9) PC 사이의 바이트
-  동일성은 요구하지 않는다.
-- **선언된 차이.** `code_hash` 의 뜻은 바꾸지 않았다(ADR-0041 결정 4). 그래서 생성 코드 파일이
-  바뀌면 코퍼스의 `content_hashes` 중 `code=` 토큰이 바뀌고, 그 토큰에서 나오는 `pair_id` 도 바뀐다.
-  soma-synth 분리 과정에서 `hknu`·`gaitex`·`addbiomechanics` 의 `code=` 와 `pair_id` 가 달라지는
-  것은 결함이 아니라 선언된 차이다(분리 때 실제로 달라진 것은 `gaitex`·`addbiomechanics` 뿐이고,
-  `amass`·`prism`·`hknu` 는 바이트 단위로 같았다). 하네스 비교(`compare_hashes.py`)는 다른 토큰이
-  `code` 하나일 때만 이것으로 분류한다. `model`·`adapter`·`config` 가 다르면 실패다.
-- 레지스트리 v2 로의 전환은 어떤 생성기 코드도 바꾸지 않았다. 생성기가 레지스트리에서 읽는 것은
-  `smpl18_profile` 뿐이고 그 값은 v1 과 같다. 바뀐 것은 러너가 부르는 방식이다: `prism` 은
-  `--data-root <root>` 대신 `--out <번들>` 로(원천은 `SOMA_SOURCE_ROOT`), 코퍼스가 있는 세 소스는
-  코퍼스를 선언된 플래그로 명시해 넘긴다.
+The runner resolves the body model folder with the same function as the generators
+(`paths.body_model_dir`), passes its data root to the generators as `SOMA_DATA_ROOT`, and hashes the folder
+it resolved. The record holds the folder and where it came from (`directory_from`: `SOMA_BODY_MODEL_DIR` or
+`data_root`). The per-file overrides `SOMA_SMPL_MODEL_MALE` and `SOMA_SMPL_MODEL_FEMALE` accepted by
+`scripts/poc/anthro_smpl.py` (which amass and prism go through) bypass that folder, so when set their path
+and SHA-256 are recorded in `resolved_config.yaml` `body_model_file_overrides`.
 
 ---
 
-## 7. 재개와 부분 실패
+## 6. Determinism
 
-현재 다섯 생성기가 **네 가지 서로 다른 재개 판정**을 쓴다.
+- File iteration is always sorted. Nothing depends on directory enumeration order.
+- Parallel execution does not change results. Takes are independent and share no mutable state.
+- The order of floating-point operations does not change with the degree of parallelism.
+- Process pools start their workers with `spawn` on every platform (`multiprocessing.get_context("spawn")`,
+  `ProcessPoolExecutor(mp_context=...)`). Windows has only `spawn` and Linux defaults to `fork`, and a worker
+  that inherits the parent's modules, `sys.path` edits and open files could behave differently from PC to PC.
+  The pools in use today are the two `--jobs` of `addbiomechanics` (`generate_addbio_unified8.py`,
+  `generate_addbio_faithful.py`), and `tests/pipeline/test_process_start_method.py` scans `src/` and
+  `scripts/` by AST and rejects any pool made without `spawn`. The runner's `--jobs` shards start generator
+  processes with `subprocess`, so they are not affected.
 
-| 소스 | 판정 | 반쯤 쓰다 만 take 를 알아채나 |
+### 6.1 Byte identity is claimed only on the same PC in the same pinned environment (ADR-0041)
+
+- On **the same PC in the same pinned environment** (CPython 3.13.5, numpy 2.2.6, scipy 1.16.2, the same
+  `smpl18` revision) the outputs must be byte-identical. This is checked with the harness (`scripts/harness/`,
+  `run_harness.py` → `hash_outputs.py` → `compare_hashes.py`). npz files are compared by per-member array hash,
+  JSON after parsing with time fields masked. The baseline is a hash file made on the same PC with the code
+  before the change (it is not stored in this repository; its path is given to `compare_hashes.py`).
+- **Across PCs, results are judged within a tolerance.** CPU, BLAS, numpy, zlib and line endings affect the
+  result. A difference of about 1 float32 ulp has been observed across machines. Teammates' bundles stay on
+  their PCs (§9), so byte identity across PCs is not required.
+- **A declared difference.** The meaning of `code_hash` was not changed (ADR-0041 decision 4). So when a
+  generation code file changes, the `code=` token of the corpus's `content_hashes` changes, and so does the
+  `pair_id` derived from it. That the `code=` and `pair_id` of `hknu`, `gaitex` and `addbiomechanics` differ
+  across the soma-synth split is a declared difference, not a defect (in the split only `gaitex` and
+  `addbiomechanics` actually changed; `amass`, `prism` and `hknu` were byte-identical). The harness comparison
+  (`compare_hashes.py`) classifies a difference this way only when `code` is the only token that differs. A
+  difference in `model`, `adapter` or `config` is a failure.
+- The move to registry v2 changed no generator code. The only thing a generator reads from the registry is
+  `smpl18_profile`, and its values are the same as in v1. What changed is how the runner calls them: `prism`
+  gets `--out <bundle>` instead of `--data-root <root>` (sources from `SOMA_SOURCE_ROOT`), and the three
+  sources with a corpus are given the corpus explicitly through the declared flag.
+
+---
+
+## 7. Resume and partial failure
+
+Today the five generators use **four different resume predicates**.
+
+| Source | Predicate | Does it notice a half-written take? |
 |---|---|---|
-| amass | 4파일 존재 + `manifest.json` 파싱 성공 | **예** |
-| prism | core 파일 존재 | 아니오 |
-| addbiomechanics | `manifest.json` 존재 | 아니오 |
-| gaitex · hknu | 없음(항상 재생성) | 해당 없음 |
+| amass | 4 files exist + `manifest.json` parses | **Yes** |
+| prism | core files exist | No |
+| addbiomechanics | `manifest.json` exists | No |
+| gaitex · hknu | none (always regenerated) | Not applicable |
 
-**표준은 가장 강한 것을 채택한다** — `bundle_opens`: 모든 산출 파일이 존재하고 `manifest.json`
-이 파싱되어야 건너뛴다. 나머지는 `source_pipelines_v2.yaml` 에 현재 값 그대로 기록해 두고,
-러너가 통합할 때 이 판정으로 올린다.
+**The standard adopts the strongest** — `bundle_opens`: skip only when every output file exists and
+`manifest.json` parses. The others are recorded as they are today in `source_pipelines_v2.yaml`, to be raised
+to this predicate when the runner unifies them.
 
-건너뛴 take 수는 `metrics.json` 에 남긴다. 조용한 건너뛰기는 재개가 아니라 누락이다.
+The number of skipped takes is recorded in `metrics.json`. A silent skip is not a resume but an omission.
 
-`soma-synth run` 은 어느 생성기도 재개시키지 않는다(§1.3): 모든 번들과 코퍼스를 빈 폴더에 만들므로 이
-판정들이 건너뛸 take 가 없다. 위 판정은 생성기를 직접 돌리거나 운영자가 `--bundle-arg=--resume` 류의 플래그를
-넘길 때의 동작이다.
+`soma-synth run` does not make any generator resume (§1.3): every bundle and corpus is built in an empty
+folder, so these predicates have no takes to skip. The predicates above describe the behaviour when a
+generator is run directly or an operator passes a flag like `--bundle-arg=--resume`.
 
-검증에도 건너뛰기가 하나 있다. validation ledger 는 PASS 한 take 를 그 내용 digest, `spec_version`, 생성 코드
-digest, **검증기 digest**(`catalog.default_validator_digest`: spec 과 `validation/checks.py`·`npz_io.py`·
-`report.py` 의 바이트)와 함께 기억하고, 넷이 모두 같을 때만 다시 보지 않는다(`takes_trusted`). 그래서 검증기
-코드가 바뀌면 모든 ledger 의 신뢰가 한 번 풀리고, 다음 검증은 모든 take 를 다시 본다(`--full` 과 같다).
+Validation has one skip too. The validation ledger remembers each take that PASSed together with its content
+digest, `spec_version`, generation code digest and **validator digest** (`catalog.default_validator_digest`:
+the bytes of the spec and of `validation/checks.py`, `npz_io.py` and `report.py`), and does not look again
+only when all four are the same (`takes_trusted`). So when the validator code changes, every ledger's trust is
+released once and the next validation looks at every take again (like `--full`).
 
-L4 governance 의 절대 경로 검사는 드라이브 문자와 POSIX 절대 경로를 잡는다: `/`, 폴더 이름, 다시 `/` 로
-이어지는 경로가 값의 시작이나 공백·따옴표·`=`·`:`·괄호·구분자 뒤에 오면 뿌리와 상관없이 FAIL 이다
-(`/Users/`·`/home/`·`/Volumes/`·`/tmp/` 뿐 아니라 `/data/`·`/opt/`·`/srv/`·`/scratch/`·`/nfs/`·`/gpfs/`·
-`/workspace/` 도). 논리 id(`extracted/…`, `runs/…/tmp/…`), 단위(`m/s^2`), URL(`https://host/home/…`,
-`file:///home/…`: 경로 앞 글자가 `/`)은 걸리지 않고, 아래에 경로가 없는 `/tmp` 하나도 걸리지 않는다.
+The L4 governance absolute-path check catches drive letters and POSIX absolute paths: a path of `/`, a folder
+name and another `/` at the start of a value or after whitespace, a quote, `=`, `:`, a bracket or a separator
+is a FAIL whatever its root (not only `/Users/`, `/home/`, `/Volumes/`, `/tmp/`, but also `/data/`, `/opt/`,
+`/srv/`, `/scratch/`, `/nfs/`, `/gpfs/`, `/workspace/`). Logical ids (`extracted/…`, `runs/…/tmp/…`), units
+(`m/s^2`) and URLs (`https://host/home/…`, `file:///home/…`: the character before the path is `/`) are not
+caught, and a lone `/tmp` with no path below it is not caught either.
 
-적합성 판정(`checks.check_dataset_profile_conformance`)은 번들이 배포 전에 가져야 할 파일(`README.md`·
-`VALIDATION_REPORT.json`·`validation_ledger.json`)이 없으면 WARN 을 붙인다. 러너의 validate 단계는 이 판정을
-보고서·원장을 쓰기 전에, readme 단계보다 먼저 하므로, 호출한 쪽이 검증 뒤에 쓸 파일을 `pending_files` 로 넘기면
-그 파일은 없다고 적지 않는다. 러너는 결과와 상관없이 쓰는 자기 보고서·원장을 넘기고, `README.md` WARN 은 계획에
-readme 단계가 있고 **검증이 통과했을 때만** 보고서에서 뺀다(`checks.missing_distribution_file`). 검증이
-실패하면 실행이 readme 단계 전에 멈춰(fail-fast) 번들에 `README.md` 가 없으므로 그 WARN 이 남는다.
-`--stop-after validate` 면 `README.md` WARN 하나는 남는다: 그 실행은 그것을 쓰지 않는다. `soma-synth validate`
-는 번들 폴더에 바로 쓰는 `--report`·`--ledger` 의 이름만 넘기고, 아무것도 쓰지 않는 검증은 셋 다 경고한다.
-번들이 만들어야 할 파일(`KNOWN_LIMITATIONS.json` 등)은 넘겨도 없으면 FAIL 이다.
+The conformance check (`checks.check_dataset_profile_conformance`) adds a WARN when a file a bundle must have
+before distribution (`README.md`, `VALIDATION_REPORT.json`, `validation_ledger.json`) is missing. The runner's
+validate stage runs this check before writing the report and ledger and before the readme stage, so when the
+caller passes the files it will write after validation as `pending_files`, they are not reported missing. The
+runner passes its own report and ledger, which it writes whatever the result, and drops the `README.md` WARN
+from the report only when the plan has a readme stage **and validation passed**
+(`checks.missing_distribution_file`). If validation fails, the run stops before the readme stage (fail-fast)
+and the bundle has no `README.md`, so that WARN stays. With `--stop-after validate` one `README.md` WARN stays:
+that run does not write it. `soma-synth validate` passes only the names of `--report` and `--ledger` written
+directly into the bundle folder, and a validation that writes nothing warns about all three. A file the bundle
+must produce (`KNOWN_LIMITATIONS.json` and so on) is a FAIL when missing even if it is passed.
 
 ---
 
-## 8. 소스별 차이
+## 8. Per-source differences
 
-**이 절은 [`configs/datasets/source_pipelines_v2.yaml`](../../configs/datasets/source_pipelines_v2.yaml)
-에서 생성한다. 손으로 고치지 않는다.**
+**This section is generated from [`configs/datasets/source_pipelines_v2.yaml`](../../configs/datasets/source_pipelines_v2.yaml).
+Do not edit it by hand.**
 
 ```
 soma-synth pipeline-doc --render
 ```
 
-손으로 관리하는 표는 낡는다. 그래서 이 절은 생성한다.
+A hand-maintained table goes stale, so this section is generated.
 
 <!-- BEGIN GENERATED: source pipelines -->
 
-> 생성물이다. 원본은 [`source_pipelines_v2.yaml`](../../configs/datasets/source_pipelines_v2.yaml) 이고,
-> `soma-synth pipeline-doc --render` 가 이 블록을 다시 쓴다. 손으로 고치지 말 것.
+> Generated. The source is [`source_pipelines_v2.yaml`](../../configs/datasets/source_pipelines_v2.yaml);
+> `soma-synth pipeline-doc --render` rewrites this block. Do not edit it by hand.
 
-| source | `small_mode` | emitter | 재개 판정 | 병렬 | 진입점 | 번들 lineage | 코퍼스 | smpl18 프로파일 |
+| source | `small_mode` | emitter | resume predicate | parallel | entry point | bundle lineage | corpus | smpl18 profile |
 |---|---|---|---|---|---|---|---|---|
 | `addbiomechanics` | `synthetic_from_smpl` | `unified8_emit` | `manifest_exists` | `process_pool` | `generate_addbio_unified8.py` | `addbio_unified8` | `addbio_smpl24_raw` | `addbiomechanics` |
 | `amass` | `synthetic_from_smpl` | `inline` | `bundle_opens` | `shard` | `generate_amass_faithful_all.py` | `amass_faithful_full` | — | `amass` |
@@ -759,24 +815,24 @@ soma-synth pipeline-doc --render
 | `hknu` | `synthetic_from_smpl` | `unified8_emit` | `none` | `none` | `generate_hknu_unified8.py` | `hknu_unified8` | `hknu_smpl24_paired` | `configs/smpl18/profiles/hknu.yaml` |
 | `prism` | `measured_physical` | `inline` | `core_files_exist` | `none` | `generate_prism_measured_all.py` | `prism_faithful_full` | — | `configs/smpl18/profiles/prism.yaml` |
 
-**재개 판정의 뜻**
+**What the resume predicates mean**
 
 - `bundle_opens` — skips when every deliverable exists and manifest.json parses
 - `core_files_exist` — skips when every core deliverable file exists, without opening any of them
 - `manifest_exists` — skips when manifest.json exists, even if the npz beside it are truncated
 - `none` — no skip logic; every take is rebuilt on every run
 
-**공유 emitter 사용**: `addbiomechanics`, `gaitex`, `hknu` — **미사용(자체 구현)**: `amass`, `prism`
+**Shared emitter**: `addbiomechanics`, `gaitex`, `hknu` — **Own implementation**: `amass`, `prism`
 
-**생성 단계 (코퍼스 → 번들 → 후처리)**
+**Generation stages (corpus → bundle → post-steps)**
 
-- `addbiomechanics` — 코퍼스 `generate_addbio_smpl24.py --out <addbio_smpl24_raw>` (지문 `SUMMARY.json`, 번들에 `--raw` 로 전달) → 번들 `generate_addbio_unified8.py --out <addbio_unified8>`
-- `amass` — 번들 `generate_amass_faithful_all.py --out-root <amass_faithful_full>`
-- `gaitex` — 코퍼스 `generate_gaitex_smpl24.py --out <gaitex_smpl24>` (지문 `_run.json`, 번들에 `--retarget` 로 전달) → 번들 `generate_gaitex_unified8.py --out <gaitex_unified8>`
-- `hknu` — 코퍼스 `generate_hknu_faithful.py --out <hknu_smpl24_paired>` (지문 `SUMMARY.json`, 번들에 `--paired` 로 전달) → 번들 `generate_hknu_unified8.py --out <hknu_unified8>`
-- `prism` — 번들 `generate_prism_measured_all.py --out <prism_faithful_full>` → 후처리 `synthesize_insole_heading.py {dataset_dir}`
+- `addbiomechanics` — corpus `generate_addbio_smpl24.py --out <addbio_smpl24_raw>` (fingerprint `SUMMARY.json`, passed to the bundle as `--raw`) → bundle `generate_addbio_unified8.py --out <addbio_unified8>`
+- `amass` — bundle `generate_amass_faithful_all.py --out-root <amass_faithful_full>`
+- `gaitex` — corpus `generate_gaitex_smpl24.py --out <gaitex_smpl24>` (fingerprint `_run.json`, passed to the bundle as `--retarget`) → bundle `generate_gaitex_unified8.py --out <gaitex_unified8>`
+- `hknu` — corpus `generate_hknu_faithful.py --out <hknu_smpl24_paired>` (fingerprint `SUMMARY.json`, passed to the bundle as `--paired`) → bundle `generate_hknu_unified8.py --out <hknu_unified8>`
+- `prism` — bundle `generate_prism_measured_all.py --out <prism_faithful_full>` → post-step `synthesize_insole_heading.py {dataset_dir}`
 
-**읽는 환경 변수**
+**Environment variables read**
 
 - `addbiomechanics` — `SOMA_DATA_ROOT`, `SOMA_SOURCE_ROOT`, `SOMA_BODY_MODEL_DIR`, `ADDBIO_RETARGET_CORPUS`
 - `amass` — `SOMA_DATA_ROOT`, `SOMA_SOURCE_ROOT`, `SOMA_BODY_MODEL_DIR`
@@ -784,118 +840,184 @@ soma-synth pipeline-doc --render
 - `hknu` — `SOMA_DATA_ROOT`, `SOMA_SOURCE_ROOT`, `SOMA_BODY_MODEL_DIR`
 - `prism` — `SOMA_DATA_ROOT`, `SOMA_SOURCE_ROOT`, `SOMA_BODY_MODEL_DIR`
 
-**바디 모델 세트**
+**Body model sets**
 
-- `smpl_clean` — data root 기준 `body_models/smpl` (`SOMA_BODY_MODEL_DIR` 가 있으면 그 폴더, `pipeline.paths.body_model_dir()`), 성별에 따른 파일 선택은 `smpl18.model.select` 가 정한다. 사용: `addbiomechanics`, `amass`, `gaitex`, `hknu`, `prism`
+- `smpl_clean` — `body_models/smpl` under the data root (or `SOMA_BODY_MODEL_DIR` when set; `pipeline.paths.body_model_dir()`); the file for each sex is chosen by `smpl18.model.select`. Used by: `addbiomechanics`, `amass`, `gaitex`, `hknu`, `prism`
 
-**생성 정책 (`generation_policy`)**
+**Generation policy (`generation_policy`)**
 
-- 근거: `standing_decision` — ADR-0041 (`docs/adr/ADR-0041-soma-synth-split-and-teammate-generation.md`), 결정 기록 `research/decisions/2026-09-25_source_distribution_and_pipeline_split_decision.md` §4
-- 등급 `experimental_non_candidate`, 배포 범위 `internal_only`, `releases_holds: false`
+- Basis: `standing_decision` — ADR-0041 (`docs/adr/ADR-0041-soma-synth-split-and-teammate-generation.md`), decision record `research/decisions/2026-09-25_source_distribution_and_pipeline_split_decision.md` §4
+- Class `experimental_non_candidate`, distribution scope `internal_only`, `releases_holds: false`
 
 <!-- END GENERATED: source pipelines -->
 
 ---
 
-## 9. 이 파이프라인이 하지 않는 것
+## 9. What this pipeline does not do
 
-- **push 하지 않는다.** `src/soma_synth/cli.py` 의 `_next_step_guide` 가 명시하듯 soma-synth 는
-  번들을 어디에도 올리지 않는다. 번들은 만든 PC 에 남는다. 설계이지 미완성이 아니다.
-- **`experimental_non_candidate` 가 아닌 것은 만들지 않는다.** 생성 정책은 아래 §9.1 이다.
-  canonical·internal-candidate 생성은 hold 아래 그대로 있고(상위 프로젝트의 hold 규칙), 이 파이프라인은
-  그것을 열지 않는다.
-- **생성이 끝나면 `KNOWN_LIMITATIONS.json` 을 렌더한다.** 검증기가 모든 번들에 요구하는
-  파일이므로 생성기가 아니라 러너가 `configs/datasets/known_limitations_v1.yaml` 에서 쓴다.
-  번들 이름의 블록이 없으면 파일을 쓰지 않고 `metrics.json` 에 `limitations_block_missing` 을
-  남기며, 이어지는 validate 가 그 부재를 FAIL 로 보고한다.
-- **봉인 문서를 고치지 않는다.**
-- **임계값을 코드 상수로 두지 않는다.** 임계값은 버전이 붙은 설정 파일에 둔다.
+- **It does not push.** As `_next_step_guide` in `src/soma_synth/cli.py` states, soma-synth uploads bundles
+  nowhere. A bundle stays on the PC that made it. This is by design, not unfinished work.
+- **It makes nothing that is not `experimental_non_candidate`.** The generation policy is §9.1 below.
+  Canonical and internal-candidate generation stay under hold (the parent project's hold rules), and this
+  pipeline does not open them.
+- **It renders `KNOWN_LIMITATIONS.json` when generation ends.** The validator requires this file of every
+  bundle, so the runner, not the generator, writes it from `configs/datasets/known_limitations_v1.yaml`. If
+  there is no block for the bundle's name, the file is not written, `limitations_block_missing` is recorded in
+  `metrics.json`, and the following validate reports the absence as a FAIL.
+- **It does not edit sealed documents.**
+- **It does not keep thresholds as code constants.** Thresholds live in versioned configuration files.
 
-### 9.1 생성 정책 — 결정 기록 하나로 상시 허용한다 (ADR-0041, 2026-09-25)
+### 9.1 Generation policy — standing permission by one decision record (ADR-0041, 2026-09-25)
 
-**상시 허용.** 내부 사용자가 자기 PC 에서 `soma-synth run` 으로 `experimental_non_candidate` · `internal_only` 번들을
-만드는 것은 `ADR-0041`(상위 프로젝트: `docs/adr/ADR-0041-soma-synth-split-and-teammate-generation.md`) 이 기록한
-결정(`2026-09-25_source_distribution_and_pipeline_split_decision.md`(상위 프로젝트: `research/decisions/2026-09-25_source_distribution_and_pipeline_split_decision.md`)
-§4) 하나로 허용된다. 실행마다 소유자 기록을 요구하지 않는다. 레지스트리 v2 의 `generation_policy`
-가 이 결정을 이름으로 적고, `--authorized-by` 없이 실행한 `soma-synth run` 은 그것을 run
-`manifest.json` 의 `generation_decision` 에 남긴다: 기준(`standing_decision`), ADR, 결정 기록 경로와
-그 SHA-256, 등급, 배포 범위, `releases_holds: false`. 적재할 때 정책의 등급이
-`experimental_non_candidate`, 범위가 `internal_only`, `releases_holds` 가 `false` 가 아니면
-레지스트리가 거부된다.
+**Standing permission.** An internal user making `experimental_non_candidate` · `internal_only` bundles with
+`soma-synth run` on their own PC is permitted by one decision (`2026-09-25_source_distribution_and_pipeline_split_decision.md`
+(parent project: `research/decisions/2026-09-25_source_distribution_and_pipeline_split_decision.md`) §4),
+recorded by `ADR-0041` (parent project: `docs/adr/ADR-0041-soma-synth-split-and-teammate-generation.md`). No
+owner record is required per run. Registry v2's `generation_policy` names this decision, and a
+`soma-synth run` without `--authorized-by` records it in the run `manifest.json` `generation_decision`: the
+basis (`standing_decision`), the ADR, the decision record path and its SHA-256, the class, the distribution
+scope and `releases_holds: false`. On load, the registry is refused unless the policy's class is
+`experimental_non_candidate`, its scope `internal_only` and `releases_holds` `false`.
 
-**등급 강제.** 러너는 두 번 확인한다.
+**Class enforcement.** The runner checks twice.
 
-- 레지스트리가 소스에 `experimental_non_candidate` 가 아닌 `artifact_class` 를 선언하면 아무것도
-  실행하기 전에 거부한다(소유자 기록을 건네도 마찬가지다).
-- 생성이 끝난 번들의 `INDEX.json` 이 `artifact_class: experimental_non_candidate`,
-  `distribution_scope: internal_only` 가 아니거나 `INDEX.json` 이 없으면 generate 단계를 실패로 끝낸다
-  (`logs/artifact_class.txt`). 코퍼스 지문 파일이 두 필드를 적으면 그것도 같은 값이어야 한다(§1.3).
+- If the registry declares for a source an `artifact_class` other than `experimental_non_candidate`, the run
+  is refused before anything runs (even with an owner record).
+- If the finished bundle's `INDEX.json` is not `artifact_class: experimental_non_candidate`,
+  `distribution_scope: internal_only`, or there is no `INDEX.json`, the generate stage ends as a failure
+  (`logs/artifact_class.txt`). If a corpus fingerprint file records the two fields, they must have the same
+  values (§1.3).
 
-**`soma-synth run` 밖의 생성은 상시 허용의 범위가 아니다.** 상시 허용의 조건은 실행 기록(결정, 원천 해시,
-코드 리비전)이고, 그것을 남기는 것은 `soma-synth run` 뿐이다. `soma-synth pipeline` 의 generate 단계는
-거부되며(종료 코드 3) `soma-synth run` 을 가리킨다. `pipeline` 은 이미 있는 번들의 validate → readme →
-register 에 쓴다(`--skip-generate` 또는 `--start-at validate`). 생성기 스크립트를 직접 실행하는 것은 러너가
-막을 수 없으므로 여기서 범위 밖이라고 적어 둔다.
+**Generation outside `soma-synth run` is not covered by the standing permission.** The condition of the
+standing permission is the run record (decision, source hashes, code revision), and only `soma-synth run`
+leaves one. The generate stage of `soma-synth pipeline` is refused (exit code 3) and points to
+`soma-synth run`. `pipeline` is for validate → readme → register of an existing bundle (`--skip-generate` or
+`--start-at validate`). Running a generator script directly cannot be stopped by the runner, so it is
+recorded here as out of scope.
 
-**누구의 PC 에서든 같다.** 결정 기록 §4 는 내부 사용자가 **자기 PC 에서** 생성하는 것을 다룬다
-(ADR-0041 `1.2.0`). 러너는 누구의 PC 인지 가리지 않고 같은 조건(등급 강제, 실행 기록)을 건다. 어느 PC
-에서도 [보존 규칙](RETENTION_RULES.md) §1 은 그대로다.
-운영 lineage 를 바꾸는 것은 1.2 의 순서를 따르고, 러너는 그 증거가 `_superseded` 에 없으면 운영 lineage 의
-`--replace-existing` 을 거부한다(§1.3). `_superseded`·`_runs`·`_manifest_backfill` 과 원천은 지우지 않으며
-(1.4), 러너는 원천·바디 모델·증거 폴더 안에 쓰지 않는다(§1.3).
+**The same on anyone's PC.** Decision record §4 covers internal users generating **on their own PC**
+(ADR-0041 `1.2.0`). The runner applies the same conditions (class enforcement, run record) whoever's PC it is.
+On every PC, [retention rules](RETENTION_RULES.md) §1 stay as they are. Changing a production lineage follows
+the order of 1.2, and the runner refuses `--replace-existing` on a production lineage when that evidence is not
+in `_superseded` (§1.3). `_superseded`, `_runs`, `_manifest_backfill` and the sources are never deleted (1.4),
+and the runner does not write inside the sources, the body models or the evidence folders (§1.3).
 
-**거부는 성공이 아니다.** 거부된 실행은 실행 기록(`logs/refusal.txt`)을 남기고 `soma-synth run` 은 종료 코드
-3 으로 끝난다(실패한 단계는 1, 경로·레지스트리를 풀지 못한 경우는 2). 읽기 전용·증거 폴더
-거부는 실행 기록을 열기 전이라 기록 없이 종료 코드 3 으로 끝난다(§1.3).
+**A refusal is not a success.** A refused run leaves a run record (`logs/refusal.txt`) and `soma-synth run`
+ends with exit code 3 (1 for a failed stage, 2 when paths or the registry cannot be resolved). A read-only or
+evidence-folder refusal happens before the run record is opened, so it ends with exit code 3 and no record
+(§1.3).
 
-**소스별 소유자 기록은 여전히 유효하다.** 소유자가 `research/decisions/` 에 날짜·소스·
-`experimental_non_candidate` 범위를 적고 `releases_holds: false` 라고 명시한 승인 기록(2026-09-14
-방식)을 `--authorized-by <기록>` 으로 건네면, 러너는 전과 같이 `gates.py` 로 그 기록을 읽어 소스와
-등급을 확인하고, 게이트가 거부한 사유와 기록을 함께 `generation_decision`(기준 `owner_record`)과
-`logs/authorization.txt` 에 남긴다. 기록 파일의 SHA-256 과 사본(`authorization/<기록>`)도 실행 기록에 남는다.
-소스별 기록이 허가하는 것도 `experimental_non_candidate` 뿐이다(`gates.py` 는 다른 등급을 적은 기록을
-거부한다). canonical 과 candidate 생성은 hold 와 그 승인된 전이(상위 프로젝트의 hold 규칙) 아래에 있고, 상시
-허용도 소스별 기록도 그것을 열지 않는다. `gates.py` 의 거부 판정은 상위 프로젝트의 hold 검사다.
+**Per-source owner records still work.** When the owner gives an approval record in `research/decisions/`
+that states the date, the source, the `experimental_non_candidate` scope and `releases_holds: false`
+(the 2026-09-14 method) with `--authorized-by <record>`, the runner, as before, reads it with `gates.py`,
+checks the source and class, and records the gate's reasons for refusal together with the record in
+`generation_decision` (basis `owner_record`) and `logs/authorization.txt`. The record file's SHA-256 and a copy
+(`authorization/<record>`) are kept in the run record too. A per-source record also permits only
+`experimental_non_candidate` (`gates.py` refuses a record that names another class). Canonical and candidate
+generation are under the hold and its approved transitions (the parent project's hold rules), and neither the
+standing permission nor a per-source record opens them. `gates.py`'s refusal is the parent project's hold check.
 
-**governance root 는 상위 프로젝트에 마운트됐을 때만 있다.** `gates.py` 가 읽는 M0 evaluator
-(`configs/evaluators`)·게이트 설정과 소유자 기록(`research/decisions`)은 상위 프로젝트의 것이다.
-`gates.GOVERNANCE_ROOT` 는 이 저장소가 상위 프로젝트 안에 `packages/soma-synth` 로 마운트돼 있고 그 상위
-프로젝트 루트에 `configs/evaluators` 와 `research/decisions` 가 둘 다 있을 때만 그 루트이고, 그 밖의 배치
-(단독 체크아웃, 두 폴더 중 하나가 없는 상위 프로젝트)에서는 없다. 환경 변수나 플래그로 바꿀 수 없다
-(fail-closed). evaluator, 그것이 가리키는 게이트 설정, 소유자 기록, 결정 기록의 SHA-256 은 모두 이 루트에서
-읽고, 상대 경로로 준 `--authorized-by` 는 작업 폴더가 아니라 이 루트 기준으로 푼다. governance root 가 없으면
-`--authorized-by` 를 준 실행과 정책이 없는 레지스트리(v1)로 기록 없이 한 실행이 결정 전에 거부되고, 거부
-사유가 governance root 가 없다고 적는다(`logs/refusal.txt`, 종료 코드 3). `--authorized-by` 없이 레지스트리
-v2 로 한 실행, 곧 상시 허용은 영향을 받지 않는다. 그때는 결정 기록 파일을 읽을 수 없으므로
-`generation_decision.decision_record_sha256` 은 해시 대신
-`{"status": "unavailable", "reason": "... is not in this checkout"}` 이다.
+**The governance root exists only when mounted in the parent project.** The M0 evaluator
+(`configs/evaluators`), the gate settings and the owner records (`research/decisions`) that `gates.py` reads
+belong to the parent project. `gates.GOVERNANCE_ROOT` is the parent project root only when this repository is
+mounted in it as `packages/soma-synth` and that root has both `configs/evaluators` and `research/decisions`; in
+any other arrangement (a standalone checkout, a parent project missing either folder) there is none. It cannot
+be changed by environment variable or flag (fail-closed). The evaluator, the gate settings it points to, the
+owner records and the decision record's SHA-256 are all read from this root, and an `--authorized-by` given as
+a relative path is resolved against this root, not the working folder. Without a governance root, a run with
+`--authorized-by` and a run without a record on a registry with no policy (v1) are refused before the decision,
+and the reason says there is no governance root (`logs/refusal.txt`, exit code 3). A run without
+`--authorized-by` on registry v2, that is, the standing permission, is not affected. The decision record file
+cannot be read then, so `generation_decision.decision_record_sha256` is
+`{"status": "unavailable", "reason": "... is not in this checkout"}` instead of a hash.
 
-**추적 기록.** 모든 실행 기록(`_runs/run_<identity>/`)은 §4.1 의 추적 기록을 남긴다: 원천 해시
-목록(`source_manifest.json`), 코드 리비전과 `smpl18` 리비전, 생성 근거가 된 결정 기록의 경로.
-라이선스가 철회되면 이것으로 영향받는 산출물을 찾는다. 코퍼스에서 만든 번들(`hknu`·`gaitex`·`addbiomechanics`)은
-코퍼스 자신의 기록이 원천을 피험자·trial 이름이나 부분 해시로만 적지만, 실행 기록의 `source_manifest.json`
-`source_files` 블록이 그 실행의 코퍼스·번들 단계가 읽을 수 있었던 원천 파일 전부를 파일 전체의 SHA-256 과 함께
-적는다(§4.1). 코퍼스를 재사용한 실행의 코퍼스 원천은 그 코퍼스를 만든
-실행의 기록에 있고, 이번 기록에는 그 코퍼스의 지문이 있다.
+**The tracing record.** Every run record (`_runs/run_<identity>/`) keeps the tracing record of §4.1: the source
+hash list (`source_manifest.json`), the code revision and `smpl18` revision, and the path of the decision record
+that was the basis for generating. If a licence is withdrawn, these are used to find the affected outputs. For
+bundles built from a corpus (`hknu`, `gaitex`, `addbiomechanics`), the corpus's own record names its sources
+only by subject and trial names or partial hashes, but the `source_files` block of the run record's
+`source_manifest.json` records every source file that run's corpus and bundle stages could read, with its
+whole-file SHA-256 (§4.1). For a run that reused a corpus, the corpus sources are in the record of the run that
+built it, and this record has that corpus's fingerprint.
 
-**번들은 그 PC 에만 둔다.** 등록은 그 PC 의 카탈로그(`<data root>/experimental/catalog`)에만 한다.
-공유하거나 외부에 공개하려면 별도 승인이 필요하다.
+**Bundles stay on that PC.** Registration goes only into that PC's catalog (`<data root>/experimental/catalog`).
+Sharing or publishing needs separate approval.
 
 ---
 
-## 10. 알려진 불일치
+## 10. Known mismatches
 
-봉인 문서와 현실이 어긋나는 지점을 기록한다. **고치지 않고 보고한다**(상위 프로젝트의 봉인 문서
-규칙).
+Where the sealed documents and reality disagree is recorded here. **It is reported, not fixed** (the parent
+project's rule for sealed documents).
 
-| 위치 | 봉인 문서의 서술 | 현재 실체 |
+| Location | What the sealed document says | What is actually the case |
 |---|---|---|
-| `PIPELINE_GOVERNANCE.md` §0 | `AMASS`·`PRISM`·`AddBiomechanics` 세 소스 | **5개** (+`gaitex`, `hknu`) |
-| `PIPELINE_GOVERNANCE.md` §0 | `6 IMU Small` | **8채널** |
-| `PIPELINE_GOVERNANCE.md` §0 | `15관절 Large` | **18관절** |
-| `PIPELINE_GOVERNANCE.md` §10.1 | `run_id` 가 identity 해시 | `run_id` 는 take 라벨, §3.1 이 `run_identity` 로 우회 |
-| `PIPELINE_GOVERNANCE.md` §2 | 파이프라인 위치 `src/soma_synthetic_imu/` | 생성 파이프라인은 별도 저장소 `soma-synth`(패키지 `soma_synth`, 상위 프로젝트의 submodule `packages/soma-synth`)로 옮겨 갔다(ADR-0041 결정 1) |
-| `LOCAL_DATA_PLANE.md` §1·§5·§8 | 고정된 단일 데이터 영역을 가정한다 | PC 마다 `SOMA_DATA_ROOT` 가 출력 영역이고 원천은 `SOMA_SOURCE_ROOT`(ADR-0041 결정 3). 공유 드라이브 원본 배포는 §8 갱신 뒤에만 |
+| `PIPELINE_GOVERNANCE.md` §0 | Three sources, `AMASS`, `PRISM`, `AddBiomechanics` | **5** (+`gaitex`, `hknu`) |
+| `PIPELINE_GOVERNANCE.md` §0 | `6 IMU Small` | **8-channel** |
+| `PIPELINE_GOVERNANCE.md` §0 | `15-joint Large` | **18-joint** |
+| `PIPELINE_GOVERNANCE.md` §10.1 | `run_id` is the identity hash | `run_id` is a take label; §3.1 works around it with `run_identity` |
+| `PIPELINE_GOVERNANCE.md` §2 | Pipeline location `src/soma_synthetic_imu/` | The generation pipeline moved to the separate repository `soma-synth` (package `soma_synth`, the parent project's submodule `packages/soma-synth`) (ADR-0041 decision 1) |
+| `LOCAL_DATA_PLANE.md` §1, §5, §8 | Assumes one fixed data area | On each PC `SOMA_DATA_ROOT` is the output area and the sources are `SOMA_SOURCE_ROOT` (ADR-0041 decision 3). Distributing originals on the shared drive only after §8 is updated |
 
-해소는 M0 evaluator 승급을 포함하는 review set 사안이다. 위 두 줄(§2, `LOCAL_DATA_PLANE`)은 다음 M0
-승격 review set 에서 고친다(ADR-0041).
+Resolving these is a review-set matter that includes promoting the M0 evaluator. The last two rows (§2,
+`LOCAL_DATA_PLANE`) are fixed in the next M0 promotion review set (ADR-0041).
+
+---
+
+## 11. Operator reference
+
+What an operator meets most often, in one place. The rules behind each item are in the sections cited.
+
+**Exit codes**
+
+| Code | `run` | `stage-sources` |
+|---|---|---|
+| 0 | every stage succeeded | every listed file is present and matches |
+| 1 | a stage failed (including a validation FAIL) | a file could not be staged (missing from `--from`, copy hash mismatch), or with `--verify-only` a file is missing or differs |
+| 2 | locations or the registry cannot be resolved (`SOMA_DATA_ROOT` unset, relative or missing; unknown source) | the list, a folder or an argument cannot be used |
+| 3 | **refused** — the reason is on standard error | refused — a destination file differs from the list (nothing copied), or the destination location |
+
+**Common refusals (exit code 3)** (§1.3)
+
+| Gist of the message | What clears it |
+|---|---|
+| `inside ... which is read-only` (`extracted`, `raw_archives`, a source folder, the body models, `_superseded`, `_manifest_backfill`) | send the output to a lineage folder or a scratch folder |
+| `it already holds ...` (the bundle or corpus folder is not empty) | `--replace-existing` (for a corpus also `--rebuild-corpus`), or an empty folder |
+| `selects part of the source ... production lineage directory` | send a sample to a scratch folder |
+| `sets --out, which the runner controls` | the output is `dataset_dir`, the corpus `--corpus`, the sources `SOMA_SOURCE_ROOT` |
+| `no _superseded/<name>_* folder ... holds a copy` | put the evidence in `_superseded/` before replacing a production folder ([retention rule](RETENTION_RULES.md) 1.2) |
+| `its generation did not finish -- .generating is there` | that bundle is unfinished; rebuild it with `--replace-existing` |
+
+`warning: ... cloud-synchronised folder` and `team shared drive` are warnings, not refusals; the run continues.
+To silence them, move the data root and outputs to a local disk.
+
+**First-sample selection values** (case-sensitive). PRISM's `--only` takes the **subject id** `prism_subj001`,
+not the source folder name (`subj001` is refused with "no PRISM take of that subject"). HKNU's and GAITEX's
+`--subjects` take the source folder names as they are (`S01`, `austra`). Pass them in the `=` form
+(`--bundle-arg=--only --bundle-arg=prism_subj001`); for a source with a corpus, send the corpus to the scratch
+folder too (`--corpus <scratch>/hknu_smpl24_paired` with the same `--corpus-arg` selection).
+
+**Locks** (§1.3, §4.1). The generate stage creates `<folder>.lock` beside the bundle (and corpus) folder and
+deletes it when it ends. The refusal names the lock's pid, host and start time. If that process no longer
+exists (`tasklist /FI "PID eq <pid>"` or `ps -p <pid>`), a dead run left it: delete it by hand. The runner
+never deletes someone else's lock. The catalog holds an operating-system lock on `.catalog.lock`; if another
+registration holds it, the writer waits up to 900 seconds and stops with `CatalogLocked`. Never delete
+`.catalog.lock` (its presence is normal).
+
+**`<folder>.replaced-<run>` / `<folder>.failed-<run>`** (§1.3). The previous generation moved aside by
+`--replace-existing`, and the output of a failed replacement. On success the previous generation in a scratch
+folder is deleted, and that of a production folder stays until the owner approves its deletion. On failure the
+new output becomes `.failed-<run>` and the previous generation is renamed back. While either is beside it, the
+folder is not replaced again: to accept the new generation delete `.replaced-*` (a production folder's, after
+approval); to go back, clear the current folder and rename `.replaced-*` back. Inspect `.failed-*`, then
+delete it.
+
+**Staging leftovers** (§2.3). An interrupted `stage-sources` can leave unverified copies named
+`.<name>.<random>.staging`. They are not source files, are reported as `LEFTOVER`, and are never deleted by the
+command: delete them by hand.
+
+**Catalog history size** (§4.1). Registering a bundle for the first time writes one gzip record of about 55
+bytes per asset: `gaitex` (360 assets) about 20 KB, `prism` (900) about 50 KB, `hknu` (1,400) about 80 KB,
+`amass` (41,305) about 2.4 MB, `addbiomechanics` (202,300) about 11 MB. Superseding a whole version is about
+twice that; re-registering a rebuilt bundle is about three times the changed assets' share, and nothing
+changed means no record.
