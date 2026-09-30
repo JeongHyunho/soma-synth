@@ -1,17 +1,19 @@
-"""Blender 애니메이션용 데이터 추출: 8관절 3D위치 + 6-IMU 방향 + 발 GRF/contact.
+"""Extract data for the Blender animation: 8-joint 3D positions + 6-IMU orientations + foot
+GRF/contact.
 
-PRISM take002.pkl(안전 로딩)에서 window[1000,2000)의 imu_gt 3D 위치를 뽑고,
-faithful 산출 npz에서 IMU 방향/GRF를 합쳐 작은 anim_data.npz로 저장한다(INTERNAL-ONLY).
+Takes the imu_gt 3D positions in window [1000,2000) from PRISM take002.pkl (loaded safely), combines
+them with the IMU orientations and GRF from the faithful output npz, and saves a small anim_data.npz
+(INTERNAL-ONLY).
 
     python export_anim_data.py --run <take folder> [--pkl <take002.pkl>] [--data-root <dir>]
 
---run 은 반드시 준다: small_reference.npz 와
-development_reference.npz 를 담은 PRISM faithful take 폴더이고, anim_data.npz 가 거기에 쓰인다. --pkl 을
-주지 않으면 원천 폴더($SOMA_SOURCE_ROOT, 없으면 <--data-root 또는 $SOMA_DATA_ROOT>/extracted)의
-prism/subj001/take002.pkl 을 읽는다. 입력이 모두 있는지 먼저 확인하고, 그 뒤에야 쓴다.
-번들의 take 는 그 생성기만 쓰므로 --run 이 번들·코퍼스(위 폴더에 INDEX.json 이 있다), lineage 컨테이너,
-증거 폴더, 원천 폴더 안이면 거부한다(viewer_paths.writable_folder): take 폴더를 scratch 폴더로 복사해 그
-사본을 준다.
+--run is required: the PRISM faithful take folder holding small_reference.npz and
+development_reference.npz; anim_data.npz is written there. Without --pkl, prism/subj001/take002.pkl
+is read from the source folder ($SOMA_SOURCE_ROOT, else <--data-root or $SOMA_DATA_ROOT>/extracted).
+Every input is checked first, and only then is anything written.
+A bundle's takes are written only by its generator, so --run inside a bundle or corpus (a folder
+above holds INDEX.json), the lineage container, an evidence folder or a source folder is refused
+(viewer_paths.writable_folder): copy the take folder to a scratch folder and pass the copy.
 """
 from __future__ import annotations
 import argparse, os, pickle, sys

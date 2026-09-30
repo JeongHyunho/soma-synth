@@ -1,18 +1,19 @@
-"""Blender(bpy) — PRISM faithful 참조 3D 애니메이션 -> mp4 (로컬, INTERNAL-ONLY).
+"""Blender (bpy) — PRISM faithful reference 3D animation -> mp4 (local, INTERNAL-ONLY).
 
-실행:
+Run:
   blender -b --python blender_prism_anim.py -- --run <take folder> [--smoke]
-  --smoke : 단일 프레임 PNG만(스모크 테스트)
+  --smoke : a single-frame PNG only (smoke test)
 
---run 은 export_anim_data.py 가 anim_data.npz 를 쓴 take 폴더다. 반드시 준다. anim_data.npz 가
-있는지 먼저 확인하고, 그 뒤에야 장면을 만들고 <run>/prism_faithful_animation.mp4 (또는 --smoke 면
-<run>/figures/anim_smoke.png) 를 쓴다. --run 이 번들·코퍼스(위 폴더에 INDEX.json 이 있다),
-lineage 컨테이너, 증거 폴더, 원천 폴더 안이면 거부한다(viewer_paths.writable_folder):
-export_anim_data.py 에 준 scratch 사본을 준다.
+--run is the take folder where export_anim_data.py wrote anim_data.npz. It is required.
+anim_data.npz is checked first, and only then is the scene built and
+<run>/prism_faithful_animation.mp4 (or, with --smoke, <run>/figures/anim_smoke.png) written. --run
+inside a bundle or corpus (a folder above holds INDEX.json), the lineage container, an evidence
+folder or a source folder is refused (viewer_paths.writable_folder): pass the scratch copy given to
+export_anim_data.py.
 
-내용: imu_gt 8관절 스켈레톤 + 6 virtual-IMU 방향 박스 + 발 vertical-GRF 화살표.
-PRISM world = Z-up = Blender Z-up (좌표 그대로). Workbench 엔진(헤드리스 안정).
-INTERNAL-ONLY 스탬프를 프레임에 번인.
+Content: imu_gt 8-joint skeleton + 6 virtual-IMU orientation boxes + foot vertical-GRF arrows.
+PRISM world = Z-up = Blender Z-up (coordinates as they are). Workbench engine (stable headless).
+An INTERNAL-ONLY stamp is burnt into the frames.
 """
 import os, sys
 import numpy as np
@@ -22,15 +23,15 @@ import mathutils
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import viewer_paths  # noqa: E402
 
-STRIDE = 2                     # 1000 -> 500 프레임
-FPS = 50                       # 10 s 영상
+STRIDE = 2                     # 1000 -> 500 frames
+FPS = 50                       # a 10 s video
 CAM_OFFSET = mathutils.Vector((1.0, -4.0, 1.8))
 
 # Okabe-Ito RGBA
 BLUE = (0.0, 0.45, 0.70, 1); VERM = (0.84, 0.37, 0.0, 1); GREEN = (0.0, 0.62, 0.45, 1)
 GRAY = (0.18, 0.18, 0.18, 1); BONE = (0.62, 0.62, 0.62, 1); IMUCOL = (0.94, 0.89, 0.26, 1)
 RED = (0.86, 0.08, 0.08, 1); FLOOR = (0.86, 0.86, 0.86, 1)
-IMU_OFFSET = mathutils.Vector((0.0, 0.13, 0.0))   # 센서 로컬 +Y로 띄워 방향 가시화
+IMU_OFFSET = mathutils.Vector((0.0, 0.13, 0.0))   # lifted along the sensor's local +Y to show its orientation
 
 JOINT_COLOR = {"pelvis": GRAY, "head": GREEN, "knee_l": BLUE, "foot_l": BLUE,
                "wrist_l": BLUE, "knee_r": VERM, "foot_r": VERM, "wrist_r": VERM}
@@ -68,7 +69,7 @@ AXES = [("x", (1, 0, 0), (0.90, 0.10, 0.10, 1)),   # X=red
 
 
 def new_axis(name, edir, rgba):
-    """센서 로컬 축 표시용 얇은 화살대(원기둥). 로컬 +Z를 edir로 회전."""
+    """A thin shaft (cylinder) showing a sensor's local axis. Rotates local +Z onto edir."""
     o = new_cyl(name, 0.014, rgba)
     o.rotation_quaternion = mathutils.Vector((0, 0, 1)).rotation_difference(mathutils.Vector(edir))
     o.location = mathutils.Vector(edir) * (AXIS_LEN / 2.0)
@@ -140,7 +141,7 @@ def main(argv=None):
         scene.collection.objects.link(piv); piv.rotation_mode = "QUATERNION"
         box = new_box(f"imu_{c}", (0.11, 0.075, 0.04), IMUCOL)
         for child in [box] + [new_axis(f"imuax_{c}_{ax}", e, col) for ax, e, col in AXES]:
-            child.parent = piv                                # pivot이 원점이라 local=world 유지
+            child.parent = piv                                # the pivot is the origin, so local = world
             child.matrix_parent_inverse = mathutils.Matrix.Identity(4)
         box.location = (0, 0, 0); box.rotation_quaternion = (1, 0, 0, 0)
         imu_pivot.append(piv)
@@ -165,8 +166,8 @@ def main(argv=None):
             set_bone(bone_obj[bi], J[f, a], J[f, b], k)
         for si in range(6):
             q = mathutils.Quaternion(tuple(imu_quat[f, si]))          # wxyz
-            loc = mathutils.Vector(imu_pos[f, si]) + (q @ IMU_OFFSET)  # 센서에서 살짝 띄움
-            key(imu_pivot[si], k, loc=loc, quat=tuple(imu_quat[f, si]))  # box+RGB축이 따라옴
+            loc = mathutils.Vector(imu_pos[f, si]) + (q @ IMU_OFFSET)  # lifted slightly off the sensor
+            key(imu_pivot[si], k, loc=loc, quat=tuple(imu_quat[f, si]))  # the box and RGB axes follow
         for s in range(2):
             h = float(np.clip(grf_vert[f, s] / grf_ref, 0, 2.2)) * 0.45 if contact[f, s] else 0.0
             fp = foot_pos[f, s]
@@ -175,7 +176,7 @@ def main(argv=None):
         pivot.location = tuple(J[f, 0]); pivot.keyframe_insert("location", frame=k)
         cam.location = mathutils.Vector(J[f, 0]) + CAM_OFFSET; cam.keyframe_insert("location", frame=k)
 
-    # linear interpolation (mocap 충실)
+    # linear interpolation (faithful to the mocap)
     for act in bpy.data.actions:
         for fc in act.fcurves:
             for kp in fc.keyframe_points:

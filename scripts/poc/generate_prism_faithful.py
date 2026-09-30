@@ -1,29 +1,38 @@
-"""PRISM -> paired Small/Large **물리적으로 충실한(faithful) 참조** 생성기 (독립 replica).
+"""PRISM -> paired Small/Large **physically faithful reference** generator (independent replica).
 
-이 스크립트는 상위 프로젝트의 정식 PRISM experimental pilot 설계
-(`configs/experiments/prism_experimental_pilot_v1.json`)의 알고리즘/pin을 그대로 따라,
-독립적으로 동일한 faithful 참조 페어를 생성한다. 정식 파이프라인 코드는 건드리지 않는다.
+This script follows the algorithm and pins of the parent project's sanctioned PRISM experimental
+pilot design (`configs/experiments/prism_experimental_pilot_v1.json`) as they are, and independently
+generates the same faithful reference pair. It does not touch the sanctioned pipeline code.
 
-정식 접근(=현실 제약에 맞춤). 필드명은 업데이트된 qmd 스펙(small/00_sensors·01_streams, large/02_kinematics) 준수:
-  * SMPL 신체모델 파일 없이도 돌도록 **관절 '위치'가 아니라 '회전/상대회전'** 기반이다.
-    - SMPL-24 pose chain FK로 글로벌 관절 회전을 poses에서 복원(모델 불필요).
-    - 17관절(골반 제외)은 SMPL local(부모 대비) 회전을 joint_rotation[T,18,4]로 담는다(0=골반 global).
-  * Small 8채널 통합 IMU: 본체 6(back_T4·wrist_l/r·shank_l/r·occiput) + 인솔 2(foot_l/r).
-    - 본체 5개는 PRISM `imu_gt`, back_T4는 SMPL spine3(관절9)+pelvis→head α=2/3 proxy.
-    - 인솔 2채널도 orientation 제공(중력기준 자세·heading 드리프트, 자기계 없음). ideal이라 GT로
-      채우고 imu_orientation_absolute_heading=False로 실제 한계를 표기.
+The sanctioned approach (fitted to real constraints). Field names follow the updated qmd spec
+(small/00_sensors, 01_streams, large/02_kinematics):
+  * It is based on **joint rotations and relative rotations, not joint positions**, so that it runs
+    without an SMPL body model file.
+    - SMPL-24 pose-chain FK recovers the global joint rotations from the poses (no model needed).
+    - The 17 joints (pelvis excluded) carry their SMPL local (parent-relative) rotation in
+      joint_rotation[T,18,4] (0 = pelvis global).
+  * Small 8-channel unified IMU: 6 body (back_T4, wrist_l/r, shank_l/r, occiput) + 2 insole (foot_l/r).
+    - 5 body channels from PRISM `imu_gt`; back_T4 is an SMPL spine3 (joint 9) + pelvis→head α=2/3 proxy.
+    - The 2 insole channels also give orientation (gravity-referenced attitude, heading drift, no
+      magnetometer). Being ideal, they are filled from GT and the real limitation is flagged with
+      imu_orientation_absolute_heading=False.
     - specific force f = R^T (a_world - g),  g=[0,0,-9.80665] (PRISM world = Z-up).
-    - angular velocity = 인접 방향의 rotation-log(SO3) / dt (deg/s).
-  * 프레임은 PRISM world(Z-up) = 갱신된 spec G(large/99_conventions.qmd: Z-up·PRISM world 정렬). 별도 변환 불필요.
-  * PRISM insole(force/CoP/contact)는 **별도 development_reference.npz**(measured/source_derived).
-    계약상 measured kinetics는 synthetic namespace와 분리(§6.5) → Large에 넣지 않는다.
-  * Large 골반 병진은 `root_velocity`[T,3] m/s(프레임간 변위/dt)로 저장(spec). 절대 위치는
-    pelvis_position_world_aux(참고)로 병기하며 `pos[t]=pos[0]+dt·cumsum(root_velocity)`로 복원.
-  * 전체 take(13160f)에서 미분/FK 후 window[1000,2000)로 슬라이스(경계 아티팩트 방지).
+    - angular velocity = rotation-log (SO3) of adjacent orientations / dt (deg/s).
+  * The frame is PRISM world (Z-up) = the updated spec G (large/99_conventions.qmd: Z-up, aligned
+    with PRISM world). No separate conversion is needed.
+  * The PRISM insole (force/CoP/contact) goes in a **separate development_reference.npz**
+    (measured/source_derived). By contract, measured kinetics are kept apart from the synthetic
+    namespace (§6.5) → not put in Large.
+  * Large pelvis translation is stored as `root_velocity`[T,3] m/s (frame-to-frame displacement/dt)
+    (spec). The absolute position is given alongside as pelvis_position_world_aux (reference) and
+    recovered as `pos[t]=pos[0]+dt·cumsum(root_velocity)`.
+  * Derivatives and FK are computed on the whole take (13160 frames), then sliced to the window
+    [1000,2000) (avoids edge artifacts).
 
-한계: 관절 '중심 위치'(joint_centers_world)와 ISB JCS 각도는 SMPL 모델/ISB 규약이 필요해
-  생성하지 않는다(unavailable). physics GRF/역동역학은 DETERMINISTIC_EXECUTION_CONFIG_HOLD로 금지.
-  따라서 이건 여전히 `experimental_non_candidate`이며 quality-gate PASS가 아니다. INTERNAL-ONLY.
+Limitations: joint centre positions (joint_centers_world) and ISB JCS angles need the SMPL model and
+  the ISB convention, so they are not generated (unavailable). Physics GRF and inverse dynamics are
+  forbidden by DETERMINISTIC_EXECUTION_CONFIG_HOLD. So this is still `experimental_non_candidate` and
+  not a quality-gate PASS. INTERNAL-ONLY.
 """
 from __future__ import annotations
 
@@ -54,7 +63,7 @@ if _SRC_ROOT not in sys.path:
 from soma_synth.pipeline import paths, reduced_model  # noqa: E402
 
 # --------------------------------------------------------------------------
-# 0. Pins (정식 config prism_experimental_pilot_v1.json 과 동일)
+# 0. Pins (the same as the sanctioned config prism_experimental_pilot_v1.json)
 # --------------------------------------------------------------------------
 # Standalone single-take (subj001/take002) golden bundle: written to $SOMA_POC_OUT_DIR, else
 # paths.lineage_dir(RUN_ID) under $SOMA_DATA_ROOT; the source is paths.source_dir("prism").
@@ -88,24 +97,24 @@ SMPL24_PARENTS = np.array(
     dtype=np.int64,
 )
 
-# Small 8채널 통합 IMU (small/00_sensors.qmd, small/01_streams.qmd).
-#   본체 6(back_T4..occiput): 9-DOF → orientation+accel+gyro.
-#   인솔 2(foot_l/r): 6축 → accel+gyro만, 융합 사원수(orientation) 없음(자기계 미포함).
+# Small 8-channel unified IMU (small/00_sensors.qmd, small/01_streams.qmd).
+#   6 body (back_T4..occiput): 9-DOF → orientation+accel+gyro.
+#   2 insole (foot_l/r): 6-axis → accel+gyro only, no fused quaternion (orientation) (no magnetometer).
 SENSOR_CODES = ["back_T4", "wrist_l", "wrist_r", "shank_l", "shank_r", "occiput", "foot_l", "foot_r"]
 N_SENSORS = 8
-N_BODY = 6  # ch0..ch5 = 9-DOF(사원수 있음). ch6/7(foot) = 6축(사원수 없음).
-# 본체 IMU site -> PRISM imu_gt 키. back_T4는 SMPL spine3(별도 처리).
-#   shank(정강이 상부, 무릎쪽 3/4)은 PRISM 무릎부 GT(L_Knee/R_Knee)를 근위 하퇴 proxy로 사용.
+N_BODY = 6  # ch0..ch5 = 9-DOF (with a quaternion). ch6/7 (foot) = 6-axis (no quaternion).
+# body IMU site -> PRISM imu_gt key. back_T4 is SMPL spine3 (handled separately).
+#   shank (upper shin, 3/4 towards the knee) uses the PRISM knee GT (L_Knee/R_Knee) as a proximal lower-leg proxy.
 SENSOR_IMU_GT = {
     "wrist_l": "L_Wrist", "wrist_r": "R_Wrist",
     "shank_l": "L_Knee", "shank_r": "R_Knee", "occiput": "Head",
 }
-# 인솔(Moticon OpenGo) 6축 IMU — 좌/우, 발 GT(L_Foot/R_Foot) 기반. orientation 없음.
+# insole (Moticon OpenGo) 6-axis IMU — left/right, from the foot GT (L_Foot/R_Foot). No orientation.
 FOOT_CODES = ["foot_l", "foot_r"]
 FOOT_IMU_GT = {"foot_l": "L_Foot", "foot_r": "R_Foot"}
 
-# Large 운동학(large/02_kinematics.qmd): 골반(root)+17관절 = smpl18이 남기는 18관절.
-#   제외: spine1(3)·spine2(6)·collar(13,14)·hand(22,23). joint_names는 SMPL 인덱스 순서. 목록은 패키지 소유.
+# Large kinematics (large/02_kinematics.qmd): pelvis (root) + 17 joints = the 18 joints smpl18 keeps.
+#   Excluded: spine1(3), spine2(6), collar(13,14), hand(22,23). joint_names in SMPL index order. The package owns the list.
 JOINT18_NAMES = list(reduced_model.JOINT18_NAMES)
 SMPL18_INDICES = np.array(reduced_model.KEEP18, np.int64)
 
@@ -143,7 +152,7 @@ class TakeSpec:
 
 
 # --------------------------------------------------------------------------
-# 1. 안전 로딩
+# 1. Safe loading
 # --------------------------------------------------------------------------
 class _NumpyOnlyUnpickler(pickle.Unpickler):
     # `_frombuffer` reconstructs an ndarray from an in-band (BYTEARRAY8) buffer for PRISM's two
@@ -164,14 +173,14 @@ def load_prism_safe(path):
 
 
 # --------------------------------------------------------------------------
-# 2. 헬퍼
+# 2. Helpers
 # --------------------------------------------------------------------------
 def project_so3(R):
-    """SVD로 가장 가까운 정규직교 회전행렬로 투영(det=+1 보장)."""
+    """Project onto the nearest orthonormal rotation matrix by SVD (det=+1 guaranteed)."""
     U, _, Vt = np.linalg.svd(R)
     Rp = U @ Vt
     det = np.linalg.det(Rp)
-    # det<0면 마지막 특이벡터 반전
+    # if det<0, flip the last singular vector
     neg = det < 0
     if np.any(neg):
         U2 = U.copy()
@@ -181,10 +190,10 @@ def project_so3(R):
 
 
 def rotmat_to_quat_wxyz(R):
-    """[...,3,3] -> [...,4] (w,x,y,z), 시간축 부호 연속성."""
+    """[...,3,3] -> [...,4] (w,x,y,z), sign-continuous over time."""
     q_xyzw = Rotation.from_matrix(R.reshape(-1, 3, 3)).as_quat().reshape(R.shape[:-2] + (4,))
     q = np.concatenate((q_xyzw[..., 3:4], q_xyzw[..., :3]), axis=-1)
-    if q.ndim == 2:  # [N,4] 시간열에 부호 연속성
+    if q.ndim == 2:  # sign continuity over an [N,4] time series
         for i in range(1, q.shape[0]):
             if np.dot(q[i], q[i - 1]) < 0:
                 q[i] = -q[i]
@@ -192,7 +201,7 @@ def rotmat_to_quat_wxyz(R):
 
 
 def rotvec_to_quat_wxyz(rotvec):
-    """[...,3] axis-angle -> [...,4] (w,x,y,z), 2D면 시간축 부호 연속성."""
+    """[...,3] axis-angle -> [...,4] (w,x,y,z), sign-continuous over time when 2D."""
     q_xyzw = Rotation.from_rotvec(rotvec.reshape(-1, 3)).as_quat().reshape(rotvec.shape[:-1] + (4,))
     q = np.concatenate((q_xyzw[..., 3:4], q_xyzw[..., :3]), axis=-1)
     if q.ndim == 2:
@@ -203,7 +212,7 @@ def rotvec_to_quat_wxyz(rotvec):
 
 
 def smpl24_global_rotation(poses_rotvec):
-    """poses [T,24,3] axis-angle -> global rotmats [T,24,3,3] (PRISM world), FK 누적."""
+    """poses [T,24,3] axis-angle -> global rotmats [T,24,3,3] (PRISM world), accumulated by FK."""
     local = Rotation.from_rotvec(poses_rotvec.reshape(-1, 3)).as_matrix().reshape(-1, 24, 3, 3)
     out = np.empty_like(local)
     out[:, 0] = local[:, 0]
@@ -213,11 +222,11 @@ def smpl24_global_rotation(poses_rotvec):
 
 
 def angular_velocity_deg_s(R, dt):
-    """[N,3,3] world 방향열 -> body-frame 각속도 [N,3] deg/s. rotation-log 중앙차분."""
+    """[N,3,3] world orientation series -> body-frame angular velocity [N,3] deg/s. Central differences of the rotation log."""
     Rp = project_so3(R)
     N = Rp.shape[0]
     omega = np.zeros((N, 3), dtype=np.float64)
-    # 중앙차분: rel = R[k-1]^T R[k+1], omega = log(rel)/(2dt)
+    # central difference: rel = R[k-1]^T R[k+1], omega = log(rel)/(2dt)
     rel_c = np.swapaxes(Rp[:-2], -1, -2) @ Rp[2:]
     omega[1:-1] = Rotation.from_matrix(rel_c).as_rotvec() / (2.0 * dt)
     rel0 = np.swapaxes(Rp[0], -1, -2) @ Rp[1]
@@ -265,7 +274,7 @@ def _sha256_file(path):
 
 
 def add_docx_code_aliases(large):
-    """팀 Data Specification의 Large code *이름*을 기존 PoC 배열에 무손실 alias한다."""
+    """Alias the Large code *names* of the team Data Specification onto the existing PoC arrays, losslessly."""
     compatible = dict(large)
     for specification_code, internal_code in DOCX_LARGE_FLAT_CODE_ALIASES.items():
         if internal_code not in compatible:
@@ -275,7 +284,7 @@ def add_docx_code_aliases(large):
 
 
 def docx_code_compatibility_metadata():
-    """업데이트된 qmd 스펙(00_sensors·01_streams·02_kinematics) 코드명 준수 현황과 의미 경계."""
+    """How the code names follow the updated qmd spec (00_sensors, 01_streams, 02_kinematics), and the semantic limits."""
     return {
         "spec_documents": {
             "small_sensors": "small/00_sensors.qmd",
@@ -285,7 +294,7 @@ def docx_code_compatibility_metadata():
         "historical_docx": {
             "document": DATA_SPECIFICATION_DOCX,
             "document_sha256": DATA_SPECIFICATION_DOCX_SHA256,
-            "note": "이전 DOCX flat/qualified 별칭(joint_positions/joint_rotations)은 qmd 코드명으로 대체됨(superseded).",
+            "note": "The earlier DOCX flat/qualified aliases (joint_positions/joint_rotations) were superseded by the qmd code names.",
         },
         "small_codes": ["sensor_codes(8)", "imu_orientation", "imu_acceleration",
                         "imu_angular_velocity", "imu_orientation_absolute_heading"],
@@ -293,22 +302,22 @@ def docx_code_compatibility_metadata():
                         "joint_velocity", "pelvis_position_world_aux"],
         "status": "code_name_and_shape_compatibility_only",
         "semantic_limits": {
-            "small": "코드명·shape은 qmd 준수; 단위/장착보정(mount extrinsic) 의미는 미인증. "
-                     "인솔(foot_l/r) orientation은 중력기준 자세(heading 드리프트); ideal 참조라 GT로 채움.",
-            "root_velocity": "PRISM world(=spec G, Z-up) 프레임의 프레임간 변위/dt; heading 정규화는 스펙상 미확정.",
-            "joint_rotation": "SMPL local(부모 대비) 쿼터니언; ISB JCS 각 분해는 미적용.",
-            "joint_velocity": "joint_rotation과 동일 규약의 각속도(0=골반, 1-17=관절).",
+            "small": "Code names and shapes follow the qmd; the meaning of units and mount extrinsics is not certified. "
+                     "Insole (foot_l/r) orientation is a gravity-referenced attitude (heading drift); filled from GT because this is an ideal reference.",
+            "root_velocity": "Frame-to-frame displacement/dt in the PRISM world (= spec G, Z-up) frame; heading normalisation is undecided in the spec.",
+            "joint_rotation": "SMPL local (parent-relative) quaternion; ISB JCS angle decomposition not applied.",
+            "joint_velocity": "Angular velocity by the same convention as joint_rotation (0 = pelvis, 1-17 = joints).",
         },
         "unavailable_codes": {
-            "grf": "canonical SOMA world 지면반력[T,3] 미생성(insole는 development_reference에 source-native).",
-            "cop": "canonical [T,2] SOMA world CoP 미생성.",
-            "joint_torques": "2차 범위 역동역학 미생성.",
+            "grf": "Canonical SOMA-world ground reaction force [T,3] not generated (the insole is in development_reference, source-native).",
+            "cop": "Canonical [T,2] SOMA-world CoP not generated.",
+            "joint_torques": "Second-scope inverse dynamics not generated.",
         },
     }
 
 
 # --------------------------------------------------------------------------
-# 3. 생성 (full-take 계산 후 window 슬라이스)
+# 3. Generation (computed on the full take, then sliced to the window)
 # --------------------------------------------------------------------------
 def subject_fit_inputs(spec):
     """(native pose [N,24,3], rest joints (24,3)) of one take, for the subject's pooled fit.
@@ -345,7 +354,7 @@ def build(spec, reduction=None):
     pelvis_pos_full = np.asarray(imu_gt["Pelvis"]["pos_world"], np.float64)
     head_pos_full = np.asarray(imu_gt["Head"]["pos_world"], np.float64)
 
-    # ---- 시간축 ----
+    # ---- time axis ----
     timestamps_s = np.arange(T, dtype=np.float64) * dt
     source_interval_s = [win_start / fps, win_end / fps]
     timestamps_sha256 = sha256_hex(np.ascontiguousarray(timestamps_s, "<f8").tobytes())
@@ -372,16 +381,16 @@ def build(spec, reduction=None):
     chest_vel_full = butter_filtfilt(centered_diff(chest_pos_filt, dt))
     chest_acc_full = centered_diff(chest_vel_full, dt)
 
-    # ---------------- SMALL: 8채널 통합 IMU (본체 6 + 인솔 2) ----------------
-    #   본체 6(ch0..5): 9축 → 절대 heading 사원수. 인솔 2(ch6/7): 6축 → 중력기준 자세(heading 드리프트).
-    #   01_streams.qmd 갱신으로 인솔도 orientation 제공. ideal 참조이므로 인솔 orientation을
-    #   GT(참 heading 포함)로 채우고, 실제 6축 한계는 imu_orientation_absolute_heading 플래그로 표기.
+    # ---------------- SMALL: 8-channel unified IMU (6 body + 2 insole) ----------------
+    #   6 body (ch0..5): 9-axis → absolute-heading quaternion. 2 insole (ch6/7): 6-axis → gravity-referenced attitude (heading drift).
+    #   Since the 01_streams.qmd update the insoles also give orientation. This is an ideal reference, so the insole
+    #   orientation is filled from GT (true heading included) and the real 6-axis limitation is flagged with imu_orientation_absolute_heading.
     imu_orientation = np.zeros((T, N_SENSORS, 4), np.float32)
     imu_acceleration = np.zeros((T, N_SENSORS, 3), np.float32)
     imu_angular_velocity = np.zeros((T, N_SENSORS, 3), np.float32)
     imu_valid_mask = np.ones((T, N_SENSORS), bool)
     imu_confidence = np.zeros((T, N_SENSORS), np.float32)
-    # 절대(자기계) heading 보유 여부: 본체 True, 인솔 False(중력기준 자세·heading 드리프트).
+    # whether an absolute (magnetometer) heading is present: body True, insole False (gravity-referenced attitude, heading drift).
     imu_orientation_absolute_heading = np.array([True] * N_BODY + [False] * len(FOOT_CODES))
     site_prov = {}
 
@@ -400,8 +409,8 @@ def build(spec, reduction=None):
         emit_site(j, np.asarray(gt["ori_world"], np.float64),
                   np.asarray(gt["acc_world"], np.float64), 0.7, "source_derived:imu_gt")
 
-    # ch6/7 인솔(foot_l/r): 인솔도 orientation 추출(중력기준, heading 드리프트).
-    #   ideal 참조라 orientation을 GT(참 heading 포함)로 채우고, 한계는 heading 플래그로 표기.
+    # ch6/7 insole (foot_l/r): orientation is extracted for the insoles too (gravity-referenced, heading drift).
+    #   An ideal reference, so orientation is filled from GT (true heading included); the limitation is flagged by the heading flag.
     for jj, code in enumerate(FOOT_CODES):
         j = N_BODY + jj
         gt = imu_gt[FOOT_IMU_GT[code]]
@@ -410,21 +419,21 @@ def build(spec, reduction=None):
                   "source_derived:imu_gt(real_insole=gravity_ref_heading_drift)")
 
     small = {
-        "sensor_codes": np.array(SENSOR_CODES, dtype=object),          # 8채널 통합
-        "imu_orientation": imu_orientation,                           # [T,8,4] 전 채널 유효(인솔=중력기준 자세)
+        "sensor_codes": np.array(SENSOR_CODES, dtype=object),          # 8-channel unified
+        "imu_orientation": imu_orientation,                           # [T,8,4] valid on every channel (insole = gravity-referenced attitude)
         "imu_acceleration": imu_acceleration,                         # [T,8,3] specific force
         "imu_angular_velocity": imu_angular_velocity,                 # [T,8,3] deg/s
-        "imu_valid_mask": imu_valid_mask,                             # [T,8] 채널 연결 상태
+        "imu_valid_mask": imu_valid_mask,                             # [T,8] channel connection state
         "imu_confidence": imu_confidence,                             # [T,8]
-        # 절대 heading 보유 여부: 인솔 2채널 False(6축, 중력기준·heading 드리프트)
+        # whether an absolute heading is present: the 2 insole channels False (6-axis, gravity-referenced, heading drift)
         "imu_orientation_absolute_heading": imu_orientation_absolute_heading,  # [8]
         "mount_id": np.array([f"prism_faithful::{c}" for c in SENSOR_CODES], dtype=object),
         "small_mode": "ideal", "pair_id": pair_id, "timestamps_s": timestamps_s,
         "frame_count": np.int64(T),
     }
 
-    # ---------------- LARGE: 골반(root) + 17관절 = SMPL 18 부분집합 (large/02_kinematics.qmd) ----------------
-    pelvis_position = win(pelvis_pos_full).astype(np.float64)                          # 절대 위치(참고 aux 계산용)
+    # ---------------- LARGE: pelvis (root) + 17 joints = SMPL 18 subset (large/02_kinematics.qmd) ----------------
+    pelvis_position = win(pelvis_pos_full).astype(np.float64)                          # absolute position (for the reference aux)
     smpl_global_orientation = rotmat_to_quat_wxyz(win(gR_full)).astype(np.float32)     # [T,24,4] lossless
     # Reduced model (smpl18.reduce): the 4 frozen joints take the subject's constants and spine3/the
     # shoulders absorb what was removed, so distal global orientation is preserved exactly. `reduction`
@@ -444,16 +453,16 @@ def build(spec, reduction=None):
     fixed_C = reduction.constants
     Lrefit = reduced_model.reduce_local(Lfull, fixed_C)
 
-    # root_velocity [T,3] m/s: 프레임 간 골반 변위(backward diff, [0]=0). 누적으로 시작기준 궤적 정확 복원:
-    #   pos[t] = pos[0] + dt * cumsum(root_velocity)[t].  프레임=PRISM world(spec G 프레임 변환 미적용; 스펙상 미확정).
+    # root_velocity [T,3] m/s: frame-to-frame pelvis displacement (backward diff, [0]=0). Its cumulative sum recovers the trajectory from the start exactly:
+    #   pos[t] = pos[0] + dt * cumsum(root_velocity)[t].  Frame = PRISM world (no spec G frame conversion applied; undecided in the spec).
     root_velocity = np.zeros((T, 3), np.float64)
     root_velocity[1:] = (pelvis_position[1:] - pelvis_position[:-1]) / dt
     root_velocity = root_velocity.astype(np.float32)
 
-    # joint_rotation [T,18,4]: [0]=골반 global 자세(q_world_from_pelvis), [1:]=17관절 SMPL local rotation(부모 대비)
+    # joint_rotation [T,18,4]: [0] = pelvis global attitude (q_world_from_pelvis), [1:] = 17-joint SMPL local rotation (parent-relative)
     joint_rotation = np.zeros((T, 18, 4), np.float32)
     joint_rotation[:, 0, :] = rotmat_to_quat_wxyz(win(gR_full[:, 0])).astype(np.float32)
-    # joint_velocity [T,18,3] deg/s: [0]=골반 각속도(정렬용 extra), [1:]=17관절 각속도(spec)
+    # joint_velocity [T,18,3] deg/s: [0] = pelvis angular velocity (extra, for alignment), [1:] = 17-joint angular velocity (spec)
     joint_velocity = np.zeros((T, 18, 3), np.float32)
     joint_velocity[:, 0, :] = win(angular_velocity_deg_s(gR_full[:, 0], dt)).astype(np.float32)
     for k in range(1, 18):
@@ -463,12 +472,12 @@ def build(spec, reduction=None):
         joint_velocity[:, k, :] = win(angular_velocity_deg_s(Lrefit[:, idx], dt)).astype(np.float32)
 
     large = {
-        "joint_names": np.array(JOINT18_NAMES, dtype=object),            # 18 (SMPL 인덱스 순서)
-        "root_velocity": root_velocity,                                 # [T,3] m/s 골반 root 속도(spec; 프레임간 변위/dt)
-        "joint_rotation": joint_rotation,                               # [T,18,4] 0=root global, 1-17=관절 local
-        "joint_velocity": joint_velocity,                               # [T,18,3] deg/s (0=root, 1-17=관절)
-        "pelvis_position_world_aux": pelvis_position.astype(np.float32),  # [T,3] m 절대 위치(참고 aux; root_velocity 누적 기준)
-        "smpl_global_orientation_prism_world": smpl_global_orientation,  # [T,24,4] lossless 보조
+        "joint_names": np.array(JOINT18_NAMES, dtype=object),            # 18 (SMPL index order)
+        "root_velocity": root_velocity,                                 # [T,3] m/s pelvis root velocity (spec; frame-to-frame displacement/dt)
+        "joint_rotation": joint_rotation,                               # [T,18,4] 0=root global, 1-17=joint local
+        "joint_velocity": joint_velocity,                               # [T,18,3] deg/s (0=root, 1-17=joints)
+        "pelvis_position_world_aux": pelvis_position.astype(np.float32),  # [T,3] m absolute position (reference aux; the base of the root_velocity sum)
+        "smpl_global_orientation_prism_world": smpl_global_orientation,  # [T,24,4] lossless auxiliary
         "pair_id": pair_id, "timestamps_s": timestamps_s, "frame_count": np.int64(T),
     }
 
@@ -481,7 +490,7 @@ def build(spec, reduction=None):
         "cop_feet_world": np.stack([win(insole["L_Foot"]["CoP_world"]),
                                     win(insole["R_Foot"]["CoP_world"])], axis=1).astype(np.float32),
         "cop_combined_world": win(insole["combined"]["CoP_world"]).astype(np.float32),
-        "foot_contact_mask": np.stack([  # contacts normalized to bool (usage policy C급8)
+        "foot_contact_mask": np.stack([  # contacts normalized to bool (usage policy item C8)
             win(insole["L_Foot"]["contacts"])[:, 0].astype(bool),
             win(insole["R_Foot"]["contacts"])[:, 0].astype(bool),
         ], axis=1),
@@ -493,9 +502,9 @@ def build(spec, reduction=None):
     }
 
     # ---------------- ANTHRO: subject skeleton constants (anthro/00_anthropometry.qmd) ----------------
-    #   Large 모션 18관절(축소모델) + Anthro 고정 4관절(spine1/spine2/collars, fit 상수) = SMPL 22-체인.
-    #   fixed_C는 재구성 위치잔차 최소화로 fit(위 재적합 블록); spine3/어깨가 편차 흡수 → 말단 방향 exact.
-    #   rest-pose 관절 위치/분절 길이는 SMPL 모델 + 실제 betas로 회귀. height/mass/sex는 측정값(subj_info).
+    #   Large motion 18 joints (reduced model) + Anthro 4 fixed joints (spine1/spine2/collars, fitted constants) = SMPL 22-chain.
+    #   fixed_C is fitted by minimising the reconstruction position residual (refit block above); spine3/shoulders absorb the deviation → distal orientation exact.
+    #   rest-pose joint positions and segment lengths are regressed from the SMPL model + the real betas. height/mass/sex are measured (subj_info).
     subj_info = dict(raw["info"]["subj_info"])
     anthro = anthro_smpl.compute_anthro(smpl_model, betas0, subj_info, pair_id,
                                         fixed_joint_local_R=fixed_C,
@@ -505,28 +514,28 @@ def build(spec, reduction=None):
 
     # ---------------- validation ----------------
     v = {}
-    qn = np.linalg.norm(imu_orientation, axis=2)   # 전 8채널(인솔 포함, NaN 없음)
+    qn = np.linalg.norm(imu_orientation, axis=2)   # all 8 channels (insoles included, no NaN)
     v["imu_quat_norm_max_dev"] = float(np.max(np.abs(qn - 1)))
     v["pelvis_quat_norm_max_dev"] = float(np.max(np.abs(np.linalg.norm(joint_rotation[:, 0, :], axis=1) - 1)))
     v["joint_rotation_quat_norm_max_dev"] = float(np.max(np.abs(
         np.linalg.norm(joint_rotation, axis=2) - 1)))
     dts = np.diff(timestamps_s)
     v["timestamp_step_max_err"] = float(np.max(np.abs(dts - dt)))
-    # specific-force 역변환: a = R f + g, imu_gt.Head(occiput 채널) 로 검증
+    # specific-force inverse: a = R f + g, checked against imu_gt.Head (the occiput channel)
     Rh = win(np.asarray(imu_gt["Head"]["ori_world"], np.float64))
     f_head = imu_acceleration[:, SENSOR_CODES.index("occiput"), :].astype(np.float64)
     a_recon = np.einsum("nij,nj->ni", Rh, f_head) + GRAVITY_PRISM_WORLD
     a_true = win(np.asarray(imu_gt["Head"]["acc_world"], np.float64))
     v["specific_force_inverse_max_abs_err_m_s2"] = float(np.max(np.abs(a_recon - a_true)))
-    # root_velocity 누적 복원 검증: pos[t] = pos[0] + dt*cumsum(root_velocity)
+    # check the cumulative recovery from root_velocity: pos[t] = pos[0] + dt*cumsum(root_velocity)
     pos_recon = pelvis_position[0] + dt * np.cumsum(root_velocity.astype(np.float64), axis=0)
     v["root_velocity_cumsum_recon_max_abs_err_m"] = float(np.max(np.abs(pos_recon - pelvis_position)))
-    # FK 검증: SMPL FK 글로벌 방향 vs PRISM imu_gt 방향(부위별) — 상대변화 일치도(회전 offset 제거)
+    # FK check: SMPL FK global orientation vs PRISM imu_gt orientation (per site) — agreement of relative change (rotation offset removed)
     fk_vs_gt = {}
     for code, joint in [("wrist_l", 20), ("wrist_r", 21), ("occiput", 15), ("shank_l", 4), ("shank_r", 5)]:
         R_fk = win(gR_full[:, joint])
         R_gt = win(np.asarray(imu_gt[SENSOR_IMU_GT[code]]["ori_world"], np.float64))
-        # 고정 offset = R_gt[0]^T R_fk[0] 제거 후 잔차 각도
+        # residual angle after removing the fixed offset = R_gt[0]^T R_fk[0]
         offset = R_gt[0].T @ R_fk[0]
         resid = np.swapaxes(R_gt, -1, -2) @ R_fk @ np.swapaxes(offset[None], -1, -2)
         ang = np.degrees(np.linalg.norm(Rotation.from_matrix(project_so3(resid)).as_rotvec(), axis=1))
@@ -572,7 +581,7 @@ def build(spec, reduction=None):
                        "extracted/prism/%s/%s.pkl" % (spec.subject_id.replace("prism_", ""), spec.take_id)),
                    "native_frames_total": N, "native_rate_hz": fps,
                    "note": "some wrist/head IMU frames are synth (info.data_info.synth_imu_frames); "
-                           "본 참조는 imu_gt(model-derived kinematics) 기반이라 직접 영향은 없으나 provenance상 유의."},
+                           "this reference is built on imu_gt (model-derived kinematics), so it is not directly affected, but note it for provenance."},
         "window": {"frame_start": win_start, "frame_end_exclusive": win_end,
                    "frame_count": T, "source_interval_s": source_interval_s},
         "identity": {"pair_id": pair_id, "contract_id": CONTRACT_ID, "contract_version": CONTRACT_VERSION,
@@ -599,11 +608,11 @@ def build(spec, reduction=None):
         "prism_usage_policy": {
             "config_id": "prism_usage_policy_v1",
             "note": "Small IMU derived from imu_gt (model-derived), permitted for all sites incl. the "
-                    "excluded wrist/head (A급1 PERMITTED_AS_IMU_GT_ONLY). Pelvis trajectory uses "
+                    "excluded wrist/head (policy item A1 PERMITTED_AS_IMU_GT_ONLY). Pelvis trajectory uses "
                     "imu_gt.Pelvis.pos_world (released stream), consistent with trans-only world "
-                    "(A급2; root_offset not added). Insole contacts normalized to bool (C급8). anthro "
+                    "(policy item A2; root_offset not added). Insole contacts normalized to bool (policy item C8). anthro "
                     "height/body_mass in SOMA spec units (m/kg); PRISM source subj_info units "
-                    "undeclared upstream (C급7); arm_length excluded.",
+                    "undeclared upstream (policy item C7); arm_length excluded.",
         },
         "large_joint_names": JOINT18_NAMES,
         "deliverables": [
@@ -611,19 +620,19 @@ def build(spec, reduction=None):
             "development_reference.npz", "manifest.json", "README.md",
         ],
         "faithful_content": {
-            "small": "8채널 통합 IMU(back_T4·wrist_l/r·shank_l/r·occiput·foot_l/r), 전 채널 orientation+accel+gyro. "
-                     "인솔 2(foot_l/r)는 6축이라 실제로는 중력기준 자세(heading 드리프트); "
-                     "ideal 참조라 orientation은 GT로 채우고 imu_orientation_absolute_heading=False로 표기. "
-                     "shank=PRISM 무릎부 GT(proxy), 손목/머리/발=imu_gt, back_T4=spine3+α proxy.",
-            "large": "골반(root) root_velocity[T,3] + joint_rotation[T,18,4](0=골반 global, 1-17=관절 SMPL local, "
-                     "축소모델: spine3·좌우 어깨는 고정관절 편차 흡수하도록 재적합) + joint_velocity[T,18,3]; "
-                     "절대 위치는 pelvis_position_world_aux(참고). raw SMPL은 smpl_global_orientation_prism_world 보존.",
-            "anthro": "대상자 뼈대 상수(anthro/00_anthropometry.qmd): joint_position[2,22,3](T-pose·직립중립, "
-                      "SMPL rest 회귀) + segment_length[13] + fixed_joint_rotation[4,4](spine1/spine2/collars, "
-                      "모션 전체 위치잔차 최소화 fit; sec-anthro-fit) + sex/height/body_mass(측정) + betas(source_derived). "
-                      "Large 축소모델 모션과 합쳐 SMPL 22-체인 복원(말단 방향 exact). betas는 참조 레이어로 이전.",
-            "development_reference": "PRISM insole GRF/CoP/contacts (measured/source_derived), 별도 namespace. "
-                                     "인솔 전용(betas 등 SMPL 형상은 anthro_reference로 이전됨).",
+            "small": "8-channel unified IMU (back_T4, wrist_l/r, shank_l/r, occiput, foot_l/r), orientation+accel+gyro on every channel. "
+                     "The 2 insoles (foot_l/r) are 6-axis, so in reality a gravity-referenced attitude (heading drift); "
+                     "an ideal reference, so orientation is filled from GT and flagged with imu_orientation_absolute_heading=False. "
+                     "shank = PRISM knee GT (proxy), wrist/head/foot = imu_gt, back_T4 = spine3+α proxy.",
+            "large": "pelvis (root) root_velocity[T,3] + joint_rotation[T,18,4] (0 = pelvis global, 1-17 = joint SMPL local, "
+                     "reduced model: spine3 and both shoulders refitted to absorb the fixed joints' deviation) + joint_velocity[T,18,3]; "
+                     "absolute position in pelvis_position_world_aux (reference). Raw SMPL kept in smpl_global_orientation_prism_world.",
+            "anthro": "Subject skeleton constants (anthro/00_anthropometry.qmd): joint_position[2,22,3] (T-pose, upright neutral, "
+                      "SMPL rest regression) + segment_length[13] + fixed_joint_rotation[4,4] (spine1/spine2/collars, "
+                      "fitted by minimising the position residual over the whole motion; sec-anthro-fit) + sex/height/body_mass (measured) + betas (source_derived). "
+                      "Combined with the Large reduced-model motion it recovers the SMPL 22-chain (distal orientation exact). betas moved to the reference layer.",
+            "development_reference": "PRISM insole GRF/CoP/contacts (measured/source_derived), separate namespace. "
+                                     "Insole only (SMPL shape such as betas moved to anthro_reference).",
         },
         "anthro_reconstruction": {
             **reduced_model.reconstruction_block(
@@ -656,42 +665,42 @@ def write_outputs(out_dir, small, large, dev, anthro, manifest):
 def write_readme(out_dir, run_id):
     readme = f"""# PRISM → Small/Large **FAITHFUL** reference ({run_id})
 
-정식 PRISM experimental pilot 레시피(`prism_experimental_pilot_v1`)를 독립적으로 replicate한
-**물리적으로 충실한 참조 페어**입니다. 여전히 `experimental_non_candidate` · 계약 비준수 · 품질게이트 미평가 ·
-`INTERNAL-ONLY`. 학습/평가 입력 금지.
+A **physically faithful reference pair**, an independent replica of the sanctioned PRISM experimental
+pilot recipe (`prism_experimental_pilot_v1`). Still `experimental_non_candidate` · not contract-compliant ·
+not quality-gate evaluated · `INTERNAL-ONLY`. Not for training or evaluation input.
 
-외국인 연구자용 상세 영문 설명서는 동봉 `DATA_DESCRIPTION_EN.md`(번들에 별도 유지) 참조.
-필드/shape/규약의 정본은 `manifest.json`이다.
+For the detailed English description, see the enclosed `DATA_DESCRIPTION_EN.md` (kept separately in the bundle).
+`manifest.json` is authoritative for fields, shapes and conventions.
 
-## 파일
-- `small_reference.npz` — 8채널 통합 IMU `sensor_codes`(back_T4·wrist_l/r·shank_l/r·occiput·foot_l/r):
-  `imu_orientation[T,8,4]`(전 채널) · `imu_acceleration[T,8,3]` specific force ·
+## Files
+- `small_reference.npz` — 8-channel unified IMU `sensor_codes` (back_T4, wrist_l/r, shank_l/r, occiput, foot_l/r):
+  `imu_orientation[T,8,4]` (every channel) · `imu_acceleration[T,8,3]` specific force ·
   `imu_angular_velocity[T,8,3]` deg/s · `imu_valid_mask` · `imu_confidence` · `imu_orientation_absolute_heading`[8].
-  인솔(foot_l/r)도 orientation 제공 — 6축이라 중력기준 자세(heading 드리프트), ideal 참조라 GT로 채움.
-- `large_reference.npz` — `joint_names`(18) + `root_velocity[T,3]`(골반 속도 m/s) + `joint_rotation[T,18,4]`
-  (`[:,0]`=골반 global, `[:,1:]`=17관절 SMPL local) + `joint_velocity[T,18,3]`(deg/s) +
-  `pelvis_position_world_aux[T,3]`(절대위치 참고) + `smpl_global_orientation_prism_world[T,24,4]`(무손실 보조). ISB JCS 각 아님.
-  - 궤적 복원: `pos[t] = pelvis_position_world_aux[0] + dt·cumsum(root_velocity)[t]`.
-- `anthro_reference.npz` — 대상자 뼈대 상수(시행·프레임 무관): `joint_position[2,22,3]`(T-pose·직립중립, root 기준) +
-  `segment_length[13]` + `fixed_joint_rotation[2,4,4]`(spine1·spine2·좌우 collar, take 평균) +
-  `sex`·`height`·`body_mass`(측정) + `betas`(SMPL 형상, source_derived). **Large 모션 + Anthro → SMPL 22-체인 복원.**
-- `development_reference.npz` — PRISM insole GRF(source-native 단위)/CoP(world m)/contact (measured/source_derived; 인솔 전용, synthetic과 분리)
-- `manifest.json` — provenance, validation(재구성 잔차 포함), 미적용 단계
+  The insoles (foot_l/r) also give orientation — 6-axis, so a gravity-referenced attitude (heading drift); filled from GT as an ideal reference.
+- `large_reference.npz` — `joint_names` (18) + `root_velocity[T,3]` (pelvis velocity m/s) + `joint_rotation[T,18,4]`
+  (`[:,0]` = pelvis global, `[:,1:]` = 17-joint SMPL local) + `joint_velocity[T,18,3]` (deg/s) +
+  `pelvis_position_world_aux[T,3]` (absolute position, reference) + `smpl_global_orientation_prism_world[T,24,4]` (lossless auxiliary). Not ISB JCS angles.
+  - Trajectory recovery: `pos[t] = pelvis_position_world_aux[0] + dt·cumsum(root_velocity)[t]`.
+- `anthro_reference.npz` — subject skeleton constants (independent of trial and frame): `joint_position[2,22,3]` (T-pose, upright neutral, root-relative) +
+  `segment_length[13]` + `fixed_joint_rotation[2,4,4]` (spine1, spine2, left/right collar, take mean) +
+  `sex`, `height`, `body_mass` (measured) + `betas` (SMPL shape, source_derived). **Large motion + Anthro → SMPL 22-chain recovery.**
+- `development_reference.npz` — PRISM insole GRF (source-native units)/CoP (world m)/contact (measured/source_derived; insole only, kept apart from synthetic)
+- `manifest.json` — provenance, validation (including reconstruction residuals), steps not applied
 
-## 실데이터 유래
-- **source_derived:** 손목/머리/정강이 IMU(PRISM imu_gt), 인솔 IMU(발 GT), 골반 궤적, SMPL FK 17관절 회전, SMPL betas(형상).
-- **derived:** anthro 뼈대(SMPL rest-pose J 회귀), fixed_joint_rotation(take 평균).
-- **measured:** insole 수직력(development_reference), 신장·체중·성별(subj_info).
-- **proxy:** back_T4(spine3 방향 + pelvis→head α=2/3 축위치), shank(무릎부 GT → 정강이 상부 proxy).
-- **복원 주의:** 고정 4관절을 take 평균으로 얼리면 손목 재구성 잔차 ~0.1m(identity로 얼리면 ~0.3m).
-  프레임별 변동·무손실 원본은 `large.smpl_global_orientation_prism_world`와 raw SMPL 참조 레이어에 보존.
-- **unavailable(생성 안 함):** ISB JCS 각도, canonical `grf`/`cop`, `joint_torques`,
-  physics 모멘트/파워/COM, mount extrinsic(분절→센서 lever arm), 품질게이트.
+## From real data
+- **source_derived:** wrist/head/shin IMU (PRISM imu_gt), insole IMU (foot GT), pelvis trajectory, SMPL FK 17-joint rotations, SMPL betas (shape).
+- **derived:** anthro skeleton (SMPL rest-pose J regression), fixed_joint_rotation (take mean).
+- **measured:** insole vertical force (development_reference), height, weight, sex (subj_info).
+- **proxy:** back_T4 (spine3 orientation + pelvis→head α=2/3 axial position), shank (knee GT → upper-shin proxy).
+- **Recovery caveat:** freezing the 4 fixed joints at the take mean gives a wrist reconstruction residual of ~0.1 m (~0.3 m when frozen at identity).
+  Per-frame variation and the lossless original are kept in `large.smpl_global_orientation_prism_world` and the raw SMPL reference layer.
+- **unavailable (not generated):** ISB JCS angles, canonical `grf`/`cop`, `joint_torques`,
+  physics moments/powers/COM, mount extrinsics (segment→sensor lever arm), quality gates.
 
-## 규약
-프레임 PRISM world(Z-up 우수) = 갱신 spec `G`(Z-up·PRISM world 정렬), 쿼터니언 `(w,x,y,z)`, 중력 `g=[0,0,-9.80665]`,
-specific force `f=Rᵀ(a_world−g)`, 각속도 rotation-log deg/s. 방향 프레임은 PRISM GT 분절 프레임이며
-`00_sensors.qmd`의 물리 센서 축 정렬(mount extrinsic)은 미적용(목표 규약).
+## Conventions
+Frame PRISM world (Z-up, right-handed) = the updated spec `G` (Z-up, aligned with PRISM world), quaternion `(w,x,y,z)`, gravity `g=[0,0,-9.80665]`,
+specific force `f=Rᵀ(a_world−g)`, angular velocity rotation-log deg/s. The orientation frame is the PRISM GT segment frame;
+the physical sensor axis alignment (mount extrinsics) of `00_sensors.qmd` is not applied (target convention).
 """
     with open(os.path.join(out_dir, "README.md"), "w", encoding="utf-8") as fh:
         fh.write(readme)

@@ -120,15 +120,15 @@ PROTECTED_DATA_FILES = ("README.md", "MASTER.md", "state/local_archive_inventory
 #: A path component that marks a cloud-synchronised folder. Output there draws a warning
 #: (:func:`warn_if_synced`): the sync client can rewrite files underneath a running generator and
 #: copies internal-only data off the PC.
-#: Dropbox, OneDrive, Google Drive (the desktop client's top-level folders in English and Korean:
-#: "My Drive" / "내 드라이브", "Shared drives" / "공유 드라이브", "Other computers" /
-#: "다른 컴퓨터", and the older "Google Drive" folder), Synology Drive ("SynologyDrive") and
+#: Dropbox, OneDrive, Google Drive (the desktop client's top-level folders "My Drive", "Shared
+#: drives" and "Other computers", under their English and their Korean names, and the older
+#: "Google Drive" folder), Synology Drive ("SynologyDrive") and
 #: iCloud Drive (Windows: ``iCloudDrive``; macOS: ``com~apple~CloudDocs``). These are the folder
 #: names the clients create on Windows, macOS and Linux alike (``~/Dropbox``, ``~/OneDrive*``,
 #: ``~/Google Drive``, ``/Volumes/GoogleDrive*``), so they are matched on every platform.
 _SYNCED_FOLDER_EXACT = ("dropbox", "my drive", "shared drives", "other computers",
-                        "내 드라이브", "공유 드라이브", "다른 컴퓨터", "iclouddrive",
-                        "com~apple~clouddocs")
+                        "내 드라이브", "공유 드라이브", "다른 컴퓨터",  # Korean folder names Drive creates; matched literally
+                        "iclouddrive", "com~apple~clouddocs")
 _SYNCED_FOLDER_PREFIXES = ("dropbox (", "onedrive", "google drive", "googledrive", "synologydrive",
                            "synology drive")
 #: POSIX only: two consecutive components that mark a synchronised tree on macOS, whose File

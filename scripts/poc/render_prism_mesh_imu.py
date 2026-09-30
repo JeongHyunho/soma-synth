@@ -1,17 +1,21 @@
-"""PRISM SMPL-X 바디 메시 + 8개 IMU 부위의 CV-표준 RGB 좌표축(피부 표면 부착) 렌더.
+"""Render the PRISM SMPL-X body mesh + CV-standard RGB coordinate axes of the 8 IMU sites
+(attached to the skin surface).
 
-따로 배포되는 render_amass.py 발표 패키지(애드온·접지보정·룩·카메라)를 재사용한다(필수) +
-- IMU 위치: 프레임마다 «메시 표면»에 투영(사지·머리=최근접 표면점, 가슴=전방 레이캐스트) 후
-  표면 법선으로 살짝 띄워 배치 → 몸속에 박히지 않고 피부 위에 놓인다.
-- 축: computer-vision 표준 좌표프레임(OpenCV/Open3D/ROS 류) — 순수 R/G/B, shaft(원기둥)+화살촉(원뿔).
-  방향은 해당 IMU 부위 SMPL-X 분절(본) 프레임.  X=red · Y=green · Z=blue.
+Reuses the separately distributed render_amass.py presentation package (add-on, ground
+correction, look, camera; required) +
+- IMU position: projected onto the «mesh surface» each frame (limbs and head = nearest surface
+  point, chest = forward ray cast), then lifted slightly along the surface normal → it sits on the
+  skin instead of inside the body.
+- Axes: the computer-vision standard coordinate frame (OpenCV/Open3D/ROS style) — pure R/G/B,
+  shaft (cylinder) + arrowhead (cone). Oriented by the frame of the IMU site's SMPL-X segment
+  (bone).  X=red · Y=green · Z=blue.
 
   blender -b --python render_prism_mesh_imu.py -- --anim <npz> --out <dir> --range 1:333:1
 
 INTERNAL-ONLY.
 """
 import argparse, os, sys
-import numpy as np                 # 표준 위치: sys.path 조작과 무관하다
+import numpy as np                 # standard location: independent of the sys.path edits
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
@@ -24,28 +28,28 @@ import addon_utils
 from mathutils import Vector, Matrix
 import render_amass as ra
 
-# IMU site -> (mount, 방향본, 표면투영, 축프레임)   (00_sensors.qmd 스펙 반영)
-#   mount = ("bone", 본) / ("along", 원위본, 근위본, frac)
-#   frame(스펙 축규약): ("limb", "L"/"R")=+Y근위·+Z바깥측방·+X=YxZ / "trunk"·"head"=+Y상방·+Z우측·+X전방 / "foot"
+# IMU site -> (mount, orienting bone, surface projection, axis frame)   (per the 00_sensors.qmd spec)
+#   mount = ("bone", bone) / ("along", distal bone, proximal bone, frac)
+#   frame (spec axis convention): ("limb", "L"/"R")=+Y proximal, +Z lateral, +X=YxZ / "trunk", "head"=+Y up, +Z right, +X forward / "foot"
 IMU_SITES = [
-    ("back_T4", ("along", "spine3", "neck", 0.20), "spine3", "backward", "trunk"),  # 등 상부흉추(T4)
-    ("occiput", ("bone", "head"), "head", "backward", "head"),                       # 후두부
+    ("back_T4", ("along", "spine3", "neck", 0.20), "spine3", "backward", "trunk"),  # upper thoracic back (T4)
+    ("occiput", ("bone", "head"), "head", "backward", "head"),                       # back of the head
     ("wrist_l", ("along", "left_wrist", "left_elbow", 0.16), "left_elbow", "lateral_L", ("limb", "L")),
     ("wrist_r", ("along", "right_wrist", "right_elbow", 0.16), "right_elbow", "lateral_R", ("limb", "R")),
-    ("shank_l", ("along", "left_ankle", "left_knee", 0.72), "left_knee", "forward", ("limb", "L")),   # 정강이 상부 전면
+    ("shank_l", ("along", "left_ankle", "left_knee", 0.72), "left_knee", "forward", ("limb", "L")),   # front of the upper shin
     ("shank_r", ("along", "right_ankle", "right_knee", 0.72), "right_knee", "forward", ("limb", "R")),
-    ("foot_l",  ("along", "left_foot", "left_ankle", 0.5), "left_foot", "down", ("foot", "L")),   # FSR 인솔 IMU(족저 중앙)
+    ("foot_l",  ("along", "left_foot", "left_ankle", 0.5), "left_foot", "down", ("foot", "L")),   # FSR insole IMU (middle of the sole)
     ("foot_r",  ("along", "right_foot", "right_ankle", 0.5), "right_foot", "down", ("foot", "R")),
 ]
 
-# CV 표준: X=red, Y=green, Z=blue (순수·발광)
+# CV standard: X=red, Y=green, Z=blue (pure, emissive)
 AXES = [("x", (1, 0, 0), (0.90, 0.03, 0.03)),
         ("y", (0, 1, 0), (0.05, 0.75, 0.05)),
         ("z", (0, 0, 1), (0.05, 0.20, 0.95))]
 SHAFT_LEN, SHAFT_R = 0.090, 0.0060
 HEAD_LEN, HEAD_R = 0.034, 0.0135
-SURFACE_LIFT = 0.020        # 피부 위로 띄우는 거리(m)
-REF_FRAME = 100             # 강체 부착점을 계산할 기준(중립에 가까운) 프레임
+SURFACE_LIFT = 0.020        # distance lifted above the skin (m)
+REF_FRAME = 100             # reference (near-neutral) frame for computing the rigid attachment points
 Z = Vector((0, 0, 1))
 
 
@@ -74,7 +78,7 @@ def emissive(name, rgb):
 
 
 def make_arrow(pivot, site, ax, edir, rgb):
-    """shaft(원기둥)+head(원뿔) 화살표를 pivot 로컬 +edir 방향으로."""
+    """A shaft (cylinder) + head (cone) arrow along the pivot's local +edir."""
     mat = emissive(f"m_{site}_{ax}", rgb)
     q = Z.rotation_difference(Vector(edir))
     # shaft
@@ -107,8 +111,8 @@ def build_frame(scene, site):
 
 
 def site_direction(proj, fwd, med):
-    """부착 방향(world). med=몸 오른쪽축(L->R hip), fwd=전방(anterior).
-    forward=앞, backward=뒤(등/후두부), 가쪽: 왼쪽 사지=-med, 오른쪽 사지=+med."""
+    """Attachment direction (world). med = the body's rightward axis (L->R hip), fwd = anterior.
+    forward = front, backward = back (back, occiput), lateral: left limb = -med, right limb = +med."""
     if proj == "forward":
         return fwd
     if proj == "backward":
@@ -118,20 +122,20 @@ def site_direction(proj, fwd, med):
     if proj == "lateral_R":
         return med
     if proj == "down":
-        return Vector((0, 0, -1))   # 족저(인솔) 하방
+        return Vector((0, 0, -1))   # down from the sole (insole)
     return fwd
 
 
 def sensor_frame_quat(frame, mount, armature, bones, med):
-    """00_sensors.qmd 축규약 sensor->world 쿼터니언.
-    limb: +Y=근위(무릎/팔꿈치), +Z=바깥측방(우=+med,좌=-med), +X=YxZ(우=전방/좌=후방).
-    trunk/head/foot: +Y=상방, +Z=대상자 우측(med), +X=전방."""
+    """sensor->world quaternion by the 00_sensors.qmd axis convention.
+    limb: +Y = proximal (knee/elbow), +Z = lateral (right = +med, left = -med), +X = YxZ (right = forward, left = backward).
+    trunk/head/foot: +Y = up, +Z = the subject's right (med), +X = forward."""
     up = Vector((0, 0, 1))
     if isinstance(frame, tuple) and frame[0] == "limb":
-        Yax = _head(armature, bones, mount[2]) - _head(armature, bones, mount[1])  # 근위방향
+        Yax = _head(armature, bones, mount[2]) - _head(armature, bones, mount[1])  # proximal direction
         Zax = med if frame[1] == "R" else -med
     elif isinstance(frame, tuple) and frame[0] == "foot":
-        # 발도 side-aware: +Z=바깥측방(우=+med, 좌=-med) → 좌발 +X=후방 (00_sensors.qmd)
+        # feet are side-aware too: +Z = lateral (right = +med, left = -med) → left foot +X = backward (00_sensors.qmd)
         Yax = up
         Zax = med if frame[1] == "R" else -med
     else:
@@ -139,12 +143,12 @@ def sensor_frame_quat(frame, mount, armature, bones, med):
         Zax = med
     Yax = Yax.normalized()
     Xax = Yax.cross(Zax); Xax.normalize()
-    Zax = Xax.cross(Yax); Zax.normalize()          # 직교 정규화(우수 좌표계)
-    return Matrix((Xax, Yax, Zax)).transposed().to_quaternion()   # 열 = X,Y,Z
+    Zax = Xax.cross(Yax); Zax.normalize()          # orthonormalise (right-handed)
+    return Matrix((Xax, Yax, Zax)).transposed().to_quaternion()   # columns = X,Y,Z
 
 
 def surface_origin(ev_mesh, Mw, Mw_inv, world_pos, world_dir):
-    """world_dir 로 표면 레이캐스트(관절중심에서 바깥으로) -> 표면점+법선. 실패 시 최근접점."""
+    """Ray cast to the surface along world_dir (outward from the joint centre) -> surface point + normal. The nearest point on failure."""
     o = Mw_inv @ world_pos
     d = (Mw_inv.to_3x3() @ world_dir).normalized()
     ok, loc, nrm, _ = ev_mesh.ray_cast(o, d)
@@ -160,10 +164,10 @@ def _head(armature, bones, name):
 
 
 def mount_position(armature, bones, mount):
-    """스트랩 부착 지점(분절 위 원위부) world 좌표."""
+    """World position of the strap attachment point (distal part of the segment)."""
     if mount[0] == "bone":
         return _head(armature, bones, mount[1])
-    _, distal, proximal, frac = mount           # 원위관절에서 근위쪽으로 frac
+    _, distal, proximal, frac = mount           # frac from the distal joint towards the proximal one
     d = _head(armature, bones, distal)
     p = _head(armature, bones, proximal)
     return d + frac * (p - d)
@@ -180,11 +184,11 @@ def add_imu_axes(armature, mesh, scene):
             raise SystemExit(f"[imu] bone missing: {bn} | have {sorted(b.name for b in bones)}")
     pivots = {s: build_frame(scene, s) for s, *_ in IMU_SITES}
 
-    # (1) 기준 프레임에서 부착점(본-로컬) + 스펙 축(본-로컬 회전)을 계산 — 강체 스트랩
+    # (1) at the reference frame, compute the attachment point (bone-local) + spec axes (bone-local rotation) — a rigid strap
     ref = max(scene.frame_start, min(REF_FRAME, scene.frame_end))
     scene.frame_set(ref)
-    _, med, _ = ra.body_frame(armature, scene, ref)        # med=몸 오른쪽축(엉덩이 너비, 안정적)
-    fwd = Vector((0, 0, 1)).cross(med)                     # 골반 기준 안정 전방
+    _, med, _ = ra.body_frame(armature, scene, ref)        # med = the body's rightward axis (hip width, stable)
+    fwd = Vector((0, 0, 1)).cross(med)                     # stable forward from the pelvis
     fwd = fwd.normalized() if fwd.length > 1e-6 else Vector((0, 1, 0))
     ev = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
     Mw = mesh.matrix_world; Mw_inv = Mw.inverted()
@@ -194,23 +198,24 @@ def add_imu_axes(armature, mesh, scene):
         surf, nrm = surface_origin(ev, Mw, Mw_inv, Pw, site_direction(proj, fwd, med))
         origin = surf + nrm * SURFACE_LIFT
         Obw = armature.matrix_world @ bones[ob].matrix
-        q_spec = sensor_frame_quat(frame, mount, armature, bones, med)     # 스펙 축(sensor->world)
-        q_local = Obw.to_quaternion().inverted() @ q_spec                  # 본->센서 (강체 고정)
+        q_spec = sensor_frame_quat(frame, mount, armature, bones, med)     # spec axes (sensor->world)
+        q_local = Obw.to_quaternion().inverted() @ q_spec                  # bone->sensor (rigidly fixed)
         rig[site] = (Obw.inverted() @ origin, q_local, ob)
 
-    # (2) 매 프레임 «본 강체»로 배치·회전 (분절과 함께, 미끄러짐 없음).
-    # 프레임마다 keyframe_insert 를 부르면 fcurve 에 정렬 삽입이 반복돼 프레임 수에 초선형이 된다.
-    # smpl_rig 와 같은 방식으로, 먼저 샘플만 모은 뒤
-    # 프레임 1에서 한 번만 바인딩하고 나머지는 foreach_set 으로 벌크 채운다.
+    # (2) place and rotate each frame «rigidly with the bone» (moving with the segment, no sliding).
+    # Calling keyframe_insert every frame repeats a sorted insert into the fcurve, superlinear in
+    # the number of frames. As in smpl_rig, the samples are collected first, bound once at frame 1,
+    # and the rest filled in bulk with foreach_set.
     frames = list(ra.frames_of(scene))
     T = len(frames)
     sites = [s for s, *_ in IMU_SITES]
     loc = np.empty((T, len(sites), 3), np.float64)
     quat = np.empty((T, len(sites), 4), np.float64)
-    # 이 루프는 «본 행렬»만 필요한데 frame_set 은 depsgraph 전체를 다시 평가한다 — 6890 정점 메시의
-    # armature deform 까지. 표면 계산(surface_origin)은 위 기준 프레임에서 이미 끝났으므로, 루프
-    # 동안 메시를 숨기면 그만큼이 빠진다(루프 시간이 약 절반으로 준다). 본 행렬은
-    # 비트 단위로 동일(checksum 일치)이라 결과는 바뀌지 않는다.
+    # This loop needs only the «bone matrices», but frame_set re-evaluates the whole depsgraph —
+    # including the armature deform of the 6890-vertex mesh. The surface computation
+    # (surface_origin) is already done at the reference frame above, so hiding the mesh during the
+    # loop removes that work (the loop takes about half the time). The bone matrices are
+    # bit-identical (matching checksum), so the result does not change.
     was_hidden = mesh.hide_viewport
     mesh.hide_viewport = True
     try:
@@ -225,7 +230,7 @@ def add_imu_axes(armature, mesh, scene):
     finally:
         mesh.hide_viewport = was_hidden
 
-    # q 와 -q 는 같은 회전이지만 부호가 튀면 키프레임 사이를 먼 길로 보간한다 — 부호를 이어 붙인다.
+    # q and -q are the same rotation, but a sign flip interpolates the long way between keyframes — keep the sign continuous.
     for i in range(1, T):
         d = np.einsum("kj,kj->k", quat[i], quat[i - 1])
         quat[i][d < 0] *= -1.0
@@ -236,14 +241,14 @@ def add_imu_axes(armature, mesh, scene):
         p = pivots[site]
         p.rotation_mode = "QUATERNION"
         p.location = tuple(loc[0, k])
-        p.keyframe_insert("location", frame=frames[0])            # 프레임 1이 fcurve 를 만든다
+        p.keyframe_insert("location", frame=frames[0])            # frame 1 creates the fcurve
         p.rotation_quaternion = tuple(quat[0, k])
         p.keyframe_insert("rotation_quaternion", frame=frames[0])
         fcs = {(fc.data_path, fc.array_index): fc for fc in p.animation_data.action.fcurves}
         for path, arr, n in (("location", loc, 3), ("rotation_quaternion", quat, 4)):
             for ai in range(n):
                 fc = fcs[(path, ai)]
-                fc.keyframe_points.add(T - 1)                     # 프레임 1은 이미 들어가 있다
+                fc.keyframe_points.add(T - 1)                     # frame 1 is already there
                 co = np.empty(T * 2)
                 co[0::2] = fnum
                 co[1::2] = arr[:, k, ai]

@@ -368,7 +368,7 @@ class TestCheckOutputDir:
     @pytest.mark.parametrize("folder", ["Dropbox", "dropbox", "Dropbox (Team)", "OneDrive",
                                         "OneDrive - Example", "Google Drive", "GoogleDrive",
                                         "My Drive", "Shared drives", "Other computers",
-                                        "내 드라이브", "공유 드라이브", "다른 컴퓨터",
+                                        "내 드라이브", "공유 드라이브", "다른 컴퓨터",  # Korean Drive folder names under test
                                         "SynologyDrive", "Synology Drive"])
     def test_a_cloud_synchronised_folder_is_warned_about_not_refused(self, data_root, tmp_path,
                                                                      folder, capsys):
@@ -383,8 +383,8 @@ class TestCheckOutputDir:
 
     def test_a_decomposed_korean_folder_name_is_warned_about_too(self, data_root, tmp_path,
                                                                 capsys):
-        decomposed = unicodedata.normalize("NFD", "내 드라이브")
-        assert decomposed != "내 드라이브"
+        decomposed = unicodedata.normalize("NFD", "내 드라이브")  # Korean "My Drive", decomposed below
+        assert decomposed != "내 드라이브"  # Korean "My Drive": NFD must differ from the composed form
         target = tmp_path / decomposed / "bundle"
         assert paths.check_output_dir(target) == target
         assert "cloud-synchronised" in capsys.readouterr().err
@@ -448,7 +448,7 @@ class TestSyncedLocationsOnEveryPlatform:
         "/Users/kim/OneDrive - Example University/soma",
         "/home/kim/OneDrive/soma",
         "/Users/kim/Library/CloudStorage/GoogleDrive-kim@example.org/My Drive/soma",
-        "/Users/kim/Library/CloudStorage/GoogleDrive-kim@example.org/내 드라이브/soma",
+        "/Users/kim/Library/CloudStorage/GoogleDrive-kim@example.org/내 드라이브/soma",  # Korean "My Drive"
         "/Users/kim/Library/CloudStorage/OneDrive-Personal/soma",
         "/Users/kim/Library/CloudStorage/Box-Box/soma",
         "/Users/kim/Library/CloudStorage/Dropbox/soma",
@@ -457,7 +457,7 @@ class TestSyncedLocationsOnEveryPlatform:
         "/Volumes/GoogleDrive/My Drive/soma",
         "/Volumes/GoogleDrive-1234567890/Shared drives/team/soma",
         "/Users/kim/My Drive/soma",
-        "/home/kim/공유 드라이브/soma",
+        "/home/kim/공유 드라이브/soma",                 # Korean "Shared drives"
         "/run/user/1000/gvfs/google-drive:host=example.org,user=kim/soma",
         "/home/kim/SynologyDrive/soma",
     ])
@@ -487,7 +487,7 @@ class TestSyncedLocationsOnEveryPlatform:
 
     def test_windows_paths_keep_their_rules(self):
         assert paths.synced_location(PureWindowsPath(r"C:\Users\kim\Dropbox\soma")) == "Dropbox"
-        assert paths.synced_location(PureWindowsPath(r"X:\내 드라이브\soma")) == "내 드라이브"
+        assert paths.synced_location(PureWindowsPath(r"X:\내 드라이브\soma")) == "내 드라이브"  # Korean "My Drive"
         assert paths.synced_location(PureWindowsPath(r"C:\Users\kim\iCloudDrive\x")) == "iCloudDrive"
         assert paths.synced_location(PureWindowsPath(r"E:\data\runs")) is None
         # the macOS pair and the gvfs mount are POSIX spellings: a Windows folder so named is not
@@ -514,7 +514,7 @@ class TestSyncedLocationsOnEveryPlatform:
         assert paths.on_shared_drive(PurePosixPath(
             "/Users/kim/Library/CloudStorage/GoogleDrive-x/Shared drives/Team_Share/x"))
         assert paths.on_shared_drive(PurePosixPath("/home/kim/team_share/x"))
-        assert paths.on_shared_drive(PureWindowsPath(r"X:\공유 드라이브\LAB DATA"))
+        assert paths.on_shared_drive(PureWindowsPath(r"X:\공유 드라이브\LAB DATA"))  # Korean "Shared drives"
         assert not paths.on_shared_drive(PurePosixPath("/home/kim/team/share"))
         assert not paths.on_shared_drive(PurePosixPath("/home/kim/team_share_old/x"))
 

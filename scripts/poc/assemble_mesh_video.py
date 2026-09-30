@@ -1,7 +1,8 @@
-"""frame_*.png 시퀀스 -> H.264 mp4. imageio_ffmpeg 번들 ffmpeg(libx264) 사용.
+"""frame_*.png sequence -> H.264 mp4, using the ffmpeg (libx264) bundled with imageio_ffmpeg.
 
-cv2 의 avc1(libopenh264) 인코더는 배포 빌드에 따라 없거나 깨져 있어 imageio_ffmpeg 의 ffmpeg
-바이너리를 직접 호출한다(PowerPoint/브라우저 호환 H.264, yuv420p). 흰 배경 자동 크롭 포함.
+cv2's avc1 (libopenh264) encoder is missing or broken depending on the distribution build, so the
+imageio_ffmpeg ffmpeg binary is called directly (H.264 that PowerPoint and browsers play, yuv420p).
+Crops the white background automatically.
 """
 from __future__ import annotations
 import argparse, glob, os, subprocess
@@ -17,7 +18,7 @@ def chroma_bbox(files, pad=0.07):
         im = cv2.imread(f)
         if im is None: continue
         sat = im.max(axis=2).astype(np.int16) - im.min(axis=2).astype(np.int16)
-        mask = (sat > 30) | (im.max(axis=2) < 242)       # 채도(피부·RGB축) | 접지 그림자
+        mask = (sat > 30) | (im.max(axis=2) < 242)       # saturation (skin, RGB axes) | ground shadow
         if not mask.any(): continue
         ys, xs = np.where(mask)
         y0, y1 = min(y0, ys.min()), max(y1, ys.max())

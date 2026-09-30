@@ -283,6 +283,8 @@ def test_a_bundle_without_an_index_cannot_be_confirmed(tmp_path):
 #: A child that prints to both streams, a line that is not ASCII among them, and exits with a code.
 _CHATTY = ("import sys; print('progress: take 1 of 2'); print('\\uac00\\ub098 \\u00e9', flush=True); "
            "print('warning: slow', file=sys.stderr); sys.exit(int(sys.argv[1]))")
+#: The non-ASCII line _CHATTY prints (two Hangul syllables and an accented letter).
+_NON_ASCII = "\uac00\ub098 \u00e9"
 
 
 def _child(code: int = 0, *extra: str) -> list[str]:
@@ -297,11 +299,11 @@ def test_a_logged_command_is_teed_to_the_console_and_its_log(tmp_path, capsys, c
     log = tmp_path / "logs" / "corpus.log"
     assert generate.run_command(_child(code), log_path=log) == code
     shown = capsys.readouterr()
-    assert "progress: take 1 of 2" in shown.out and "가나 é" in shown.out
+    assert "progress: take 1 of 2" in shown.out and _NON_ASCII in shown.out
     assert "warning: slow" in shown.err
     text = log.read_text(encoding="utf-8")
     assert text.startswith(f"$ {sys.executable} -c ")
-    for line in ("progress: take 1 of 2", "가나 é", "warning: slow"):
+    for line in ("progress: take 1 of 2", _NON_ASCII, "warning: slow"):
         assert line in text
     assert text.rstrip().endswith(f"[exit {code}]")
 

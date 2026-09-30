@@ -1,29 +1,31 @@
 """PRISM -> paired Small/Large **PoC DEMO** generator.
 
-목적: PRISM 한 샘플(subj001/take002.pkl)에서 계약(`PAIRED_SMALL_LARGE_DATASET_CONTRACT.md`)
-형식의 Small(6-IMU) / Large(pelvis+15관절) 페어가 "어떻게 생겼는지"를 팀원에게 보여주기
-위한 **구조·포맷 예시**다.
+Purpose: a **structure and format example** that shows teammates "what a pair looks like": a
+Small (6-IMU) / Large (pelvis + 15 joints) pair in the format of the contract
+(`PAIRED_SMALL_LARGE_DATASET_CONTRACT.md`), from one PRISM sample (subj001/take002.pkl).
 
-이것은 무엇이 아닌가 (반드시 읽을 것):
-  * 캐노니컬 데이터셋이 아니다. `experimental_non_candidate`.
-  * 물리적으로 검증된 산출물이 아니다. 프레임 좌표계는 PRISM world 원본이며
-    SOMA_WORLD_FUR 변환/리샘플/SMPL FK/품질 게이트를 적용하지 않았다.
-  * quality-gate PASS가 아니며 학습/평가 입력으로 쓰면 안 된다.
-  * INTERNAL-ONLY. 외부/클라우드/공개 링크 업로드 금지.
+What this is not (read this):
+  * Not a canonical dataset. `experimental_non_candidate`.
+  * Not a physically validated output. The frame is the native PRISM world, and no
+    SOMA_WORLD_FUR conversion, resampling, SMPL FK or quality gate was applied.
+  * Not a quality-gate PASS; must not be used as training or evaluation input.
+  * INTERNAL-ONLY. No upload to external, cloud or public links.
 
-설계 원칙:
-  * PRISM이 직접 주는 배열은 실데이터로 채우고 provenance를 `source_derived`/`measured`로 기록.
-  * 데모에서 유도한 값(specific force, angular velocity, chest proxy)은 `estimated`/`proxy`.
-  * 데모가 만들지 않는 필드(대부분의 관절 회전/모멘트/파워/각운동량 등)는 0으로 채우지 않고
-    NaN + valid_mask=false + provenance=`unavailable`.
-  * 외부 pickle은 numpy 화이트리스트 제한 unpickler로만 읽는다(임의코드 실행 차단).
+Design principles:
+  * Arrays PRISM gives directly are filled with real data and their provenance recorded as
+    `source_derived`/`measured`.
+  * Values derived in the demo (specific force, angular velocity, chest proxy) are `estimated`/`proxy`.
+  * Fields the demo does not make (most joint rotations, moments, powers, angular momentum and so
+    on) are not filled with 0 but with NaN + valid_mask=false + provenance=`unavailable`.
+  * External pickles are read only with an unpickler restricted to a numpy whitelist (no
+    arbitrary code execution).
 
-입력: ${SOMA_SOURCE_ROOT}/prism/subj001/take002.pkl (기본 ${SOMA_DATA_ROOT}/extracted/prism/...)
-출력: ${SOMA_DATA_ROOT}/runs/experimental_generation_poc_demo/<run_id>/
-둘 다 __main__에서 `soma_synth.pipeline.paths`로 정하므로, import만으로는 환경을 읽지 않는다.
+Input: ${SOMA_SOURCE_ROOT}/prism/subj001/take002.pkl (default ${SOMA_DATA_ROOT}/extracted/prism/...)
+Output: ${SOMA_DATA_ROOT}/runs/experimental_generation_poc_demo/<run_id>/
+Both are resolved in __main__ with `soma_synth.pipeline.paths`, so importing reads no environment.
 
-은퇴한 데모다: 저장소 안에서 이 스크립트를 부르는 곳이 없다. 생성은 hold 아래 있으므로 승인 없이
-실행하지 않는다.
+A retired demo: nothing in the repository calls this script. Generation is under hold, so it is not
+run without approval.
 """
 from __future__ import annotations
 
@@ -53,19 +55,19 @@ PRISM_ARCHIVE_SHA256 = "565082abbbce8df2459dffd711d58ea889c84270e90f77b75a2a552f
 
 RUN_ID = "prism-subj001-take002-poc-demo-v1"
 
-WINDOW_START = 1000          # 파일럿 설계와 동일한 창 [1000, 2000)
+WINDOW_START = 1000          # the same window as the pilot design [1000, 2000)
 T = 1000                     # 10 s @ 100 Hz
 TARGET_RATE_HZ = 100
 
-# 데모 전용 계약/버전 식별자 — 실제 v3 페어로 오인되지 않도록 일부러 분리.
+# Demo-only contract/version identifiers — kept apart on purpose so they are not mistaken for a real v3 pair.
 CONTRACT_ID = "soma_paired_small_large_v3_POC_DEMO"
 CONTRACT_VERSION = "0.0.0-poc-demo"
 
 # 4.1 canonical sensor registry (Small)
 SENSOR_CODES = ["chest", "wrist_l", "wrist_r", "foot_l", "foot_r", "head"]
-# PRISM `imu` dict 키로의 매핑. chest는 PRISM에 없으므로 Pelvis를 proxy로 사용.
+# Mapping to the keys of PRISM's `imu` dict. PRISM has no chest, so Pelvis is used as a proxy.
 SENSOR_SOURCE = {
-    "chest":   ("Pelvis",  "proxy"),        # PRISM 미제공 → Pelvis 대체(근사)
+    "chest":   ("Pelvis",  "proxy"),        # not provided by PRISM → Pelvis instead (approximation)
     "wrist_l": ("L_Wrist", "source_derived"),
     "wrist_r": ("R_Wrist", "source_derived"),
     "foot_l":  ("L_Foot",  "source_derived"),
@@ -79,25 +81,25 @@ JOINT_CODES = [
     "hip_l", "hip_r", "shoulder_l", "shoulder_r", "elbow_l", "elbow_r",
     "wrist_l", "wrist_r", "neck",
 ]
-# PRISM imu_gt 가 직접 위치를 주는 관절만 채운다. 나머지는 unavailable(NaN+mask=false).
+# Only the joints whose position PRISM imu_gt gives directly are filled. The rest are unavailable (NaN+mask=false).
 JOINT_GT_SOURCE = {
-    "ankle_l": ("L_Foot",  "proxy"),         # foot 마커 ~ 발목 근사
+    "ankle_l": ("L_Foot",  "proxy"),         # foot marker ~ ankle, approximately
     "ankle_r": ("R_Foot",  "proxy"),
     "knee_l":  ("L_Knee",  "source_derived"),
     "knee_r":  ("R_Knee",  "source_derived"),
     "wrist_l": ("L_Wrist", "source_derived"),
     "wrist_r": ("R_Wrist", "source_derived"),
-    "neck":    ("Head",    "proxy"),          # head 마커 ~ 목 근사
+    "neck":    ("Head",    "proxy"),          # head marker ~ neck, approximately
 }
 
-GRAVITY = 9.81  # m/s^2, PRISM world +Y-up 가정 하의 데모 값
+GRAVITY = 9.81  # m/s^2, a demo value assuming PRISM world is +Y-up
 
 
 # --------------------------------------------------------------------------
-# 1. 안전한 PRISM pickle 로딩 (numpy 전용 화이트리스트)
+# 1. Safe PRISM pickle loading (numpy-only whitelist)
 # --------------------------------------------------------------------------
 class _NumpyOnlyUnpickler(pickle.Unpickler):
-    """numpy 배열 재구성만 허용하고 그 외 모든 전역은 차단한다."""
+    """Allows only numpy array reconstruction and blocks every other global."""
 
     _ALLOWED = {"_reconstruct", "scalar", "ndarray", "dtype"}
 
@@ -113,15 +115,15 @@ def load_prism_safe(path: str) -> dict:
 
 
 # --------------------------------------------------------------------------
-# 2. 수학 헬퍼 (표준 공식; 데모 정확도)
+# 2. Math helpers (standard formulas; demo accuracy)
 # --------------------------------------------------------------------------
 def rotmat_to_quat_wxyz(R: np.ndarray) -> np.ndarray:
-    """[N,3,3] 회전행렬 -> [N,4] quaternion (w,x,y,z), 시간축 부호 연속성 강제."""
+    """[N,3,3] rotation matrices -> [N,4] quaternion (w,x,y,z), with sign continuity enforced over time."""
     R = np.asarray(R, dtype=np.float64)
     m00, m11, m22 = R[:, 0, 0], R[:, 1, 1], R[:, 2, 2]
     tr = m00 + m11 + m22
     q = np.zeros((R.shape[0], 4), dtype=np.float64)
-    # 안정적 분기 (trace 기반 + 대각 최대 성분 기반)
+    # stable branches (trace-based + largest-diagonal-based)
     for i in range(R.shape[0]):
         Ri = R[i]
         t = tr[i]
@@ -160,9 +162,9 @@ def rotmat_to_quat_wxyz(R: np.ndarray) -> np.ndarray:
 
 
 def angular_velocity_deg_s(R: np.ndarray, dt: float) -> np.ndarray:
-    """[N,3,3] world 회전행렬 시퀀스 -> body-frame 각속도 [N,3] (deg/s).
+    """[N,3,3] sequence of world rotation matrices -> body-frame angular velocity [N,3] (deg/s).
 
-    omega_body_hat = R^T dR/dt ; 중앙차분(경계는 전/후진차분).
+    omega_body_hat = R^T dR/dt ; central differences (forward/backward at the ends).
     """
     R = np.asarray(R, dtype=np.float64)
     N = R.shape[0]
@@ -179,7 +181,7 @@ def angular_velocity_deg_s(R: np.ndarray, dt: float) -> np.ndarray:
 
 
 def specific_force(acc_world: np.ndarray, R_world_from_sensor: np.ndarray) -> np.ndarray:
-    """f_sensor = R^T (a_world - g_world). PRISM world +Y-up 가정. m/s^2 (deg 아님)."""
+    """f_sensor = R^T (a_world - g_world). Assumes PRISM world is +Y-up. m/s^2 (not deg)."""
     # accelerometer specific force = R^T (a_world - g_world), g_world = (0,-9.81,0)
     g_world = np.array([0.0, -GRAVITY, 0.0])
     a = np.asarray(acc_world, dtype=np.float64) - g_world
@@ -188,7 +190,7 @@ def specific_force(acc_world: np.ndarray, R_world_from_sensor: np.ndarray) -> np
 
 
 def canonical_json_bytes(obj) -> bytes:
-    """RFC8785 근사: 정렬키, 공백없음, UTF-8, no BOM, no trailing newline, NaN 금지."""
+    """Approximates RFC8785: sorted keys, no whitespace, UTF-8, no BOM, no trailing newline, no NaN."""
     return json.dumps(obj, sort_keys=True, separators=(",", ":"),
                       ensure_ascii=False, allow_nan=False).encode("utf-8")
 
@@ -203,7 +205,7 @@ def f64_be_hex(x: float) -> str:
 
 
 # --------------------------------------------------------------------------
-# 3. 생성
+# 3. Generation
 # --------------------------------------------------------------------------
 def sl(a):
     """window slice + float32 view helper."""
@@ -220,23 +222,23 @@ def build(source_pkl: str):
     imu_gt = raw["imu_gt"]
     insole = raw["insole"]
 
-    # ---- 시간축 ----
+    # ---- time axis ----
     timestamps_s = (np.arange(T, dtype=np.float64) * dt)     # window-relative, exact 100 Hz
     source_interval_s = [WINDOW_START / fps, (WINDOW_START + T) / fps]
     ts_bytes = np.ascontiguousarray(timestamps_s, dtype="<f8").tobytes()
     timestamps_sha256 = sha256_hex(ts_bytes)
 
-    # ---- canonicalization config (데모) + hash ----
+    # ---- canonicalization config (demo) + hash ----
     canon_cfg = {
         "kind": "poc_demo_canonicalization",
         "window_start": WINDOW_START, "frame_count": T, "target_rate_hz": TARGET_RATE_HZ,
-        "frame_convention": "prism_world_native",  # SOMA_WORLD_FUR 변환 미적용
+        "frame_convention": "prism_world_native",  # SOMA_WORLD_FUR conversion not applied
         "gravity_m_s2": GRAVITY,
         "notes": "no resample, no SMPL FK, no JCS, no quality gate",
     }
     canon_cfg_sha256 = sha256_hex(canonical_json_bytes(canon_cfg))
 
-    # ---- pair_id (계약 3.1 순서를 데모 범위에서 근사) ----
+    # ---- pair_id (approximates the order of contract 3.1 within the demo's scope) ----
     subject_id = "prism_subj001"
     trial_id = "take002"
     preimage = [
@@ -270,7 +272,7 @@ def build(source_pkl: str):
         imu_acceleration[:, j, :] = specific_force(acc_world, R).astype(np.float32)
         imu_angular_velocity[:, j, :] = angular_velocity_deg_s(R, dt).astype(np.float32)
         imu_valid_mask[:, j] = True
-        # 데모 confidence: 실측 유래는 0.6, proxy는 0.3 (임의, 설명용)
+        # demo confidence: 0.6 for measured-derived, 0.3 for proxy (arbitrary, illustrative)
         imu_confidence[:, j] = 0.3 if prov == "proxy" else 0.6
 
     small = {
@@ -304,7 +306,7 @@ def build(source_pkl: str):
             joint_valid_mask[:, j] = True
             joint_provenance[j] = prov
 
-    # 데모가 만들지 않는 회전/각도/모멘트/파워 계열 → NaN + mask=false + unavailable
+    # rotations/angles/moments/powers the demo does not make → NaN + mask=false + unavailable
     joint_rotations = np.full((T, 15, 4), NaN, dtype=np.float32)
     joint_angles_jcs_deg = np.full((T, 15, 3), NaN, dtype=np.float32)
     joint_angular_velocity_jcs_deg_s = np.full((T, 15, 3), NaN, dtype=np.float32)
@@ -316,7 +318,7 @@ def build(source_pkl: str):
     whole_body_angular_momentum = np.full((T, 3), NaN, dtype=np.float32)
     whole_body_angular_momentum_rate = np.full((T, 3), NaN, dtype=np.float32)
 
-    # ---- Kinetics: PRISM insole 실측 GRF/CoP/contact (단위 원본-미검증) ----
+    # ---- Kinetics: PRISM insole measured GRF/CoP/contact (native units, unverified) ----
     grf_feet = np.stack([sl(insole["L_Foot"]["force_world"]),
                          sl(insole["R_Foot"]["force_world"])], axis=1).astype(np.float32)  # [T,2,3]
     grf = sl(insole["combined"]["force_world"]).astype(np.float32)                          # [T,3]
@@ -328,7 +330,7 @@ def build(source_pkl: str):
     foot_contact_mask = np.stack([sl(insole["L_Foot"]["contacts"])[:, 0],
                                   sl(insole["R_Foot"]["contacts"])[:, 0]], axis=1)          # [T,2] bool
     grf_valid_mask = np.ones((T,), dtype=bool)
-    cop_valid_mask = (grf[:, 1] > 1e-6) | (grf[:, 0] != 0)   # 하중 있을 때만
+    cop_valid_mask = (grf[:, 1] > 1e-6) | (grf[:, 0] != 0)   # only under load
 
     large = {
         "joint_codes": np.array(JOINT_CODES, dtype=object),
@@ -354,27 +356,27 @@ def build(source_pkl: str):
         "foot_contact_mask": foot_contact_mask,
         "grf_valid_mask": grf_valid_mask,
         "cop_valid_mask": cop_valid_mask,
-        # identity (Small과 동일)
+        # identity (the same as Small)
         "pair_id": pair_id,
         "timestamps_s": timestamps_s,
         "frame_count": np.int64(T),
     }
 
     # ---------------------------------------------------------------
-    # 필드별 provenance 표 (manifest)
+    # per-field provenance table (manifest)
     # ---------------------------------------------------------------
     field_provenance = {
         # Small
         "small.imu_orientation": {"shape": [T, 6, 4], "unit": "quaternion(w,x,y,z)",
             "frame": "prism_world_native", "provenance": "source_derived",
-            "note": "PRISM imu[*].ori_world (3x3) -> quaternion. chest 슬롯은 Pelvis proxy."},
+            "note": "PRISM imu[*].ori_world (3x3) -> quaternion. The chest slot is a Pelvis proxy."},
         "small.imu_acceleration": {"shape": [T, 6, 3], "unit": "m/s^2(specific force)",
             "frame": "sensor", "provenance": "estimated",
-            "note": "f=R^T(a_world-g); PRISM acc_world_filt 기반, lever-arm 무시, SOMA_WORLD_FUR 미변환."},
+            "note": "f=R^T(a_world-g); from PRISM acc_world_filt, lever arm ignored, not converted to SOMA_WORLD_FUR."},
         "small.imu_angular_velocity": {"shape": [T, 6, 3], "unit": "deg/s", "frame": "sensor",
-            "provenance": "estimated", "note": "ori_world 중앙차분에서 유도(자이로 원본 미사용)."},
+            "provenance": "estimated", "note": "Derived from central differences of ori_world (the raw gyro is not used)."},
         "small.sensor_codes[0]=chest": {"provenance": "proxy",
-            "note": "PRISM chest IMU 없음 → Pelvis 대체. 나머지 5개 site는 source_derived."},
+            "note": "PRISM has no chest IMU → Pelvis instead. The other 5 sites are source_derived."},
         # Large kinematics
         "large.pelvis_position": {"shape": [T, 3], "unit": "m", "frame": "prism_world_native",
             "provenance": "source_derived", "note": "imu_gt.Pelvis.pos_world."},
@@ -382,20 +384,20 @@ def build(source_pkl: str):
             "provenance": "source_derived", "note": "imu_gt.Pelvis.ori_world -> quaternion."},
         "large.joint_centers_world": {"shape": [T, 15, 3], "unit": "m", "frame": "prism_world_native",
             "provenance": "mixed",
-            "note": "7개 관절(ankle/knee/wrist l·r, neck)만 PRISM imu_gt로 채움(source_derived/proxy). "
-                    "나머지 8개(mtp/hip/shoulder/elbow l·r)는 SMPL FK 필요 → NaN+mask=false+unavailable.",
+            "note": "Only 7 joints (ankle/knee/wrist l·r, neck) are filled from PRISM imu_gt (source_derived/proxy). "
+                    "The other 8 (mtp/hip/shoulder/elbow l·r) need SMPL FK → NaN+mask=false+unavailable.",
             "per_joint_provenance": dict(zip(JOINT_CODES, joint_provenance))},
         "large.joint_rotations/angles/velocity": {"provenance": "unavailable",
-            "note": "SMPL FK + JCS 규약 필요. 데모 미생성 → NaN + mask=false (0으로 채우지 않음)."},
+            "note": "Needs SMPL FK + the JCS convention. Not made by the demo → NaN + mask=false (not filled with 0)."},
         "large.com_*/angular_momentum*": {"provenance": "unavailable",
-            "note": "전신 관성 모델 필요. 데모 미생성 → NaN + mask=false."},
+            "note": "Needs a whole-body inertial model. Not made by the demo → NaN + mask=false."},
         # Large kinetics
         "large.grf / grf_feet": {"shape_total": [T, 3], "shape_feet": [T, 2, 3],
             "unit": "PRISM_source_native_UNVERIFIED", "frame": "prism_world_native",
             "provenance": "measured",
-            "note": "PRISM insole force_world. 단위 미검증(범위상 N 아님, 정규화 가능성). grf=L+R 합."},
-        "large.cop / cop_feet": {"unit": "m(추정, PRISM native)", "frame": "prism_world_native ground(X,Z)",
-            "provenance": "source_derived", "note": "insole CoP_world의 (X,Z)."},
+            "note": "PRISM insole force_world. Units unverified (the range is not N; possibly normalised). grf = L+R sum."},
+        "large.cop / cop_feet": {"unit": "m(estimated, PRISM native)", "frame": "prism_world_native ground(X,Z)",
+            "provenance": "source_derived", "note": "(X,Z) of insole CoP_world."},
         "large.foot_contact_mask": {"shape": [T, 2], "provenance": "source_derived",
             "note": "insole contacts[:,0] (L,R)."},
     }
@@ -446,29 +448,32 @@ def write_outputs(out_dir: str, small, large, manifest):
         json.dump(manifest, fh, ensure_ascii=False, indent=2)
     readme = f"""# PRISM → Small/Large PoC DEMO  ({RUN_ID})
 
-**주의: 이것은 포맷/구조 예시(데모)입니다.** 캐노니컬 데이터셋도, 물리 검증 산출물도,
-quality-gate PASS도 아닙니다. `INTERNAL-ONLY`. 학습/평가 입력으로 쓰지 마세요.
+**Note: this is a format/structure example (a demo).** It is not a canonical dataset, not a
+physically validated output and not a quality-gate PASS. `INTERNAL-ONLY`. Do not use it as training
+or evaluation input.
 
-## 무엇인가
-PRISM `subj001/take002.pkl`("Walking Square" 보행, 100 Hz)의 프레임 [{WINDOW_START},{WINDOW_START+T})
-구간 {T}프레임을, paired Small/Large 계약 형식으로 매핑한 예시입니다.
+## What it is
+An example mapping the {T} frames [{WINDOW_START},{WINDOW_START+T}) of PRISM `subj001/take002.pkl`
+("Walking Square" gait, 100 Hz) into the paired Small/Large contract format.
 
-## 파일
+## Files
 - `small.npz` — 6-IMU (chest, wrist_l, wrist_r, foot_l, foot_r, head)
-- `large.npz` — pelvis + 15관절 kinematics + bilateral GRF/CoP
-- `pair_manifest.json` — 필드별 shape/단위/frame/provenance 와 "적용하지 않은 파이프라인 단계"
+- `large.npz` — pelvis + 15-joint kinematics + bilateral GRF/CoP
+- `pair_manifest.json` — per-field shape/unit/frame/provenance and "pipeline steps not applied"
 
-## 실데이터 vs 데모 채움
-- **실데이터(PRISM 유래):** IMU 방향(quaternion), pelvis 궤적/방향, knee/wrist 관절중심,
-  insole GRF/CoP/contact.
-- **데모 유도(estimated):** specific force, angular velocity(방향 미분), chest(=Pelvis proxy).
-- **미생성(unavailable, NaN+mask=false, 0으로 안 채움):** mtp/hip/shoulder/elbow 관절중심,
-  모든 관절 회전/JCS 각도/모멘트/파워, COM/각운동량.
-- **미적용 단계:** SOMA_WORLD_FUR 변환, SMPL FK(전 관절), JCS, physics GRF, 역동역학, 품질게이트,
-  insole force 단위 검증. (manifest `not_applied_pipeline_steps` 참조)
+## Real data vs demo fill
+- **Real data (from PRISM):** IMU orientation (quaternion), pelvis trajectory/orientation, knee/wrist
+  joint centres, insole GRF/CoP/contact.
+- **Derived by the demo (estimated):** specific force, angular velocity (orientation derivative),
+  chest (= Pelvis proxy).
+- **Not made (unavailable, NaN+mask=false, not filled with 0):** mtp/hip/shoulder/elbow joint centres,
+  all joint rotations/JCS angles/moments/powers, COM/angular momentum.
+- **Steps not applied:** SOMA_WORLD_FUR conversion, SMPL FK (all joints), JCS, physics GRF, inverse
+  dynamics, quality gates, insole force unit verification. (see manifest `not_applied_pipeline_steps`)
 
-## 안전
-외부 pickle은 numpy 화이트리스트 제한 unpickler로만 읽었습니다(임의코드 실행 차단).
+## Safety
+External pickles were read only with an unpickler restricted to a numpy whitelist (no arbitrary
+code execution).
 """
     with open(os.path.join(out_dir, "README.md"), "w", encoding="utf-8") as fh:
         fh.write(readme)

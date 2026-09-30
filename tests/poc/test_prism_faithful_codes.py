@@ -57,11 +57,11 @@ def test_docx_compatibility_metadata_does_not_claim_unverified_semantics() -> No
     assert "superseded" in metadata["historical_docx"]["note"]
     limits = metadata["semantic_limits"]
     assert set(limits) == {"small", "root_velocity", "joint_rotation", "joint_velocity"}
-    assert "미인증" in limits["small"]                   # units / mount extrinsics not certified
-    assert "미확정" in limits["root_velocity"]           # heading normalisation undecided
-    assert "ISB JCS" in limits["joint_rotation"] and "미적용" in limits["joint_rotation"]
+    assert "not certified" in limits["small"]            # units / mount extrinsics not certified
+    assert "undecided" in limits["root_velocity"]        # heading normalisation undecided
+    assert "ISB JCS" in limits["joint_rotation"] and "not applied" in limits["joint_rotation"]
     assert set(metadata["unavailable_codes"]) == {"grf", "cop", "joint_torques"}
-    assert all("미생성" in reason for reason in metadata["unavailable_codes"].values())
+    assert all("not generated" in reason for reason in metadata["unavailable_codes"].values())
 
 
 def test_docx_code_name_aliases_serialize_as_flat_npz_keys() -> None:

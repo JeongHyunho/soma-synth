@@ -1,20 +1,20 @@
-"""PRISM take002 (SMPL-24) -> SMPL-X 포맷 npz (render_amass.py 애드온 입력).
+"""PRISM take002 (SMPL-24) -> SMPL-X format npz (input to the render_amass.py add-on).
 
-SMPL-H -> SMPL-X 의 표준 규약:
-  SMPL/SMPL-H/SMPL-X 는 앞 66차원(global3 + body 21관절×3=63)이 직접 호환.
-  PRISM poses[T,72](SMPL 24관절)에서 0:66 을 그대로 SMPL-X body 로 쓰고,
-  jaw/eyes(66:75)·hands(75:165) 는 0(neutral)로 채워 165차원을 만든다.
-  betas 는 shape space 가 달라 0(neutral body) — smplh_to_smplx 와 동일.
+The standard SMPL-H -> SMPL-X convention:
+  SMPL/SMPL-H/SMPL-X share the first 66 dimensions (global 3 + body 21 joints x 3 = 63).
+  From PRISM poses[T,72] (SMPL 24 joints), 0:66 is used as the SMPL-X body as it is, and
+  jaw/eyes (66:75) and hands (75:165) are filled with 0 (neutral), giving 165 dimensions.
+  betas are 0 (neutral body) because the shape spaces differ — the same as smplh_to_smplx.
 
-INTERNAL-ONLY. PRISM pkl 은 numpy 화이트리스트 제한 unpickler 로만 로딩.
+INTERNAL-ONLY. The PRISM pkl is loaded only with an unpickler restricted to a numpy whitelist.
 
     python prism_to_smplx.py --out <npz> [--pkl <take002.pkl>] [--data-root <dir>]
 
---out 은 반드시 준다. --pkl 을 주지
-않으면 원천 폴더($SOMA_SOURCE_ROOT, 없으면 <--data-root 또는 $SOMA_DATA_ROOT>/extracted)의
-prism/subj001/take002.pkl 을 읽는다. pkl 이 있는지 먼저 확인하고, 그 뒤에야 --out 의 폴더를 만든다.
---out 이 번들·코퍼스(위 폴더에 INDEX.json 이 있다), lineage 컨테이너, 증거 폴더, 원천 폴더 안이면 거부한다
-(viewer_paths.writable_folder): scratch 폴더의 파일을 준다.
+--out is required. Without --pkl, prism/subj001/take002.pkl is read from the source folder
+($SOMA_SOURCE_ROOT, else <--data-root or $SOMA_DATA_ROOT>/extracted). The pkl is checked first, and
+only then is the --out folder created.
+--out inside a bundle or corpus (a folder above holds INDEX.json), the lineage container, an evidence
+folder or a source folder is refused (viewer_paths.writable_folder): name a file in a scratch folder.
 """
 from __future__ import annotations
 import argparse, os, pickle, sys
@@ -23,7 +23,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import viewer_paths  # noqa: E402
 
-W0, W1 = 1000, 2000   # 다른 산출물과 동일 window (10 s @ 100 Hz)
+W0, W1 = 1000, 2000   # the same window as the other outputs (10 s @ 100 Hz)
 #: Where --out goes instead of a bundle's folder (viewer_paths.writable_folder refuses one).
 SCRATCH_OUT = "name a file in a scratch folder"
 
@@ -70,10 +70,10 @@ def main(argv=None):
     T = poses72.shape[0]
     assert poses72.shape[1] == 72, poses72.shape
     poses_x = np.zeros((T, 165), dtype=np.float64)
-    poses_x[:, 0:66] = poses72[:, 0:66]     # global(3) + body 21관절(63); SMPL hands(66:72) drop
+    poses_x[:, 0:66] = poses72[:, 0:66]     # global(3) + body 21 joints (63); SMPL hands (66:72) dropped
     # 66:75 jaw/left_eye/right_eye = 0 ; 75:165 hands = 0 (neutral/flat)
 
-    betas = np.zeros(16, dtype=np.float64)  # shape space 상이 -> neutral (smplh_to_smplx 규약)
+    betas = np.zeros(16, dtype=np.float64)  # different shape space -> neutral (smplh_to_smplx convention)
 
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     np.savez(out, trans=trans, gender=np.array(gender), mocap_framerate=np.float64(fps),
