@@ -1,8 +1,8 @@
-# Build BOTH the Korean and English viewer manuals to docx, in sync.
+# Build the viewer manual to docx.
 #   pwsh docs\manual\build_manual.ps1
-# Source of truth = the .qmd files. Edit those (not the docx), then re-run this to rebuild both.
+# Source of truth = viewer_manual.qmd. Edit it (not the docx), then re-run this to rebuild the docx.
 # Needs Quarto ($env:QUARTO, else `quarto` on PATH, else the per-user install) and a `python` with
-# python-docx for the post-render patch. Close the manuals in Word first: an open docx cannot be
+# python-docx for the post-render patch. Close the manual in Word first: an open docx cannot be
 # overwritten, and this script does not close Word for you.
 $root = $PSScriptRoot
 Set-Location $root
@@ -22,17 +22,11 @@ function Render($qmd) {
     Write-Warning "render failed ($qmd), attempt $i/5; retrying in ${wait}s (close the docx in Word)..."
     Start-Sleep -Seconds $wait
   }
-  throw "render failed after 5 attempts: $qmd (close any manual docx open in Word, then retry)"
+  throw "render failed after 5 attempts: $qmd (close the manual docx if it is open in Word, then retry)"
 }
 
-$pairs = @(
-  @{ qmd = "viewer_manual.qmd";    docx = "viewer_manual.docx" },      # Korean
-  @{ qmd = "viewer_manual_en.qmd"; docx = "viewer_manual_en.docx" }    # English
-)
-foreach ($p in $pairs) {
-  Render $p.qmd
-  python "$root\patch_manual_docx.py" (Join-Path $root $p.docx)
-}
+Render "viewer_manual.qmd"
+python "$root\patch_manual_docx.py" (Join-Path $root "viewer_manual.docx")
 
-Write-Output "Built manuals:"
+Write-Output "Built manual:"
 Get-ChildItem "$root\*.docx" | Select-Object Name, @{n = "KB"; e = { [int]($_.Length / 1KB) } } | Format-Table -AutoSize
