@@ -63,8 +63,11 @@ export SOMA_DATA_ROOT="$HOME/soma_data"         # put it in ~/.zshrc or ~/.bashr
 ## Get the sources and body models
 
 The sources are in the team Google Drive folder **`SOMA_AI_SharedData/00_Dataset`**, one folder per source,
-with a `SHA256SUMS` list from the owner. Copy them onto a local disk with `stage-sources`: it copies only
-the listed files that are missing, verifies each against the list, and never deletes or overwrites anything.
+with a `SHA256SUMS` list from the owner. The folder is shared with you, so it appears under *Shared with me*:
+add it to My Drive (*Organize → Add shortcut to My Drive*) to get a local path in the Google Drive desktop app,
+e.g. `G:\My Drive\SOMA_AI_SharedData\00_Dataset`. Copy the sources onto a local disk with `stage-sources`: it
+copies only the listed files that are missing, verifies each against the list, and never deletes or
+overwrites anything.
 
 ```bash
 soma-synth stage-sources --from "<local path of 00_Dataset>" --sums SHA256SUMS --sources prism,hknu
@@ -72,11 +75,12 @@ soma-synth stage-sources --sums SHA256SUMS --sources prism,hknu --verify-only   
 ```
 
 Sizes: `amass` 12.1 GB, `prism` 5.0 GB, `gaitex` 17.7 GB, `hknu_fullbody` 27.9 GB, `addbiomechanics` 568 GB.
-Fetch `addbiomechanics` with [rclone](https://rclone.org) (a Google Drive remote on the shared drive), not
-through the Drive desktop app, which is unreliable at that size; then stage from the download:
+Fetch `addbiomechanics` with [rclone](https://rclone.org) (a Google Drive remote of your account, after the
+shortcut above), not through the Drive desktop app, which first caches files on the system disk; then stage
+from the download:
 
 ```bash
-rclone copy "<remote>:00_Dataset/addbiomechanics" "<download folder>/addbiomechanics" --progress
+rclone copy "<remote>:SOMA_AI_SharedData/00_Dataset/addbiomechanics" "<download folder>/addbiomechanics" --progress
 soma-synth stage-sources --from "<download folder>" --sums SHA256SUMS --sources addbiomechanics
 ```
 
