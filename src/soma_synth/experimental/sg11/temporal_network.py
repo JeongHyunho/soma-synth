@@ -10,5 +10,3 @@ class ResidualTCN(nn.Module):
         for d in dilations:layers.extend([nn.Conv1d(c,64,3,padding=d,dilation=d),nn.ReLU()]);c=64
         self.net=nn.Sequential(*layers,nn.Conv1d(64,outputs,1));zero_head(self.net[-1])
     def forward(self,x):return self.net(x)
-
-

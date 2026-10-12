@@ -4,7 +4,7 @@ Reference repository: https://github.com/martinling/imusim
 
 Pinned commit: `294e171ae5f2da7384ffc7d1b9af347cfcb30ce2`.
 
-The upstream source was cloned, inspected, and retained under `reference_imusim/`. The port in `imusim_core.py` is adapted from that source, Copyright (C) 2009-2011 University of Edinburgh, under GPL-3.0-or-later. The license is included in `LICENSE_IMUSIM.txt`; source attribution is retained in code. This is a Python 3/NumPy port of the ideal trajectory pathway, not a claim to run the original package or reproduce every part of the 2011 experiment.
+The upstream source was cloned, inspected, and retained under `reference_imusim/`. The port in `quaternion_spline.py` is adapted from that source, Copyright (C) 2009-2011 University of Edinburgh, under GPL-3.0-or-later. The license is included in `LICENSE_IMUSIM.txt`; source attribution is retained in code. This is a Python 3/NumPy port of the ideal trajectory pathway, not a claim to run the original package or reproduce every part of the 2011 experiment.
 
 ## Algorithm mapping
 

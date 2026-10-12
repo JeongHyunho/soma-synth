@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import numpy as np
-from .pipeline import SITES, synthesize, correct
+from .synthesis_pipeline import SITES, synthesize, correct
 
 
 def main():

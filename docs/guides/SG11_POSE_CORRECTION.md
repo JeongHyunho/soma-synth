@@ -53,7 +53,7 @@ Small/Large bundle. The command does not emit reference joint angles or SMPL mot
 
 This is offline/noncausal synthesis. Learned correction transfer to other datasets,
 sensor placements and frame conventions is not established by these unit tests.
-The historical gyro implementation is retained in `imusim_core.py`, under its
+The historical gyro implementation is retained in `quaternion_spline.py`, under its
 GPL-3.0-or-later terms; `LICENSE_IMUSIM.txt` and `IMUSIM_SOURCE.md` accompany it.
 This extension is isolated and not imported by the default generators.
 Source implementations: SOMA `physics_neural_full_20261005/prepare_data.py`,
@@ -71,3 +71,15 @@ Source implementations: SOMA `physics_neural_full_20261005/prepare_data.py`,
 - Command-line synthesis with that checkpoint produced finite corrected signals.
 - These are implementation checks, not a new HKNU accuracy evaluation or a full
   repository test-suite pass. No dataset or trained checkpoint is committed.
+
+## Module organization
+
+| File | Responsibility |
+|---|---|
+| `physics_synthesis.py` | SG11 acceleration and spline-based gyro synthesis |
+| `neural_model.py` | Learned translation and rotation correction with physics |
+| `temporal_network.py` | Temporal convolutional network architecture |
+| `marker_geometry.py` | Position and orientation from three-marker clusters |
+| `quaternion_spline.py` | Attributed IMUSim quaternion/spline mathematics |
+| `synthesis_pipeline.py` | Input validation, masks, checkpoint loading and execution |
+| `__main__.py` | Python command-line entry point |

@@ -4,11 +4,9 @@ import json
 from pathlib import Path
 
 import numpy as np
-from scipy.signal import savgol_filter
-from scipy.spatial.transform import Rotation
 
-from . import imusim_core as ic
-from .cluster_frame import frame
+from .physics_synthesis import sg11
+from .marker_geometry import frame
 
 SITES = ('TA', 'LFA', 'RFA', 'LSK', 'RSK', 'HE', 'LFT', 'RFT')
 
@@ -17,25 +15,6 @@ def runs(mask):
     edges = np.diff(np.r_[False, mask, False].astype(int))
     return zip(np.where(edges == 1)[0], np.where(edges == -1)[0])
 
-
-def sg11(time, position, rotation):
-    """Match the historical SG11 kernel; output specific force and rad/s."""
-    time = np.asarray(time, dtype=float)
-    if len(time) < 11 or not np.allclose(np.diff(time), .01, rtol=0, atol=1e-8):
-        raise ValueError('SG11 requires at least 11 uniformly spaced 100-Hz frames')
-    time = time - time[0]
-    q = ic.smooth_quaternions(rotation, .001)
-    qt = time[2:-2]
-    valid = (time >= max(time[3], qt[2])) & (time <= min(time[-4], qt[-2]))
-    qv, w = ic.quaternion_bspline(qt, q, time[valid])
-    r = Rotation.from_quat(np.roll(qv, -1, axis=1))
-    a = savgol_filter(position-position[:1], 11, 5, deriv=2, delta=.01, axis=0, mode='interp')
-    signal = np.full((len(time), 6), np.nan)
-    orientation = np.full((len(time), 4), np.nan)
-    signal[valid, :3] = r.inv().apply(a[valid] + [0, 0, 9.81])
-    signal[valid, 3:] = w
-    orientation[valid] = qv
-    return signal, orientation
 
 
 def synthesize(time, markers, usable, sites):
@@ -76,7 +55,7 @@ def synthesize(time, markers, usable, sites):
 def correct(signals, valid, checkpoint, metadata):
     """Load an explicit trained artifact; never train or access real targets here."""
     import torch
-    from .pose_model import PoseCorrection
+    from .neural_model import PoseCorrection
     checkpoint = Path(checkpoint)
     info = json.loads(Path(metadata).read_text(encoding='utf-8-sig'))
     sha = hashlib.sha256(checkpoint.read_bytes()).hexdigest()

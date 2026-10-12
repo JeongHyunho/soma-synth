@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from .models import ResidualTCN
+from .temporal_network import ResidualTCN
 
 def skew(v):
  x,y,z=v.unbind(-1);zero=torch.zeros_like(x)
@@ -36,5 +36,3 @@ class PoseCorrection(nn.Module):
  def regularization(self):
   d,r=self.last_fields;d=d[:,:,15:-15]/.01;r=r[:,:,15:-15]/.0872664626
   return .0001*(d.square().mean()+r.square().mean())+.001*(d.diff(dim=2).square().mean()+r.diff(dim=2).square().mean())
-
-

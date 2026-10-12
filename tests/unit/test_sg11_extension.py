@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
-from soma_synth.experimental.sg11.pipeline import sg11, synthesize, SITES
+from soma_synth.experimental.sg11.synthesis_pipeline import sg11, synthesize, SITES
 
 
 def test_constant_acceleration_and_rotation():
@@ -44,7 +44,7 @@ def test_rate_guard():
 
 def test_pose_zero_head_identity():
     torch = pytest.importorskip('torch')
-    from soma_synth.experimental.sg11.pose_model import PoseCorrection
+    from soma_synth.experimental.sg11.neural_model import PoseCorrection
     model = PoseCorrection(np.zeros(48, np.float32), np.ones(48, np.float32)).eval()
     x = torch.randn(1, 48, 100)
     with torch.inference_mode():
@@ -55,8 +55,8 @@ def test_checkpoint_contract_and_gap(tmp_path):
     torch = pytest.importorskip('torch')
     import hashlib
     import json
-    from soma_synth.experimental.sg11.pose_model import PoseCorrection
-    from soma_synth.experimental.sg11.pipeline import correct
+    from soma_synth.experimental.sg11.neural_model import PoseCorrection
+    from soma_synth.experimental.sg11.synthesis_pipeline import correct
     model = PoseCorrection(np.zeros(48, np.float32), np.ones(48, np.float32))
     path = tmp_path/'best.pt'
     torch.save({'state_dict': model.state_dict()}, path)
