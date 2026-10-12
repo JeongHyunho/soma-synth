@@ -23,6 +23,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+pose-correction = ["torch>=2.7"]
 dev = ["pytest>=8"]
 # The Small/Large viewer and the plotting/video tools in scripts/poc (docs/guides/small_large_viewer.md).
 # Blender 4.5 (with the SMPL-X add-on) is external: it is installed separately and found by
@@ -40,6 +41,7 @@ soma-synth = "soma_synth.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
+"soma_synth.experimental.sg11" = ["LICENSE_IMUSIM.txt", "IMUSIM_SOURCE.md"]
 "soma_synth.vendor.nimblephysics" = [
   "SubjectOnDisk.proto",
   "UPSTREAM.md",
