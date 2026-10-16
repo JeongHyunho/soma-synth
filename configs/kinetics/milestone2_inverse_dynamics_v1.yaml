@@ -1,0 +1,56 @@
+# Inverse dynamics of the Milestone-2 (KAIST EXO Lab) takes: SMPL fits + split-belt treadmill plates.
+# Read by scripts/poc/convert_milestone2_kinetics.py. Every number the conversion uses is here.
+schema: soma_synth.kinetics.milestone2/1
+
+body_model:
+  # SMPL neutral with the full 300-component shape space (the fits use 300 betas), extracted with
+  # scripts/poc/prepare_smpl_clean_npz.py --num-betas 300 into a folder of its own.
+  file: SMPL_NEUTRAL_clean.npz
+  folder_under_data_root: body_models/smpl300
+  num_betas: 300
+
+sampling_rate_hz: 100.0
+gravity_m_s2: [0.0, 0.0, -9.80665]   # treadmill laboratory frame, Z up
+
+filter:
+  # 4th-order zero-lag Butterworth at 6 Hz on kinematics and plate signals alike: the usual gait
+  # inverse-dynamics cutoff, and the one the lab's own GRF processing uses. The same cutoff on both
+  # avoids the impact artefacts of mismatched filtering.
+  kind: butterworth_filtfilt
+  order: 4
+  cutoff_hz: 6.0
+
+plates:
+  # Raw H5 units and sign: force N and moment N mm, both as exerted ON the plate, moment about the
+  # plate origin. The origins were recovered from cop_x = -My/Fz + x0 (slope -1.000, r = -1.000).
+  moment_scale_to_n_m: 0.001
+  left:  {force: grf_left,  moment: moment_left,  origin_m: [0.25, 0.0, 0.0]}
+  right: {force: grf_right, moment: moment_right, origin_m: [-0.25, 0.0, 0.0]}
+  # Vertical load below which a foot is unloaded: CoP and free moment are NaN and no load is applied.
+  contact_threshold_n: 20.0
+
+segments:
+  # Mesh voxel size for the segment inertia (uniform density, scaled to the force-plate mass).
+  voxel_size_m: 0.01
+  # The total mass is the trial's mean vertical plate force over g: it includes the exoskeleton the
+  # subjects wore (the recorded weight does not); the plates are the reference for the mass.
+  total_mass: force_plate_mean
+
+quality:
+  # A loaded plate whose CoP lies farther than this from its foot (ankle-toe midpoint, horizontal)
+  # is a crossover or misassignment: those frames are not GRF-valid.
+  cop_to_foot_max_m: 0.25
+  # SMPL fit glitches: a joint whose global rotation turns more than this between two frames
+  # (10 ms) is a fitting failure, not walking (gait peaks well below 10 deg per frame). The frame
+  # and the filter's reach on both sides are not kinetics-valid.
+  max_rotation_step_deg: 30.0
+  glitch_pad_frames: 25
+  # Frames trimmed from each end when summarising (filter edge transients).
+  edge_frames: 100
+
+# Takes the dataset excludes: the overground reconstruction failed (about 3 minutes of walking but
+# 0.09 m, 2.3 m and 4.5 m of forward travel). Their laboratory-frame kinetics are still computed.
+excluded_takes:
+  S009_level_075mps_lv0_trial_01: overground reconstruction failed (0.09 m forward travel)
+  S010_level_100mps_lv0_trial_01: overground reconstruction failed (2.3 m forward travel)
+  S006_level_075mps_lv0_trial_01: overground reconstruction failed (4.5 m forward travel)
