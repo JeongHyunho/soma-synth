@@ -58,6 +58,8 @@ GPL-3.0-or-later terms; `LICENSE_IMUSIM.txt` and `IMUSIM_SOURCE.md` accompany it
 This extension is isolated and not imported by the default generators.
 Source implementations: SOMA `physics_neural_full_20261005/prepare_data.py`,
 `pose_correction_20261005/cluster_frame.py`, and `sg11_repeat_20261007/pose_model.py`.
+These source files are not in this repository (they are in the research workspace the
+pathway came from); nor is the checkpoint the verification below names.
 
 ## Verification (2026-10-12)
 

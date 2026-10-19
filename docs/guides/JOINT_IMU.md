@@ -114,3 +114,8 @@ Network constructors were adapted to explicit portable configuration; tensor nam
 and forward equations are retained. No training or test suite was run for this port.
 Numerical equivalence to saved predictions remains to be verified before treating
 this integration as a validated replacement in the shared generation pipeline.
+
+> **Note (2026-10-19).** The provenance files named above (`probabilistic_matched_20261017/…`,
+> `marker_quality_20261014/prepare.py`) are not in this repository; they are in the research workspace
+> the model was trained in. Neither are the checkpoints (`joint_best.pt`, `gated_best.pt`) or any saved
+> predictions, so the numerical equivalence above cannot be checked from this repository alone.

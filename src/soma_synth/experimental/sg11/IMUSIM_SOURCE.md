@@ -4,6 +4,14 @@ Reference repository: https://github.com/martinling/imusim
 
 Pinned commit: `294e171ae5f2da7384ffc7d1b9af347cfcb30ce2`.
 
+> **Note (2026-10-19).** Three paths named below are not in this repository: `reference_imusim/` (the
+> cloned upstream source), `previous_baseline/` (the former implementation) and `test_imusim_core.py`
+> (the recursion check). They belong to the research workspace this port came from. The upstream
+> source is the pinned commit above; the checks this repository runs are `tests/unit/test_sg11_extension.py`.
+>
+> **Licence scope.** `quaternion_spline.py` is GPL-3.0-or-later. It is kept for internal use only: the
+> repository is not distributed outside the team, so no GPL distribution obligation is incurred.
+
 The upstream source was cloned, inspected, and retained under `reference_imusim/`. The port in `quaternion_spline.py` is adapted from that source, Copyright (C) 2009-2011 University of Edinburgh, under GPL-3.0-or-later. The license is included in `LICENSE_IMUSIM.txt`; source attribution is retained in code. This is a Python 3/NumPy port of the ideal trajectory pathway, not a claim to run the original package or reproduce every part of the 2011 experiment.
 
 ## Algorithm mapping
