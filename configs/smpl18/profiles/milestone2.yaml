@@ -1,0 +1,53 @@
+# Milestone-2 (KAIST EXO Lab) as a smpl18 profile: SMPL parameters in one npz per take, fitted by
+# the provider with MoSh++ (300 betas, neutral model) and reconstructed overground.
+# INTERNAL: this profile lives in the SOMA project, not in the smpl18 package, because the
+# dataset is internal.
+#
+# Parity basis: scripts/poc/generate_milestone2_unified8.py and the provider's README in
+# smpl_npz_milestone2_refit_overground/, 2026-10-19.
+schema: smpl18_profile_v1
+id: milestone2
+description: Milestone-2 SMPL fits (*_overground_trim.npz; trans/global_orient/body_pose/betas[300])
+source_kind: smpl_parameters
+format: npz
+
+layout:
+  # <subject>_<condition>_<level>_<trial>_overground_trim.npz, all in one folder; the subject is
+  # the leading S0nn of the file name.
+  subject: "smpl_npz_milestone2_refit_overground"
+  trial: "smpl_npz_milestone2_refit_overground/{trial}_overground_trim.npz"
+
+bindings:
+  # The overground root (trans / global_orient), not the treadmill one (*_treadmill), which walks
+  # in place; global_orient [T,3] and body_pose [T,69] together are the [T,24,3] pose.
+  poses: {field: [global_orient, body_pose], layout: "T,J*3"}
+  betas: {field: betas}             # 300 shape components; the body model must carry all of them
+  trans: {field: trans}
+  fps: {field: fps}                 # 100 Hz for every take
+  gender:
+    # The fits used the neutral model; every subject is male (data provider, 2026-10-16).
+    field: smpl_model
+    map: {basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl: neutral}
+
+conventions:
+  up_axis: z                        # overground_vertical_axis = 2 in every take
+  length_unit: m
+  angle_unit: rad
+
+shape:
+  method: parameters                # betas come from the source; no fit
+
+root:
+  placement: source_translation
+
+repairs:
+  wrap: none
+  # A no-op at the native 100 Hz, kept so the rate is stated.
+  resample: {fps: 100, rotations: slerp, translation: linear}
+  discontinuity: {settings_key: discontinuity, action: flag}
+
+skip:
+  trials_with_fps_other_than: 100
+
+# The package's shared engine settings; resolved from the smpl18 package configs.
+settings: settings/default.yaml

@@ -11,7 +11,8 @@ ARTIFACT_DOCS: dict[str, str] = {
     "small": "8-channel wearable IMU (orientation + acceleration + angular velocity) at 8 body sites, "
              "expressed in the spec sensor frame S (spec_S_v2).",
     "large": "Reduced-model kinematics: 18-joint rotations/velocities + pelvis trajectory, plus the "
-             "lossless 24-joint SMPL global orientation.",
+             "lossless 24-joint SMPL global orientation; with large_kinetics, the kinetics of "
+             "large/03_kinetics.qmd (GRF, CoP, free moment, COM dynamics, joint moments and powers).",
     "anthro": "Subject/sequence skeleton constants: rest joint positions, segment lengths, SMPL shape "
               "(betas), and body attributes.",
     "root_translation": "Raw SMPL root (pelvis) world-translation stream for the take.",
@@ -29,7 +30,7 @@ FIELD_DOCS: dict[str, dict[str, str]] = {
         "imu_orientation_absolute_heading": "(8,) bool — True if heading is absolute; False = gravity-referenced only (insole feet).",
         "sensor_codes": "(8,) site names in canonical order: back_T4, wrist_l, wrist_r, shank_l, shank_r, occiput, foot_l, foot_r.",
         "mount_id": "(8,) mount identifier per site (source::site).",
-        "small_mode": "() how small was built: measured_physical (PRISM), synthetic_from_smpl (AMASS, AddBiomechanics, HKNU) or synthetic_from_markers (GAITEX).",
+        "small_mode": "() how small was built: measured_physical (PRISM), synthetic_from_smpl (AMASS, AddBiomechanics, HKNU, Milestone-2) or synthetic_from_markers (GAITEX).",
         "axis_convention": "() sensor-frame convention tag; always spec_S_v2.",
         "pair_id": "() stable take-identity hash (identical across small/large/anthro/root_translation).",
         "timestamps_s": "(T,) float64 seconds on the 100 Hz grid, starting at 0.",
@@ -49,6 +50,20 @@ FIELD_DOCS: dict[str, dict[str, str]] = {
         "pair_id": "() stable take-identity hash (matches small/anthro).",
         "timestamps_s": "(T,) float64 seconds, 100 Hz grid.",
         "frame_count": "() int64 number of frames T.",
+        "com_acceleration": "(T,3) m/s^2 whole-body centre-of-mass acceleration in world, from the segment model (large_kinetics).",
+        "angular_momentum": "(T,3) kg m^2/s whole-body angular momentum about the centre of mass, in world (large_kinetics).",
+        "grf": "(T,2,3) N measured ground reaction force on each foot (left, right) in world; zero without contact (large_kinetics).",
+        "cop": "(T,2,2) m centre of pressure of each foot on the ground plane (world X, Y); NaN where foot_contact is False (large_kinetics).",
+        "free_moment": "(T,2) N m vertical free moment of each foot about its CoP; NaN where foot_contact is False (large_kinetics).",
+        "joint_torque": "(T,17) N m internal joint moment of the 17 moving joints (kinetics_joint_names), primary JCS component: flexion/dorsiflexion, shoulder elevation (large_kinetics).",
+        "joint_power": "(T,17) W joint power of the primary component: joint_torque x the matching JCS angular velocity (large_kinetics).",
+        "kinetics_joint_names": "(17,) joint order of the kinetics arrays: joint_names[1:] (the pelvis carries no joint moment).",
+        "joint_moments_jcs": "(T,17,3) N m internal (parent-on-child) joint moment on the three JCS axes; joint_torque is one of these components.",
+        "joint_power_total": "(T,17) W total joint power, moment . relative angular velocity over all three axes.",
+        "foot_contact": "(T,2) bool foot loaded above the contact threshold (left, right).",
+        "grf_valid_mask": "(T,) bool False where the measured ground reaction cannot be trusted (e.g. a foot on the other plate).",
+        "kinetics_valid_mask": "(T,) bool False where the joint kinetics are not valid (GRF invalid, or the motion fit glitches); apply it before any loss.",
+        "inverse_dynamics_residual": "(T,6) N, N m wrench the measured loads leave unexplained at the pelvis (force xyz, moment xyz, world).",
     },
     "anthro": {
         "namespace": "() anthro namespace tag.",
@@ -105,7 +120,7 @@ FIELD_DOCS: dict[str, dict[str, str]] = {
 ENUM_DOCS: dict[str, dict[str, str]] = {
     "small_mode": {
         "measured_physical": "PRISM physical imu.* stream (SO(3)-projected) calibrated into the spec sensor frame S.",
-        "synthetic_from_smpl": "AMASS: IMU synthesized from SMPL forward kinematics (no physical sensor).",
+        "synthetic_from_smpl": "AMASS, AddBiomechanics, HKNU, Milestone-2: IMU synthesized from SMPL forward kinematics (no physical sensor).",
         "synthetic_from_markers": "GAITEX: IMU synthesized from optical marker clusters (rigid-body pose, plate lever arm, zero-phase low-pass), no physical sensor; orientation is not a constant relabel of the SMPL joint in large, and imu_valid_mask carries per-site marker gaps (NaN under False).",
     },
     "axis_convention": {

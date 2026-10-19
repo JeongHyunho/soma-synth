@@ -139,6 +139,15 @@ body_model_sets:
     description: >-
       Licence-free npz extracted from the MPI SMPL pkl, one per gender
       (SMPL_MALE_clean.npz, SMPL_FEMALE_clean.npz, SMPL_NEUTRAL_clean.npz).
+  smpl_clean_300:
+    # The neutral model with the full 300-component shape space, for fits made in it (Milestone-2's
+    # MoSh++ betas); extracted with scripts/poc/prepare_smpl_clean_npz.py --num-betas 300. A folder of
+    # its own, so the 10-component set the other sources hash is unchanged. SOMA_BODY_MODEL_DIR does
+    # not move it: that variable names the 10-component set.
+    relative_path: body_models/smpl300
+    resolver: smpl18.model.select
+    description: >-
+      SMPL_NEUTRAL_clean.npz with shapedirs (6890, 3, 300), from basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl.
 
 sources:
 
@@ -397,3 +406,32 @@ sources:
     smpl18_profile: configs/smpl18/profiles/hknu.yaml
     stochastic: false
     reads_env: ["SOMA_DATA_ROOT", "SOMA_SOURCE_ROOT", "SOMA_BODY_MODEL_DIR"]
+
+  milestone2:
+    small_mode: synthetic_from_smpl
+    artifact_class: experimental_non_candidate
+    bundle_lineage: milestone2_unified8
+    entrypoint:
+      script: scripts/poc/generate_milestone2_unified8.py
+      required_args: ["--out"]
+      optional_args: ["--source-root", "--subjects", "--only"]
+      selection_args: ["--subjects", "--only"]
+      output_arg: "--out"
+      output_arg_kind: dataset_dir
+    # The SMPL fits and the force plates are both read from the source folder; the Large
+    # kinetics are computed while the bundle is emitted (soma_synth.kinetics.milestone2, numbers in
+    # configs/kinetics/milestone2_inverse_dynamics_v1.yaml).
+    emitter: unified8_emit
+    path_loads: ["unified8_emit"]
+    library_imports:
+      - soma_synthetic_imu.addbio_retarget.shape_fit
+      - soma_synthetic_imu.contracts.source_attribution
+      - soma_synthetic_imu.kinetics.milestone2
+    resume: none
+    parallel: none
+    # One neutral model for every subject, with the 300 shape components the fits were made in.
+    body_model_set: smpl_clean_300
+    body_model_selection: fixed_neutral
+    smpl18_profile: configs/smpl18/profiles/milestone2.yaml
+    stochastic: false
+    reads_env: ["SOMA_DATA_ROOT", "SOMA_SOURCE_ROOT"]

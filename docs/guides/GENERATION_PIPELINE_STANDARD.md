@@ -813,6 +813,7 @@ A hand-maintained table goes stale, so this section is generated.
 | `amass` | `synthetic_from_smpl` | `inline` | `bundle_opens` | `shard` | `generate_amass_faithful_all.py` | `amass_faithful_full` | — | `amass` |
 | `gaitex` | `synthetic_from_markers` | `unified8_emit` | `none` | `none` | `generate_gaitex_unified8.py` | `gaitex_unified8` | `gaitex_smpl24` | `gaitex` |
 | `hknu` | `synthetic_from_smpl` | `unified8_emit` | `none` | `none` | `generate_hknu_unified8.py` | `hknu_unified8` | `hknu_smpl24_paired` | `configs/smpl18/profiles/hknu.yaml` |
+| `milestone2` | `synthetic_from_smpl` | `unified8_emit` | `none` | `none` | `generate_milestone2_unified8.py` | `milestone2_unified8` | — | `configs/smpl18/profiles/milestone2.yaml` |
 | `prism` | `measured_physical` | `inline` | `core_files_exist` | `none` | `generate_prism_measured_all.py` | `prism_faithful_full` | — | `configs/smpl18/profiles/prism.yaml` |
 
 **What the resume predicates mean**
@@ -822,7 +823,7 @@ A hand-maintained table goes stale, so this section is generated.
 - `manifest_exists` — skips when manifest.json exists, even if the npz beside it are truncated
 - `none` — no skip logic; every take is rebuilt on every run
 
-**Shared emitter**: `addbiomechanics`, `gaitex`, `hknu` — **Own implementation**: `amass`, `prism`
+**Shared emitter**: `addbiomechanics`, `gaitex`, `hknu`, `milestone2` — **Own implementation**: `amass`, `prism`
 
 **Generation stages (corpus → bundle → post-steps)**
 
@@ -830,6 +831,7 @@ A hand-maintained table goes stale, so this section is generated.
 - `amass` — bundle `generate_amass_faithful_all.py --out-root <amass_faithful_full>`
 - `gaitex` — corpus `generate_gaitex_smpl24.py --out <gaitex_smpl24>` (fingerprint `_run.json`, passed to the bundle as `--retarget`) → bundle `generate_gaitex_unified8.py --out <gaitex_unified8>`
 - `hknu` — corpus `generate_hknu_faithful.py --out <hknu_smpl24_paired>` (fingerprint `SUMMARY.json`, passed to the bundle as `--paired`) → bundle `generate_hknu_unified8.py --out <hknu_unified8>`
+- `milestone2` — bundle `generate_milestone2_unified8.py --out <milestone2_unified8>`
 - `prism` — bundle `generate_prism_measured_all.py --out <prism_faithful_full>` → post-step `synthesize_insole_heading.py {dataset_dir}`
 
 **Environment variables read**
@@ -838,11 +840,13 @@ A hand-maintained table goes stale, so this section is generated.
 - `amass` — `SOMA_DATA_ROOT`, `SOMA_SOURCE_ROOT`, `SOMA_BODY_MODEL_DIR`
 - `gaitex` — `SOMA_DATA_ROOT`, `SOMA_SOURCE_ROOT`, `SOMA_BODY_MODEL_DIR`
 - `hknu` — `SOMA_DATA_ROOT`, `SOMA_SOURCE_ROOT`, `SOMA_BODY_MODEL_DIR`
+- `milestone2` — `SOMA_DATA_ROOT`, `SOMA_SOURCE_ROOT`
 - `prism` — `SOMA_DATA_ROOT`, `SOMA_SOURCE_ROOT`, `SOMA_BODY_MODEL_DIR`
 
 **Body model sets**
 
 - `smpl_clean` — `body_models/smpl` under the data root (or `SOMA_BODY_MODEL_DIR` when set; `pipeline.paths.body_model_dir()`); the file for each sex is chosen by `smpl18.model.select`. Used by: `addbiomechanics`, `amass`, `gaitex`, `hknu`, `prism`
+- `smpl_clean_300` — `body_models/smpl300` under the data root (or `SOMA_BODY_MODEL_DIR` when set; `pipeline.paths.body_model_dir()`); the file for each sex is chosen by `smpl18.model.select`. Used by: `milestone2`
 
 **Generation policy (`generation_policy`)**
 

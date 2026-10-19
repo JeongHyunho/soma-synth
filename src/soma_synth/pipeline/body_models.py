@@ -47,16 +47,18 @@ def set_directory(relative_path: str, data_root: Path | str | None) -> Path | No
     """
     if not relative_path:
         return None
-    if paths_mod.body_model_override() is not None:
+    # The override names the default (10-component) set only; another set (body_models/smpl300)
+    # is always read from its own folder, so it is recorded from there too.
+    if paths_mod.body_model_override() is not None and relative_path == paths_mod.BODY_MODELS:
         return paths_mod.body_model_dir(root=data_root)
     if data_root is None:
         return None
     return Path(data_root) / relative_path
 
 
-def set_directory_source() -> str:
+def set_directory_source(relative_path: str = paths_mod.BODY_MODELS) -> str:
     """Which setting chose the directory :func:`set_directory` returns, for the run record."""
-    if paths_mod.body_model_override() is not None:
+    if paths_mod.body_model_override() is not None and relative_path == paths_mod.BODY_MODELS:
         return paths_mod.BODY_MODEL_DIR_ENV
     return "data_root"
 
@@ -112,7 +114,10 @@ def set_record(
     }
     if data_root is not None:
         record["directory_relative"] = provenance_mod.relative_to_root(directory, data_root)
-        record["directory_from"] = set_directory_source()
+        override = paths_mod.body_model_override()
+        record["directory_from"] = (paths_mod.BODY_MODEL_DIR_ENV
+                                    if override is not None and Path(directory) == Path(override)
+                                    else "data_root")
     return record
 
 

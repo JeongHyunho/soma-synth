@@ -39,7 +39,7 @@ AXIS_CONVENTIONS = frozenset({"spec_S_v2"})
 SUBJECT_SCOPES = frozenset(
     {"subject_constant_trial_frame_invariant", "sequence_constant_frame_invariant"}
 )
-CAPABILITIES = frozenset({"measured_physical", "development_reference"})
+CAPABILITIES = frozenset({"measured_physical", "development_reference", "large_kinetics"})
 
 # spec_S_v2 site geometry: the canonical 8-site order (index -> name) and each site's SMPL joint.
 # Orientation is expressed in sensor frame S; by construction it is a rigid relabel of the SMPL global
@@ -166,6 +166,27 @@ _LARGE = ArtifactSpec(
         _ks("timestamps_s", "f8", "T"),
         _ks("frame_count", "i8"),
     ),
+    conditional={
+        # large/03_kinetics.qmd, for a source with measured ground reaction: the seven fields by
+        # their spec codes, then the spec's quality flags (GRF missing, inverse-dynamics residual)
+        # and the lossless JCS layers behind joint_torque / joint_power.
+        "large_kinetics": (
+            _ks("com_acceleration", "f4", "T", "3"),
+            _ks("angular_momentum", "f4", "T", "3"),
+            _ks("grf", "f4", "T", "2", "3"),
+            _ks("cop", "f4", "T", "2", "2"),
+            _ks("free_moment", "f4", "T", "2"),
+            _ks("joint_torque", "f4", "T", "17"),
+            _ks("joint_power", "f4", "T", "17"),
+            _ks("kinetics_joint_names", "U", "17"),
+            _ks("joint_moments_jcs", "f4", "T", "17", "3"),
+            _ks("joint_power_total", "f4", "T", "17"),
+            _ks("foot_contact", "bool", "T", "2"),
+            _ks("grf_valid_mask", "bool", "T"),
+            _ks("kinetics_valid_mask", "bool", "T"),
+            _ks("inverse_dynamics_residual", "f4", "T", "6"),
+        ),
+    },
 )
 
 # --------------------------------------------------------------------------- anthro

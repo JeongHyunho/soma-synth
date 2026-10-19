@@ -491,6 +491,60 @@ def check_take_l2(take_dir, take_id: str, bands: PhysicalBands = DEFAULT_BANDS) 
         findings.append(
             Finding("L2", "physical", "FAIL", f"valid_mask coverage {cov:.3f} < {bands.valid_mask_min_coverage}", take_id=take_id, artifact="small")
         )
+    findings.extend(check_take_l2_kinetics(take_dir, take_id))
+    return findings
+
+
+#: Large kinetics arrays that are finite on every frame (the CoP and free moment are not: they are
+#: undefined without contact).
+_KINETICS_FINITE = ("com_acceleration", "angular_momentum", "grf", "joint_torque", "joint_power",
+                    "joint_moments_jcs", "joint_power_total", "inverse_dynamics_residual")
+
+
+def check_take_l2_kinetics(take_dir, take_id: str) -> list[Finding]:
+    """The large_kinetics invariants: what the arrays promise about each other, no numeric band.
+
+    Without contact a foot's GRF is zero and its CoP and free moment are NaN; with contact both are
+    finite. Every other kinetics array is finite on every frame. The kinetics joints are the Large
+    joints after the pelvis, and a kinetics-valid frame is GRF-valid.
+    """
+    findings: list[Finding] = []
+    large_p = Path(take_dir) / "large_reference.npz"
+    if not large_p.exists():
+        return findings
+    with np.load(large_p, allow_pickle=False) as z:
+        if "grf" not in z.files:
+            return findings
+        a = {k: z[k] for k in z.files}
+
+    def fail(message):
+        findings.append(Finding("L2", "kinetics", "FAIL", message, take_id=take_id, artifact="large"))
+
+    for name in _KINETICS_FINITE:
+        if name in a and not np.all(np.isfinite(a[name])):
+            fail(f"non-finite values in {name}")
+    contact = a.get("foot_contact")
+    if contact is not None and contact.shape == a["grf"].shape[:2]:
+        off = ~contact
+        if np.any(a["grf"][off] != 0.0):
+            fail("grf is not zero on frames without foot_contact")
+        for name, cells in (("cop", a.get("cop")), ("free_moment", a.get("free_moment"))):
+            if cells is None:
+                continue
+            on_nan = np.isnan(cells[contact]).any()
+            off_finite = np.isfinite(cells[off]).any()
+            if on_nan:
+                fail(f"{name} is NaN on frames with foot_contact")
+            if off_finite:
+                fail(f"{name} is finite on frames without foot_contact (it is undefined there)")
+    names = a.get("kinetics_joint_names")
+    if names is not None and "joint_names" in a and list(names) != list(a["joint_names"][1:]):
+        fail("kinetics_joint_names is not joint_names[1:]")
+    if "kinetics_valid_mask" in a and "grf_valid_mask" in a:
+        if np.any(a["kinetics_valid_mask"] & ~a["grf_valid_mask"]):
+            fail("kinetics_valid_mask is True on frames grf_valid_mask calls invalid")
+        if not a["kinetics_valid_mask"].any():
+            fail("kinetics_valid_mask has no valid frame")
     return findings
 
 

@@ -64,7 +64,8 @@ class TestRegistryV2:
         assert default.path == V2 and default.schema == "source_pipelines_v2"
         v1 = stages_mod.load(V1)
         assert v1.schema == "source_pipelines_v1" and v1.generation_policy is None
-        assert set(v1.sources) == set(default.sources)
+        # v2 adds sources v1 never had; it drops none
+        assert set(default.sources) - set(v1.sources) == {"milestone2"}
 
     def test_the_policy_is_the_standing_decision_of_adr_0041(self):
         policy = stages_mod.default_registry().generation_policy
@@ -86,7 +87,7 @@ class TestRegistryV2:
         assert lineages == {
             "amass": "amass_faithful_full", "prism": "prism_faithful_full",
             "hknu": "hknu_unified8", "gaitex": "gaitex_unified8",
-            "addbiomechanics": "addbio_unified8",
+            "addbiomechanics": "addbio_unified8", "milestone2": "milestone2_unified8",
         }
         for name in registry.sources:
             assert registry.for_source(name).artifact_class == "experimental_non_candidate"
@@ -149,15 +150,21 @@ class TestRegistryV2:
     def test_every_source_reads_the_three_path_variables(self):
         registry = stages_mod.default_registry()
         for name in registry.sources:
-            assert {"SOMA_DATA_ROOT", "SOMA_SOURCE_ROOT", "SOMA_BODY_MODEL_DIR"} <= set(
-                registry.for_source(name).reads_env), name
+            source = registry.for_source(name)
+            assert {"SOMA_DATA_ROOT", "SOMA_SOURCE_ROOT"} <= set(source.reads_env), name
+            # SOMA_BODY_MODEL_DIR names the 10-component set; a source on another set is not
+            # moved by it and does not claim to read it
+            uses_default_set = source.body_model_set == "smpl_clean"
+            assert ("SOMA_BODY_MODEL_DIR" in source.reads_env) == uses_default_set, name
         assert "ADDBIO_RETARGET_CORPUS" in registry.for_source("addbiomechanics").reads_env
 
     def test_v2_keeps_what_v1_declared_apart_from_the_declared_changes(self):
         v1, v2 = stages_mod.load(V1), stages_mod.load(V2)
         assert (v1.spec_id, v1.spec_version, v1.canonical_stages, v1.resume_predicates) == (
             v2.spec_id, v2.spec_version, v2.canonical_stages, v2.resume_predicates)
-        assert v1.body_model_sets == v2.body_model_sets
+        # v2 adds the 300-component set and changes none of v1's
+        assert {k: v2.body_model_sets[k] for k in v1.body_model_sets} == v1.body_model_sets
+        assert set(v2.body_model_sets) - set(v1.body_model_sets) == {"smpl_clean_300"}
         for name in v1.sources:
             old, new = v1.for_source(name), v2.for_source(name)
             for attribute in ("small_mode", "emitter", "resume", "parallel", "body_model_set",
@@ -207,7 +214,7 @@ class TestRegistryV2:
                 assert given <= set(options), (name, step.script, sorted(given - set(options)))
                 assert {f for f in options if f.startswith("-") and options[f]} <= given
                 scripts += 1
-        assert scripts == 9            # five bundle entrypoints, three corpora, one post-step
+        assert scripts == 10           # six bundle entrypoints, three corpora, one post-step
 
     def test_the_registry_names_no_force_flag_and_no_resume_behaviour(self):
         """Every build is fresh, so nothing tells an entrypoint to rebuild what it would skip,

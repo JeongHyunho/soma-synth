@@ -100,6 +100,7 @@ SOURCE_FOLDERS = {
     "gaitex": "gaitex",
     "hknu": "hknu_fullbody",
     "addbiomechanics": "addbiomechanics",
+    "milestone2": "milestone2",
 }
 
 #: Where the source archives were downloaded to under the data root. Like extracted/, retention

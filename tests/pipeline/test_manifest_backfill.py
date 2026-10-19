@@ -152,7 +152,8 @@ def test_the_shipped_registry_resolves_the_three_sources_that_lacked_an_attribut
     bundled text or a form scope rather than an SPDX identifier, and publication is
     NOT_ESTABLISHED."""
     registry = bf.load_attribution()
-    assert set(registry.resolved) == {"amass", "hknu", "prism"}
+    # milestone2 joined later; its generator writes the attribution at emit time, no backfill
+    assert set(registry.resolved) == {"amass", "hknu", "prism", "milestone2"}
     assert registry.pending == {}
 
 

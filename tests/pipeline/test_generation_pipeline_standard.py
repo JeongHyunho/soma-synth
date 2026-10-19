@@ -45,9 +45,10 @@ def test_every_source_declares_a_known_resume_predicate():
         assert source.resume in registry.resume_predicates, name
 
 
-def test_all_five_sources_are_declared():
+def test_all_six_sources_are_declared():
     registry = stages_mod.default_registry()
-    assert set(registry.sources) == {"amass", "prism", "addbiomechanics", "gaitex", "hknu"}
+    assert set(registry.sources) == {"amass", "prism", "addbiomechanics", "gaitex", "hknu",
+                                     "milestone2"}
 
 
 def test_every_declared_entrypoint_script_exists():

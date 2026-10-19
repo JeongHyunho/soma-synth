@@ -4,9 +4,10 @@
 > **stays on the PC that made it.** The licences of the source datasets apply.
 
 soma-synth generates the SOMA synthetic IMU datasets (spec `qmd_unified8_smpl18`). From motion-capture
-sources (AMASS, PRISM, HKNU, GAITEX, AddBiomechanics) it builds bundles of 8-channel virtual IMU data (Small)
-and an 18-joint SMPL reference (Large), and validates, documents and registers them with one command,
-`soma-synth run`.
+sources (AMASS, PRISM, HKNU, GAITEX, AddBiomechanics, Milestone-2) it builds bundles of 8-channel virtual IMU
+data (Small) and an 18-joint SMPL reference (Large), and validates, documents and registers them with one
+command, `soma-synth run`. For Milestone-2, which has force plates, Large also carries the kinetics (GRF, CoP,
+free moment, COM dynamics, joint moments and powers by inverse dynamics).
 
 The full specification is [`docs/guides/GENERATION_PIPELINE_STANDARD.md`](docs/guides/GENERATION_PIPELINE_STANDARD.md).
 See also [`KNOWN_LIMITATIONS.md`](docs/guides/KNOWN_LIMITATIONS.md), [`RETENTION_RULES.md`](docs/guides/RETENTION_RULES.md)
@@ -49,7 +50,7 @@ The examples below assume the venv is activated.
 | Variable | Meaning | Default |
 |---|---|---|
 | `SOMA_DATA_ROOT` | output root: bundles, corpora, run records, catalog | **required**; an existing absolute path |
-| `SOMA_SOURCE_ROOT` | folder holding the source folders `amass`, `prism`, `gaitex`, `hknu_fullbody`, `addbiomechanics` | `<SOMA_DATA_ROOT>/extracted` |
+| `SOMA_SOURCE_ROOT` | folder holding the source folders `amass`, `prism`, `gaitex`, `hknu_fullbody`, `addbiomechanics`, `milestone2` | `<SOMA_DATA_ROOT>/extracted` |
 | `SOMA_BODY_MODEL_DIR` | folder holding `SMPL_{MALE,FEMALE,NEUTRAL}_clean.npz` | `<SOMA_DATA_ROOT>/body_models/smpl` |
 
 ```powershell
@@ -74,7 +75,8 @@ soma-synth stage-sources --from "<local path of 00_Dataset>" --sums SHA256SUMS -
 soma-synth stage-sources --sums SHA256SUMS --sources prism,hknu --verify-only   # check only
 ```
 
-Sizes: `amass` 12.1 GB, `prism` 5.0 GB, `gaitex` 17.7 GB, `hknu_fullbody` 27.9 GB, `addbiomechanics` 568 GB.
+Sizes: `amass` 12.1 GB, `prism` 5.0 GB, `gaitex` 17.7 GB, `hknu_fullbody` 27.9 GB, `addbiomechanics` 568 GB,
+`milestone2` 1.1 GB.
 Fetch `addbiomechanics` with [rclone](https://rclone.org) (a Google Drive remote of your account, after the
 shortcut above), not through the Drive desktop app, which first caches files on the system disk; then stage
 from the download:
@@ -86,7 +88,14 @@ soma-synth stage-sources --from "<download folder>" --sums SHA256SUMS --sources 
 
 Body models: copy `SMPL_MALE_clean.npz`, `SMPL_FEMALE_clean.npz` and `SMPL_NEUTRAL_clean.npz` from
 `00_Dataset/body_models/smpl` into `SOMA_BODY_MODEL_DIR`. All three are needed. They fall under the MPI SMPL
-non-commercial licence.
+non-commercial licence. Milestone-2's fits use 300 shape components, so it reads a neutral model with all of
+them from `<SOMA_DATA_ROOT>/body_models/smpl300` (not moved by `SOMA_BODY_MODEL_DIR`):
+
+```bash
+python scripts/poc/prepare_smpl_clean_npz.py --num-betas 300 \
+    --src <body_models/smpl>/basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl \
+    --out "$SOMA_DATA_ROOT/body_models/smpl300/SMPL_NEUTRAL_clean.npz"
+```
 
 ## First sample run
 
@@ -117,6 +126,7 @@ soma-synth run --source hknu                        # corpus hknu_smpl24_paired 
 soma-synth run --source gaitex                      # gaitex_smpl24 -> gaitex_unified8
 soma-synth run --source amass --jobs 8              # amass_faithful_full
 soma-synth run --source addbiomechanics --jobs 8    # addbio_smpl24_raw -> addbio_unified8 (hours)
+soma-synth run --source milestone2                  # milestone2_unified8, Large with kinetics
 ```
 
 `run` does generate → validate → readme → register and stops at the first failure. Every run builds into an

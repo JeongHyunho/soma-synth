@@ -235,6 +235,26 @@ profiles:
     # backfill moved it into all 287 manifests. Transcription, not authorship.
     waivers: []
 
+  milestone2:
+    small_mode: synthetic_from_smpl
+    # Measured force plates under every take: the Large artifact carries the kinetics of
+    # large/03_kinetics.qmd (the spec's ARTIFACTS table gates the keys by this capability).
+    capabilities:
+      - large_kinetics
+    additive:
+      manifest_keys:
+        - kinetics
+        - small_fit_glitch_gaps
+        - heading_turn_deg
+        - source_files
+        - subject_measures
+        - trial_condition
+        - source_fit_fix
+      source_attribution_keys:
+        - source_name
+        - attribution_note
+    waivers: []
+
   addbiomechanics:
     small_mode: synthetic_from_smpl
     capabilities: []

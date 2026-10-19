@@ -35,7 +35,9 @@ class TestTheRegistryDeclaresTheSet:
         for name in registry.sources:
             declared = registry.body_model_set_for(name)
             assert declared is not None, name
-            assert declared.relative_path == "body_models/smpl"
+            # Milestone-2's fits were made in the 300-component shape space, kept in a set of its own
+            expected = "body_models/smpl300" if name == "milestone2" else "body_models/smpl"
+            assert declared.relative_path == expected, name
             assert declared.resolver.startswith("smpl18.")
 
     def test_the_set_directory_hangs_off_the_data_root(self, tmp_path):

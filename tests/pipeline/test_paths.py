@@ -115,6 +115,7 @@ class TestSourceRoot:
         assert paths.SOURCE_FOLDERS == {
             "amass": "amass", "prism": "prism", "gaitex": "gaitex",
             "hknu": "hknu_fullbody", "addbiomechanics": "addbiomechanics",
+            "milestone2": "milestone2",
         }
 
     @pytest.mark.parametrize("source", sorted(paths.SOURCE_FOLDERS))

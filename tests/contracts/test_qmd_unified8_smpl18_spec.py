@@ -33,7 +33,7 @@ def test_allowed_enums_are_frozen() -> None:
     assert SUBJECT_SCOPES == frozenset(
         {"subject_constant_trial_frame_invariant", "sequence_constant_frame_invariant"}
     )
-    assert CAPABILITIES == frozenset({"measured_physical", "development_reference"})
+    assert CAPABILITIES == frozenset({"measured_physical", "development_reference", "large_kinetics"})
 
 
 # ------------------------------------------------------------------ dtype_class

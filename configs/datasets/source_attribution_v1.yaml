@@ -101,6 +101,29 @@ sources:
         identifier, because no SPDX licence applies. publication is NOT_ESTABLISHED because no
         record names one.
 
+  milestone2:
+    status: resolved
+    evidence: >-
+      The provider's two READMEs, shipped with the source (smpl_npz_milestone2_refit_overground/
+      README.md, m2_kinetics_for_hyunhu/README.md): KAIST EXO Lab Milestone-2 collection, sent for
+      Small-data generation inside the team. No public record, DOI or licence exists for it.
+    value:
+      source_name: milestone2
+      stable_source_id: ds-kaist-exo-milestone2
+      dataset_citation: >-
+        KAIST EXO Lab, Milestone-2 gait collection (internal, unpublished): SMPL fits
+        (smpl_npz_milestone2_refit_overground) and force-plate kinetics (m2_kinetics_for_hyunhu)
+      publication: NOT_ESTABLISHED
+      license_id: internal_lab_data_no_redistribution
+      changes_made: >-
+        true; the overground SMPL fits turned to a +X heading, reduced to the 18-joint model,
+        eight IMU channels synthesised from the SMPL body, and joint kinetics computed by inverse
+        dynamics from the force plates. Measured GRF, CoP and free moment are carried as measured.
+      attribution_note: >-
+        Internal team data: no licence text exists, so license_id states the internal,
+        no-redistribution scope rather than an SPDX identifier, and publication is NOT_ESTABLISHED
+        because none is recorded.
+
   prism:
     status: resolved
     approved: >-

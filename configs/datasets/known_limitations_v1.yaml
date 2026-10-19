@@ -2739,3 +2739,276 @@ bundles:
       generator fixes of 2026-09-15, owner record
       research/decisions/2026-09-15_*_experimental_regeneration_authorization.md),
       which left the seven run-directory artifacts PIPELINE_GOVERNANCE.md section 10.1 requires
+  milestone2_unified8:
+  - id: milestone2.internal_only
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: distribution_scope is internal_only. Milestone-2 is KAIST EXO Lab data sent for use inside
+      the team; no licence text, DOI or publication exists (license_id internal_lab_data_no_redistribution,
+      publication NOT_ESTABLISHED).
+    consequence: Do not upload to any public Git, cloud, model or dataset hub, or share outside the team;
+      do not redistribute the source or the bundle.
+    evidence: manifest.json distribution_scope, source_attribution.license_id, source_attribution.publication;
+      configs/datasets/source_attribution_v1.yaml sources.milestone2
+    status: open
+    since: '2026-10-19'
+    related:
+    - milestone2.experimental_non_candidate
+  - id: milestone2.experimental_non_candidate
+    kind: rights
+    severity: do_not_use
+    scope:
+      level: bundle
+    statement: 'artifact_class is experimental_non_candidate and quality_gate is NOT_EVALUATED: synthetic
+      Small channels and source-derived kinetics, not canonical output and not contract-compliant.'
+    consequence: Do not cite the bundle as gate-passing or contract-compliant output.
+    evidence: manifest.json artifact_class, artifact_label, quality_gate, unavailable_or_not_applied 'quality
+      gates'
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.emg_excluded
+    kind: source_scope
+    severity: info
+    scope:
+      level: bundle
+    statement: EMG is an excluded modality; the recorded reason is not_in_synthetic_artifact_scope.
+    consequence: No EMG channel exists in any deliverable.
+    evidence: manifest.json excluded_modalities ['emg'] and excluded_modality_reasons.emg
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.all_channels_synthetic
+    kind: source_scope
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: Every IMU channel at all eight sites is synthesised by forward kinematics from the SMPL
+      fits (small_mode synthetic_from_smpl). No sensor noise, bias, misalignment or soft-tissue motion is
+      modelled. The exoskeleton's back IMU on 30 takes is device data and is not carried.
+    consequence: Treat all eight channels as simulated; a model trained only here has never seen sensor
+      noise or mounting error.
+    evidence: small_reference.npz small_mode; manifest.json source.note, small_content in faithful_content,
+      unavailable_or_not_applied 'measured IMU'
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.back_t4_spine3_proxy
+    kind: proxy
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+    statement: 'No SMPL joint sits at T4. back_T4 is a non-rigid chest proxy: its orientation is the spine3
+      segment and its acceleration is evaluated at pelvis + 2/3 (head - pelvis); imu_confidence is 0.4.'
+    consequence: Treat back_T4 as a synthetic point on a deforming trunk line; weight it by its 0.4 confidence.
+    evidence: manifest.json canonicalization_config.chest_alpha; small_reference.npz imu_confidence[:,0]
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.no_sensor_mount_extrinsics
+    kind: approximation
+    severity: caution
+    scope:
+      level: site
+      sites:
+      - back_T4
+      - wrist_l
+      - wrist_r
+      - shank_l
+      - shank_r
+      - occiput
+      - foot_l
+      - foot_r
+    statement: No segment-to-sensor lever arm is applied; each site's acceleration is evaluated at a joint
+      centre rather than at a sensor case on the skin.
+    consequence: Do not fit or evaluate sensor-placement or mounting-offset models on this bundle.
+    evidence: manifest.json unavailable_or_not_applied 'sensor mount extrinsics (segment->sensor lever arm)'
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.foot_heading_flag_spec_sensor
+    kind: hardware_limit
+    severity: info
+    scope:
+      level: site
+      sites:
+      - foot_l
+      - foot_r
+      arrays:
+      - imu_orientation_absolute_heading
+      files:
+      - small_reference.npz
+    statement: imu_orientation_absolute_heading is [T,T,T,T,T,T,F,F] because the spec's foot sensor is
+      a six-axis insole with no heading reference; here the foot orientations are FK-exact and do carry
+      a world heading.
+    consequence: A model meant for the spec's insoles must not depend on foot heading.
+    evidence: small_reference.npz imu_orientation_absolute_heading
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.treadmill_reconstructed_progression
+    kind: source_defect
+    severity: caution
+    scope:
+      level: bundle
+      arrays:
+      - root_velocity
+      - pelvis_position_world_aux
+      - imu_acceleration
+    statement: The subjects walked on a treadmill; the provider reconstructed overground progression by
+      integrating the belt speed, so forward travel is reconstructed, not measured. The provider measured
+      about 6 cm/s of residual stance-foot slide in the overground path (no foot lock was applied,
+      overground_foot_lock_applied 0).
+    consequence: Expect a small foot slide in stance in the kinematics and in the foot-site accelerations;
+      do not take stance-foot velocity as zero.
+    evidence: the provider's README in smpl_npz_milestone2_refit_overground (point 3); the source npz key
+      overground_foot_lock_applied
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.kinetics_laboratory_frame
+    kind: approximation
+    severity: info
+    scope:
+      level: array
+      arrays:
+      - com_acceleration
+      - grf
+      - cop
+      files:
+      - large_reference.npz
+    statement: The kinetics are computed in the treadmill laboratory frame, where the plates measured and
+      Newton's laws hold, and carried into the bundle world by the overground reconstruction's rigid
+      transform. com_acceleration is therefore the laboratory acceleration; it does not include the
+      belt-speed variation the reconstruction adds to the pelvis path, and it differs from a double
+      difference of pelvis_position_world_aux by that term.
+    consequence: Balance GRF against com_acceleration, not against the pelvis path.
+    evidence: manifest.json kinetics.frame_of_computation and kinetics.com_acceleration_frame_note;
+      kinetics.cop_under_foot_check (the CoP lies under the foot the Large kinematics place)
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.exoskeleton_mass
+    kind: approximation
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - joint_torque
+      - joint_moments_jcs
+      - joint_power
+      - com_acceleration
+      - angular_momentum
+      files:
+      - large_reference.npz
+    statement: The subjects wore an exoskeleton. The plates weigh it with the subject (the plate mass is
+      1.8-10.6 kg above the recorded weight), so the segment masses are the subject's SMPL mesh scaled to
+      the plate mass, distributing the device's mass over the body in proportion. Where the device actually
+      sits (attached to the legs) is not modelled; frontal-plane knee moments in particular come out larger
+      than in unassisted gait.
+    consequence: Read the joint kinetics as those of subject plus device under a proportional mass model;
+      treat frontal and transverse components with more caution than the sagittal ones.
+    evidence: manifest.json kinetics.body_mass_force_plate_kg, kinetics.body_mass_recorded_kg,
+      kinetics.body_mass_note; configs/kinetics/milestone2_inverse_dynamics_v1.yaml segments.total_mass
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.kinetics_validity_masks
+    kind: source_defect
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - kinetics_valid_mask
+      - grf_valid_mask
+      files:
+      - large_reference.npz
+    statement: kinetics_valid_mask is False around SMPL fit glitches (a joint turning more than
+      quality.max_rotation_step_deg in one frame, padded by quality.glitch_pad_frames; mostly near the end
+      of a take) and where grf_valid_mask is False (a loaded foot's CoP farther than quality.cop_to_foot_max_m
+      from that foot, a step onto the other belt). Over the 96 takes 98.1% of frames are valid.
+    consequence: Apply kinetics_valid_mask before any use of the kinetics; the arrays are finite there but
+      not meaningful.
+    evidence: manifest.json kinetics.grf_invalid_frames, kinetics.kinematics_invalid_frames,
+      kinetics.kinetics_valid_frames; configs/kinetics/milestone2_inverse_dynamics_v1.yaml quality
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.fit_glitch_small_gaps
+    kind: source_defect
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - imu_valid_mask
+      - imu_orientation
+      - imu_acceleration
+      - imu_angular_velocity
+      - joint_rotation
+      files:
+      - small_reference.npz
+      - large_reference.npz
+    statement: Some provider SMPL fits jump a joint by tens of degrees between two frames (up to about
+      170 degrees), mostly near the end of a take. Synthesised from such a jump, the gyro and acceleration
+      would show spikes no sensor reports, so those frames padded by quality.glitch_pad_frames are invalid
+      Small cells at all eight sites (NaN under imu_valid_mask False, imu_confidence 0) and not
+      kinetics-valid. Large joint_rotation keeps the fit as it is on those frames.
+    consequence: Apply imu_valid_mask to Small and kinetics_valid_mask to the kinetics; do not train on
+      the Large kinematics of the masked frames.
+    evidence: manifest.json small_fit_glitch_gaps.invalid_frames and kinetics.kinematics_invalid_frames;
+      configs/kinetics/milestone2_inverse_dynamics_v1.yaml quality.max_rotation_step_deg, glitch_pad_frames
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.mtp_and_upper_limb_kinetics
+    kind: approximation
+    severity: caution
+    scope:
+      level: array
+      arrays:
+      - joint_torque
+      - joint_moments_jcs
+      files:
+      - large_reference.npz
+    statement: 'SMPL has no anatomical MTP joint: the left_foot/right_foot moments are those of the SMPL
+      toe segment, loaded only while the CoP is ahead of the toe joint. Upper-limb and neck moments carry
+      no external load and depend on segment inertia alone; their non-primary JCS components follow the
+      right-side axes mirrored for the left.'
+    consequence: Use the toe moments as a proxy, not an anatomical MTP moment; treat upper-limb moments as
+      small inertial estimates.
+    evidence: manifest.json kinetics.method and kinetics.joint_torque_component
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.excluded_takes
+    kind: coverage
+    severity: caution
+    scope:
+      level: take
+      takes:
+      - S009_level_075mps_lv0_trial_01
+      - S010_level_100mps_lv0_trial_01
+      - S006_level_075mps_lv0_trial_01
+    statement: Three takes carry status excluded because the provider's overground reconstruction failed
+      (0.09 m, 2.3 m and 4.5 m of forward travel over about three minutes of walking). Their bundles are
+      on disk; their laboratory-frame kinetics are sound, their overground kinematics are not.
+    consequence: Select takes by INDEX status == ok, never by directory listing.
+    evidence: INDEX.json takes[].status and reason; configs/kinetics/milestone2_inverse_dynamics_v1.yaml
+      excluded_takes
+    status: open
+    since: '2026-10-19'
+  - id: milestone2.neutral_body_model
+    kind: approximation
+    severity: info
+    scope:
+      level: bundle
+      files:
+      - anthro_reference.npz
+    statement: The fits use the SMPL neutral model with 300 shape components (betas_num 300, gender neutral);
+      every subject is male (sex M, from the data provider). Height and body mass are measured.
+    consequence: Rebuild the body only with the 300-component neutral model (body_models/smpl300); a
+      10-component model truncates the shape.
+    evidence: anthro_reference.npz betas_num, gender, sex, height_provenance, body_mass_provenance
+    status: open
+    since: '2026-10-19'
