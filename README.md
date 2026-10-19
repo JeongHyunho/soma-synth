@@ -1,5 +1,14 @@
 # soma-synth
 
+Experimental joint gated motion, multiscale signal correction and uncertainty-aware
+IMU synthesis is documented in [JOINT_IMU.md](docs/guides/JOINT_IMU.md).
+This optional checkpoint-based pathway uses SG7 and is separate from the older
+SG11/plain-pose adapter and the default generation pipelines.
+
+Experimental marker-cluster **SG11 physics + optional learned pose correction**:
+see [usage, contracts and limitations](docs/guides/SG11_POSE_CORRECTION.md).
+This is a separate signal-artifact pathway; the existing bundle defaults are unchanged.
+
 > **INTERNAL-ONLY.** Every bundle this code makes is `experimental_non_candidate` · `internal_only` and
 > **stays on the PC that made it.** The licences of the source datasets apply.
 
