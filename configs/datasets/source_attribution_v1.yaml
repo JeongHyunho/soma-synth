@@ -103,6 +103,9 @@ sources:
 
   milestone2:
     status: resolved
+    approved: >-
+      Confirmed as proposed by the project owner on 2026-10-19: license_id states the internal,
+      no-redistribution scope (no licence text exists) and publication is NOT_ESTABLISHED.
     evidence: >-
       The provider's two READMEs, shipped with the source (smpl_npz_milestone2_refit_overground/
       README.md, m2_kinetics_for_hyunhu/README.md): KAIST EXO Lab Milestone-2 collection, sent for

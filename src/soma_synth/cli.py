@@ -740,7 +740,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "$SOMA_DATA_ROOT/extracted)")
     hs.add_argument("--sources", default=None,
                     help="comma-separated source folders (amass, prism, gaitex, hknu_fullbody, "
-                         "addbiomechanics; 'hknu' means hknu_fullbody); default all five")
+                         "addbiomechanics, milestone2; 'hknu' means hknu_fullbody); default all of them")
     hs.add_argument("--out", required=True,
                     help="the list file to write; refused inside the source root, inside "
                          "extracted/ or raw_archives/ of $SOMA_DATA_ROOT, inside an evidence "

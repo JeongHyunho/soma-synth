@@ -76,7 +76,7 @@ soma-synth stage-sources --sums SHA256SUMS --sources prism,hknu --verify-only   
 ```
 
 Sizes: `amass` 12.1 GB, `prism` 5.0 GB, `gaitex` 17.7 GB, `hknu_fullbody` 27.9 GB, `addbiomechanics` 568 GB,
-`milestone2` 1.1 GB.
+`milestone2` 1.1 GB (its list is `SHA256SUMS.milestone2`: `--sums SHA256SUMS.milestone2 --sources milestone2`).
 Fetch `addbiomechanics` with [rclone](https://rclone.org) (a Google Drive remote of your account, after the
 shortcut above), not through the Drive desktop app, which first caches files on the system disk; then stage
 from the download:
