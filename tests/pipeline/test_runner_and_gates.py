@@ -422,10 +422,10 @@ def test_a_ledger_trusted_take_is_counted_separately_from_written_and_skipped(tm
     because trusted was folded into neither counter. It is a third outcome and gets its own."""
     root = tmp_path / "run_t"
     record = provenance_mod.ProvenanceRecord(
-        source_name="amass", spec_id="qmd_unified8_smpl18", spec_version="faithful-v2"
+        source_name="amass", spec_id="qmd_unified8", spec_version="faithful-v2"
     )
     inputs = rid.RunIdentityInputs(
-        spec_id="qmd_unified8_smpl18", spec_version="faithful-v2",
+        spec_id="qmd_unified8", spec_version="faithful-v2",
         source_name="amass", entrypoint="scripts/poc/generate_amass_faithful_all.py",
     )
     run = RunDirectory(root=root, identity_inputs=inputs, provenance=record).open()

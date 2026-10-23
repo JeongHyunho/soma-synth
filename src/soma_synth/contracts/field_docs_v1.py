@@ -1,4 +1,4 @@
-"""One-line semantics for every field of the qmd_unified8_smpl18 dataset spec.
+"""One-line semantics for every field of the qmd_unified8 dataset spec.
 
 The spec module owns structure (dtype/shape/axes, CORE vs capability-conditional); this registry owns the
 prose. The README generator merges the two with live introspection. A completeness test asserts every spec
@@ -10,7 +10,7 @@ from __future__ import annotations
 ARTIFACT_DOCS: dict[str, str] = {
     "small": "8-channel wearable IMU (orientation + acceleration + angular velocity) at 8 body sites, "
              "expressed in the spec sensor frame S (spec_S_v2).",
-    "large": "Reduced-model kinematics: 18-joint rotations/velocities + pelvis trajectory, plus the "
+    "large": "SMPL-24 kinematics: 24-joint rotations/velocities + pelvis trajectory, plus the "
              "lossless 24-joint SMPL global orientation; with large_kinetics, the kinetics of "
              "large/03_kinetics.qmd (GRF, CoP, free moment, COM dynamics, joint moments and powers).",
     "anthro": "Subject/sequence skeleton constants: rest joint positions, segment lengths, SMPL shape "
@@ -41,9 +41,9 @@ FIELD_DOCS: dict[str, dict[str, str]] = {
         "gyro_provenance": "(8,) how each site's gyro was obtained (measured gyr_local_raw vs derived from orientation; measured only).",
     },
     "large": {
-        "joint_names": "(18,) reduced-model joint order (index 0 = pelvis global, 1-17 = SMPL local joints).",
-        "joint_rotation": "(T,18,4) quat wxyz — [0] pelvis global orientation, [1:] 17 parent-relative local rotations.",
-        "joint_velocity": "(T,18,3) deg/s angular velocity per joint ([0] = pelvis).",
+        "joint_names": "(24,) SMPL joint order (index 0 = pelvis global, 1-23 = SMPL local joints).",
+        "joint_rotation": "(T,24,4) quat wxyz — [0] pelvis global orientation, [1:] 23 parent-relative local rotations, the source SMPL pose.",
+        "joint_velocity": "(T,24,3) deg/s angular velocity per joint ([0] = pelvis).",
         "root_velocity": "(T,3) m/s pelvis root velocity (frame-to-frame displacement / dt).",
         "pelvis_position_world_aux": "(T,3) m absolute pelvis path (anchor for integrating root_velocity).",
         "smpl_global_orientation_world": "(T,24,4) quat wxyz — lossless global orientation of all 24 SMPL joints in world.",
@@ -55,11 +55,11 @@ FIELD_DOCS: dict[str, dict[str, str]] = {
         "grf": "(T,2,3) N measured ground reaction force on each foot (left, right) in world; zero without contact (large_kinetics).",
         "cop": "(T,2,2) m centre of pressure of each foot on the ground plane (world X, Y); NaN where foot_contact is False (large_kinetics).",
         "free_moment": "(T,2) N m vertical free moment of each foot about its CoP; NaN where foot_contact is False (large_kinetics).",
-        "joint_torque": "(T,17) N m internal joint moment of the 17 moving joints (kinetics_joint_names), primary JCS component: flexion/dorsiflexion, shoulder elevation (large_kinetics).",
-        "joint_power": "(T,17) W joint power of the primary component: joint_torque x the matching JCS angular velocity (large_kinetics).",
-        "kinetics_joint_names": "(17,) joint order of the kinetics arrays: joint_names[1:] (the pelvis carries no joint moment).",
-        "joint_moments_jcs": "(T,17,3) N m internal (parent-on-child) joint moment on the three JCS axes; joint_torque is one of these components.",
-        "joint_power_total": "(T,17) W total joint power, moment . relative angular velocity over all three axes.",
+        "joint_torque": "(T,23) N m internal joint moment of the 23 moving joints (kinetics_joint_names), primary JCS component: flexion/dorsiflexion, shoulder and collar elevation (large_kinetics).",
+        "joint_power": "(T,23) W joint power of the primary component: joint_torque x the matching JCS angular velocity (large_kinetics).",
+        "kinetics_joint_names": "(23,) joint order of the kinetics arrays: joint_names[1:] (the pelvis carries no joint moment).",
+        "joint_moments_jcs": "(T,23,3) N m internal (parent-on-child) joint moment on the three JCS axes; joint_torque is one of these components.",
+        "joint_power_total": "(T,23) W total joint power, moment . relative angular velocity over all three axes.",
         "foot_contact": "(T,2) bool foot loaded above the contact threshold (left, right).",
         "grf_valid_mask": "(T,) bool False where the measured ground reaction cannot be trusted (e.g. a foot on the other plate).",
         "kinetics_valid_mask": "(T,) bool False where the joint kinetics are not valid (GRF invalid, or the motion fit glitches); apply it before any loss.",
@@ -70,13 +70,11 @@ FIELD_DOCS: dict[str, dict[str, str]] = {
         "subject_scope": "() scope of these constants (subject-constant for PRISM, sequence-constant for AMASS).",
         "subject_scope_note": "() human note on the frame-invariance of the constants.",
         "reference_poses": "(2,) the two reference poses (e.g. T-pose, upright-neutral) that joint_position is given for.",
-        "joint_names": "(22,) SMPL 22-chain joint names for joint_position.",
-        "joint_position": "(2,22,3) m rest joint positions for the 2 reference poses (SMPL canonical rest, Y-up).",
+        "joint_names": "(24,) SMPL joint names for joint_position.",
+        "joint_position": "(2,24,3) m rest joint positions for the 2 reference poses (SMPL canonical rest, Y-up).",
         "joint_position_frame": "() frame of joint_position (smpl_canonical_rest_yup).",
-        "segment_names": "(13,) the 13 body-segment names for segment_length.",
-        "segment_length": "(13,) m bone/segment lengths.",
-        "fixed_joint_names": "(4,) the 4 frozen joints of the reduced model (spine1, spine2, left/right collar).",
-        "fixed_joint_rotation": "(4,4) quat wxyz — constant local rotation of each frozen joint, fitted once per subject by smpl18.reduce (reduced_model_fit.json at the bundle root).",
+        "segment_names": "(15,) the 15 body-segment names for segment_length.",
+        "segment_length": "(15,) m bone/segment lengths.",
         "sex": "() subject sex.",
         "height": "() m stature.",
         "body_mass": "() kg body mass (NaN if unavailable, e.g. AMASS).",
@@ -88,7 +86,6 @@ FIELD_DOCS: dict[str, dict[str, str]] = {
         "sex_provenance": "() provenance of sex.",
         "betas_provenance": "() provenance of betas.",
         "skeleton_provenance": "() provenance of the rest skeleton (joint_position / segment_length).",
-        "fixed_joint_rotation_provenance": "() how the frozen-joint constants were fitted (method, scope, pooled takes and frames).",
         "reconstruction_note": "() how to reconstruct world joints from anthro rest + large joint_rotation.",
         "pair_id": "() stable take-identity hash (matches small/large).",
         "subject_id": "() source subject identifier.",

@@ -1,10 +1,10 @@
-"""Declarative dataset spec for spec_id=qmd_unified8_smpl18, spec_version=faithful-v2: structure
+"""Declarative dataset spec for spec_id=qmd_unified8, spec_version=faithful-v2: structure
 and declared invariants, not values.
 """
 
 import pytest
 
-from soma_synth.contracts.qmd_unified8_smpl18_spec import (
+from soma_synth.contracts.qmd_unified8_spec import (
     ARTIFACTS,
     AXIS_CONVENTIONS,
     CAPABILITIES,
@@ -23,7 +23,7 @@ from soma_synth.contracts.qmd_unified8_smpl18_spec import (
 
 # ------------------------------------------------------------------ identity
 def test_spec_identity() -> None:
-    assert SPEC_ID == "qmd_unified8_smpl18"
+    assert SPEC_ID == "qmd_unified8"
     assert SPEC_VERSION == "faithful-v2"
 
 
@@ -99,16 +99,17 @@ def test_large_uses_canonical_world_key_not_prism_world() -> None:
     core = {k.name for k in ARTIFACTS["large"].core}
     assert "smpl_global_orientation_world" in core
     assert "smpl_global_orientation_prism_world" not in core
-    # joint_names is (18,) in large (per-artifact namespacing; anthro differs)
+    # joint_names is (24,) in large: the SMPL joints, pelvis first
     jn = next(k for k in ARTIFACTS["large"].core if k.name == "joint_names")
-    assert jn.axes == ("18",)
+    assert jn.axes == ("24",)
 
 
 def test_anthro_has_subject_scope_note_and_free_betas() -> None:
     core = {k.name: k for k in ARTIFACTS["anthro"].core}
     assert "subject_scope_note" in core
-    # per-artifact namespacing: joint_names is (22,) here, not (18,)
-    assert core["joint_names"].axes == ("22",)
+    # the anthro rest skeleton names the same 24 SMPL joints
+    assert core["joint_names"].axes == ("24",)
+    assert not any(name.startswith("fixed_joint") for name in core)
     # betas free length: rank 1, symbolic N axis (not a fixed int)
     assert core["betas"].axes == ("N",)
 
@@ -167,7 +168,7 @@ def test_derive_capabilities_gaitex_marker_synthetic_has_no_measured_keys() -> N
 
 def test_marker_mode_is_relabel_tolerant_and_smpl_mode_is_not() -> None:
     """L3 reads this set: a marker-fitted body is not a constant relabel of the SMPL joint (ADR-0039)."""
-    from soma_synth.contracts.qmd_unified8_smpl18_spec import RELABEL_TOLERANT_SMALL_MODES
+    from soma_synth.contracts.qmd_unified8_spec import RELABEL_TOLERANT_SMALL_MODES
 
     assert RELABEL_TOLERANT_SMALL_MODES == frozenset({"measured_physical", "synthetic_from_markers"})
     assert RELABEL_TOLERANT_SMALL_MODES < SMALL_MODES

@@ -67,7 +67,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePath
 
-from soma_synth.contracts import qmd_unified8_smpl18_spec as spec
+from soma_synth.contracts import qmd_unified8_spec as spec
 from soma_synth.validation import checks as _checks
 from soma_synth.validation import npz_io as _npz
 from soma_synth.validation import report as _report

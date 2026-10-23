@@ -64,7 +64,10 @@ def test_the_skeleton_definition_is_the_same_table(anthro):
     assert tuple(definition.PARENTS[1:]) == tuple(int(p) for p in smpl_correspondence.SMPL24_PARENTS[1:])
     assert tuple(definition.JOINT_NAMES) == tuple(anthro.JOINT24_NAMES)
     assert tuple(definition.JOINT_NAMES) == tuple(smpl_correspondence.SMPL24_NAMES)
-    assert tuple(definition.SEGMENTS) == tuple(tuple(s) for s in anthro.SEGMENTS)
+    # the anthro segments are the package's, then the two hands (anthro/00_anthropometry.qmd)
+    segments = tuple(tuple(s) for s in anthro.SEGMENTS)
+    assert segments[:len(definition.SEGMENTS)] == tuple(definition.SEGMENTS)
+    assert segments[len(definition.SEGMENTS):] == (("hand_l", 20, 22), ("hand_r", 21, 23))
 
 
 def test_rest_joints_match_both_local_copies(anthro, model_arrays, rng):
@@ -84,7 +87,8 @@ def test_betas_wider_than_the_model_are_truncated_the_same_way(anthro, model_arr
 
 def test_segment_lengths_match(anthro, rng):
     rest = rng.normal(0, 0.3, (24, 3))
-    np.testing.assert_array_equal(kinematics.segment_lengths(rest), anthro.segment_lengths(rest))
+    shared = kinematics.segment_lengths(rest)
+    np.testing.assert_array_equal(shared, anthro.segment_lengths(rest)[:len(shared)])
 
 
 def test_single_frame_fk_matches_with_the_pelvis_at_its_rest_position(anthro, rng):

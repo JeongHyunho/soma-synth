@@ -38,7 +38,7 @@ import json
 import sys
 from pathlib import Path
 
-from soma_synth.contracts import qmd_unified8_smpl18_spec as spec
+from soma_synth.contracts import qmd_unified8_spec as spec
 from soma_synth.datasets import catalog
 
 # The generator launch has one copy, in pipeline.generate (ADR-0041); these names are
@@ -574,7 +574,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="soma-synth",
         description="Generate/validate/document/register experimental synthetic-IMU datasets "
-                    "(spec_id=qmd_unified8_smpl18).",
+                    "(spec_id=qmd_unified8).",
     )
     sub = p.add_subparsers(dest="command", required=True)
 

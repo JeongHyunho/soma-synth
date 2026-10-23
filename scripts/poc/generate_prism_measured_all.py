@@ -46,7 +46,7 @@ import numpy as np
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
-SPEC_ID = "qmd_unified8_smpl18"
+SPEC_ID = "qmd_unified8"
 SPEC_VERSION = "faithful-v2"
 
 
@@ -68,9 +68,8 @@ paths = _gen.paths
 DATASET_DIRNAME = "prism_faithful_full"
 CORE_FILES = faithful_all.CORE_FILES
 
-# Reused faithful batch helpers (spec enumeration + per-subject anthro fit are identical).
+# Reused faithful batch helpers (spec enumeration is identical).
 enumerate_specs = faithful_all.enumerate_specs
-compute_subject_constants = faithful_all.compute_subject_constants
 
 
 def _write_dataset_description(out_root: Path, counts: dict, total: int) -> None:
@@ -83,7 +82,7 @@ def _write_dataset_description(out_root: Path, counts: dict, total: int) -> None
 One subdirectory per take: `prism-<subj>-<take>/` with `small_reference.npz`, `large_reference.npz`,
 `anthro_reference.npz`, `development_reference.npz`, `smpl_root_translation.npz`, `manifest.json`. Per-take
 field/shape/convention truth is the take's `manifest.json`; the full field layout is in
-`DATA_DESCRIPTION_EN.md`. Lineage: `spec_id=qmd_unified8_smpl18`, `spec_version=faithful-v2` (large uses the
+`DATA_DESCRIPTION_EN.md`. Lineage: `spec_id=qmd_unified8`, `spec_version=faithful-v2` (large uses the
 canonical key `smpl_global_orientation_world`).
 
 Small simulates the REAL physical wearable IMU, built from PRISM's physical `imu.*` stream:
@@ -136,79 +135,8 @@ def _write_root_translation(out_dir, spec, manifest, anthro) -> None:
     )
 
 
-POLICY_FILE = "prism_faithful_reduced_model_policy_v1.json"
-POLICY_TEXT = ("A fixed joint flagged in a take is a Large-motion promotion CANDIDATE (not "
-               "auto-promoted); the schema stays 18 Large + 4 fixed. Promotion (moving a fixed joint "
-               "into Large motion) is a separate schema decision applied cohort-wide if a joint is "
-               "flagged in a material fraction of takes.")
-
-
-def write_reduced_model_policy(out_root: Path, takes: list) -> Path:
-    """The bundle-level summary of the per-take fixed-joint promotion flags.
-
-    The registry requires this file at the bundle root (dataset_profiles_v1.yaml, prism
-    additive.bundle_files), and this function writes it. Every number here is a count over
-    the takes' own manifest.validation.reduced_model_fit_residual_m blocks, so the file cannot
-    disagree with the takes beside it.
-    """
-    threshold = _gen.PROMOTE_TAU_P95_M
-    joint_names = _gen.anthro_smpl.JOINT24_NAMES
-    downstream = {fixed: [joint_names[k] for k in indices]
-                  for fixed, indices in _gen.FIXED_JOINT_DOWNSTREAM.items()}
-    per_joint: dict = {}
-    per_subject: dict = {}
-    pairs = []
-    with_candidate = 0
-    counted = 0
-    for entry in takes:
-        if entry.get("status") != "ok":
-            continue
-        path = out_root / entry["rel"] / "manifest.json"
-        try:
-            block = json.loads(path.read_text(encoding="utf-8"))["validation"]["reduced_model_fit_residual_m"]
-        except (OSError, KeyError, ValueError):
-            continue                                    # a take without the block says nothing here
-        counted += 1
-        threshold = block.get("promotion_threshold_p95_m", threshold)
-        promotion = block.get("fixed_joint_promotion") or {}
-        flagged_here = False
-        subject = entry["rel"].rsplit("-take", 1)[0]
-        for joint, verdict in promotion.items():
-            if verdict.get("promotion_candidate"):
-                flagged_here = True
-                per_joint[joint] = per_joint.get(joint, 0) + 1
-                # Counted per flagged (take, joint) pair, as the hand-written 2026-08 file did
-                # despite its key's name; kept so the regenerated file reads the same.
-                per_subject[subject] = per_subject.get(subject, 0) + 1
-                pairs.append({"take": entry["rel"], "joint": joint,
-                              "p95_m": round(float(verdict["p95_m"]), 4)})
-        if flagged_here:
-            with_candidate += 1
-    policy = {
-        "config_id": "prism_faithful_reduced_model_policy_v1",
-        "version": "1.0.0",
-        "distribution_scope": "internal_only",
-        "method": ("reduced_model_fit (spec sec-anthro-fit): weld 4 fixed joints to per-subject "
-                   "constant + refit spine3/shoulders; distal orientation exact; position residual QC."),
-        "promotion_threshold_p95_m": threshold,
-        "fixed_joint_downstream": downstream,
-        "takes_total": counted,
-        "takes_with_any_candidate": with_candidate,
-        "flagged_take_count_per_joint": dict(sorted(per_joint.items())),
-        "flagged_take_count_per_subject": dict(sorted(per_subject.items())),
-        "flagged_pairs": pairs,
-        "policy": POLICY_TEXT,
-    }
-    target = out_root / POLICY_FILE
-    target.write_text(json.dumps(policy, ensure_ascii=False, indent=2) + "\n",
-                      encoding="utf-8", newline="\n")
-    return target
-
-
-def run(specs, out_root: str, build=None, force: bool = False, fits=None) -> dict:
-    """`fits` is the subjects' `CorpusFits`; a take it does not name is fitted on its own."""
+def run(specs, out_root: str, build=None, force: bool = False) -> dict:
     build = build or measured.build_measured
-    by_take = fits.by_take if fits is not None else {}
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
     results = []
@@ -220,8 +148,7 @@ def run(specs, out_root: str, build=None, force: bool = False, fits=None) -> dic
             results.append({"take": faithful_all._take_dirname(spec), "status": "skipped"})
             continue
         try:
-            small, large, dev, anthro, manifest = build(
-                spec, reduction=by_take.get(faithful_all._take_dirname(spec)))
+            small, large, dev, anthro, manifest = build(spec)
             _gen.write_outputs(str(out_dir), small, large, dev, anthro, manifest)
             _write_root_translation(out_dir, spec, manifest, anthro)
             counts["ok"] += 1
@@ -240,9 +167,6 @@ def run(specs, out_root: str, build=None, force: bool = False, fits=None) -> dic
          "frames": r.get("frames"), "rel": r["take"], "relative_path": r["take"]}
         for r in results
     ]
-    write_reduced_model_policy(out_root, takes)
-    if fits is not None:
-        fits.write(out_root)
     index = {
         "spec_id": SPEC_ID, "spec_version": SPEC_VERSION,
         "dataset_dirname": DATASET_DIRNAME, "source": "prism",
@@ -330,14 +254,12 @@ def main(argv=None) -> int:
     if args.limit:
         specs = specs[: args.limit]
     if not specs:
-        # run() rewrites INDEX.json, the policy file, the fit record and the description over
+        # run() rewrites INDEX.json and the description over
         # whatever is selected
         print(faithful_all.no_take_selected(source, args), flush=True)
         return 2
-    print("fitting per-subject frozen-joint constants (smpl18.reduce) ...", flush=True)
-    fits = compute_subject_constants(specs)
     out_root = str(out)
-    index = run(specs, out_root, force=args.force, fits=fits)
+    index = run(specs, out_root, force=args.force)
     print("INDEX:", json.dumps(index["counts"]), "->", out_root, flush=True)
     return 0
 

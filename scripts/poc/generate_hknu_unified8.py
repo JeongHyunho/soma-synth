@@ -1,4 +1,4 @@
-"""HKNU -> a `qmd_unified8_smpl18` dataset the generator-independent validator can check.
+"""HKNU -> a `qmd_unified8` dataset the generator-independent validator can check.
 
 `hknu_smpl24_paired` already carries the retargeted SMPL motion, the eight synthetic channels and
 the measured IMU beside them, but under its own spec_id -- so the only check it has ever had is the
@@ -59,7 +59,6 @@ def _load(path: pathlib.Path, name: str):
 
 
 EMIT = _load(_HERE.parent / "unified8_emit.py", "unified8_emit")
-REDUCED = EMIT.REDUCED
 # The same scan `scripts/diagnostics/pose_discontinuity_scan.py --apply` runs by hand, applied
 # while the INDEX is being written, so an excluded take is excluded from the first version of
 # the bundle rather than in a second pass someone has to remember.
@@ -212,8 +211,7 @@ def identity_for(take: pathlib.Path, subject: str, trial: str, frames: int,
         anthro_namespace="anthro_reference/hknu_smpl_v1",
         subject_scope="subject_constant_trial_frame_invariant",
         subject_scope_note="betas are fit once per subject from the N-pose joint centres and shared "
-                           "across that subject's trials; the frozen-joint constants are fitted once "
-                           "per subject over all of its trials (smpl18.reduce) and shared the same way.",
+                           "across that subject's trials.",
         height_m=float(info["height_m"]),
         height_provenance="measured:DatasetInfo.xlsx BodyHeight",
         body_mass_kg=float(info["mass_kg"]),
@@ -246,17 +244,9 @@ def take_dirname(subject: str, trial: str) -> str:
     return f"hknu_{subject}_{trial}"
 
 
-def fit_members(take: pathlib.Path) -> tuple[str, str, np.ndarray, np.ndarray]:
-    """(subject, take directory, pose, rest joints) of one corpus take, for the subject's fit."""
-    with np.load(take, allow_pickle=False) as z:
-        subject = str(z["subject"])
-        return (subject, take_dirname(subject, str(z["trial"])),
-                np.asarray(z["pose"], np.float64), np.asarray(z["rest_joints"], np.float64))
-
-
 def convert(take: pathlib.Path, out_root: pathlib.Path, models: dict,
             anthropometry: dict, root: pathlib.Path | None = None,
-            paired: pathlib.Path | None = None, reduction=None) -> dict:
+            paired: pathlib.Path | None = None) -> dict:
     with np.load(take, allow_pickle=False) as z:
         subject = str(z["subject"])
         trial = str(z["trial"])
@@ -275,7 +265,7 @@ def convert(take: pathlib.Path, out_root: pathlib.Path, models: dict,
     # subject's measured bone lengths and the pose was fitted against that
     bundle = EMIT.build_bundle(pose24=pose, trans=trans, betas=betas, gender=gender,
                                model=models[gender], src_fps=rate, source=source,
-                               rest_joints=rest, reduction=reduction)
+                               rest_joints=rest)
     out_dir = out_root / take_dirname(subject, trial)
     EMIT.write_bundle(out_dir, bundle)
     return {"take_id": out_dir.name, "rel": out_dir.name, "status": "ok",
@@ -290,7 +280,7 @@ def select_subjects(paired: pathlib.Path, wanted=None, trials: int | None = None
     Names are matched exactly against the folder listing, case included (on NTFS the joined path
     exists whatever its case, while this selection compares strings). A name the corpus lacks, and
     a selection that holds no take (``<subject>/*.npz``, after the ``--trials`` cap), raise
-    ValueError: the run would write INDEX.json, the fit record and the description over zero takes
+    ValueError: the run would write INDEX.json and the description over zero takes
     and exit 0."""
     subjects = sorted(p.name for p in paired.iterdir() if p.is_dir())
     if wanted:
@@ -357,21 +347,14 @@ def main(argv=None) -> int:
     root = corpus_root(paired)
 
     entries: list[dict] = []
-    fits = REDUCED.CorpusFits(REDUCED.settings_for_source("hknu"))
     started = time.time()
     for subject in subjects:
         takes = sorted((paired / subject).glob("*.npz"))
         if args.trials:
             takes = takes[: args.trials]
-        # One set of frozen-joint constants per subject, fitted over every trial before any is
-        # emitted, on the corpus's own (bone-length-scaled) skeleton.
-        members = [fit_members(take) for take in takes]
-        fits.fit(f"hknu_{subject}", [(rel, pose, rest) for _s, rel, pose, rest in members],
-                 basis="every trial of the subject, native rate")
-        for take, (_s, rel, _p, _r) in zip(takes, members):
+        for take in takes:
             try:
-                entries.append(convert(take, out_root, models, anthropometry, root, paired,
-                                       reduction=fits.by_take[rel]))
+                entries.append(convert(take, out_root, models, anthropometry, root, paired))
             except Exception as error:                          # noqa: BLE001
                 entries.append({"take_id": take.stem, "rel": f"hknu_{take.stem}",
                                 "status": "failed",
@@ -412,10 +395,9 @@ def main(argv=None) -> int:
     }
     (out_root / "INDEX.json").write_text(json.dumps(index, ensure_ascii=False, indent=2),
                                          encoding="utf-8", newline="\n")
-    fits.write(out_root)
     EMIT.write_data_description(
         out_root, index,
-        title="HKNU FullBody - synthetic IMU reference (qmd_unified8_smpl18)",
+        title="HKNU FullBody - synthetic IMU reference (qmd_unified8)",
         body=(
             "## What this is, and what it is not\n\n"
             "Optical mocap retargeted onto SMPL-24, then synthesized into the eight Small channels. "

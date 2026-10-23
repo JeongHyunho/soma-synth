@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from soma_synth.contracts import qmd_unified8_smpl18_spec as spec
+from soma_synth.contracts import qmd_unified8_spec as spec
 from soma_synth.validation import checks
 from soma_synth.validation.runner import validate
 

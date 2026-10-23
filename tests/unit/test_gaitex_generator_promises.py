@@ -126,7 +126,7 @@ class TestConfidenceComesFromTheSettings:
         assert settings.version == "1.1.1"
 
     def test_the_small_mode_the_wrapper_stamps_is_the_one_the_spec_admits(self, generator):
-        from soma_synth.contracts.qmd_unified8_smpl18_spec import RELABEL_TOLERANT_SMALL_MODES, SMALL_MODES
+        from soma_synth.contracts.qmd_unified8_spec import RELABEL_TOLERANT_SMALL_MODES, SMALL_MODES
 
         assert generator.SMALL_MODE in SMALL_MODES
         assert generator.SMALL_MODE in RELABEL_TOLERANT_SMALL_MODES

@@ -219,7 +219,7 @@ def test_large_anthro_reconciled_to_faithful_v2():
     assert "smpl_global_orientation_prism_world" not in large_m        # drift retired
     assert large_m["joint_names"].dtype.kind == "U"                    # U-dtype strings
     assert "subject_scope_note" in anthro_m and "subject_scope_note" not in anthro_f
-    assert manifest_m["spec_id"] == "qmd_unified8_smpl18"
+    assert manifest_m["spec_id"] == "qmd_unified8"
     assert manifest_m["spec_version"] == "faithful-v2"
     assert "README.md" not in manifest_m["deliverables"]
     assert "smpl_root_translation.npz" in manifest_m["deliverables"]

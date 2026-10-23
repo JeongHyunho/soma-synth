@@ -35,7 +35,7 @@ MODULES = [
     "soma_synth.validation.runner",
     "soma_synth.docs_gen.readme",
     "soma_synth.datasets.catalog",
-    "soma_synth.contracts.qmd_unified8_smpl18_spec",
+    "soma_synth.contracts.qmd_unified8_spec",
     "soma_synth.gaitex_retarget.native",
 ]
 

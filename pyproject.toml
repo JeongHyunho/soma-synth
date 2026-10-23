@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "soma-synth"
 version = "0.1.0"
-description = "Synthetic IMU dataset generation pipeline (qmd_unified8_smpl18): generators, retarget corpora, validation, README rendering and the local catalog"
+description = "Synthetic IMU dataset generation pipeline (qmd_unified8): generators, retarget corpora, validation, README rendering and the local catalog"
 readme = "README.md"
 requires-python = ">=3.12"
 # smpl18 is not listed: it is the submodule at packages/smpl18 and is installed from there

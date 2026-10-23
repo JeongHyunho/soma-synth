@@ -12,7 +12,7 @@ def test_dataset_readme_sections_and_determinism(tmp_path: Path) -> None:
     ds = make_dataset(tmp_path / "amass_x", source="amass", n=1)
     md = readme.render_dataset_readme(ds)
     assert "INTERNAL-ONLY" in md
-    assert "qmd_unified8_smpl18" in md and "faithful-v2" in md
+    assert "qmd_unified8" in md and "faithful-v2" in md
     assert "small_reference.npz" in md and "large_reference.npz" in md
     assert "imu_orientation" in md and "smpl_global_orientation_world" in md
     assert "CORE" in md
@@ -33,7 +33,7 @@ def test_top_level_readme_diffs(tmp_path: Path) -> None:
     a = make_dataset(tmp_path / "amass_x", source="amass", n=1)
     p = make_dataset(tmp_path / "prism_x", source="prism", small_mode="measured_physical", n=1)
     md = readme.render_top_level_readme([a, p])
-    assert "qmd_unified8_smpl18" in md
+    assert "qmd_unified8" in md
     assert "amass" in md and "prism" in md
     assert "measured_physical" in md and "synthetic_from_smpl" in md
     assert "Common CORE fields" in md

@@ -48,7 +48,7 @@ DESCRIPTION = """# HKNU FullBody - synthetic IMU reference
 
 **INTERNAL-ONLY.** Not canonical output.
 
-- `spec_id` / `spec_version`: `qmd_unified8_smpl18` / `faithful-v2`
+- `spec_id` / `spec_version`: `qmd_unified8` / `faithful-v2`
 - source: `hknu`
 - takes: 287 ok, 0 failed, 0 excluded of 287
 - generated: 2000-01-01T00:00:00+00:00

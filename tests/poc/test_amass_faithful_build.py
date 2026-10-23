@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from scipy.spatial.transform import Rotation
 from data_root_skips import DATA_ROOT, needs_data
 
 SCRIPT = Path(__file__).parents[2] / "scripts" / "poc" / "generate_amass_faithful.py"
@@ -109,13 +110,13 @@ def test_small_orientation_is_spec_sensor_frame_s_v2():
 
 
 @NEEDS_DATA
-def test_large_reduced_model_and_trajectory_reconstruction():
+def test_large_smpl24_and_trajectory_reconstruction():
     m = _mod()
     small, large, anthro, manifest = m.build(_spec(m, "KIT", _first("KIT")))
     mm = int(large["frame_count"])
-    assert list(large["joint_names"]) == m.JOINT18_NAMES
-    assert large["joint_rotation"].shape == (mm, 18, 4)
-    assert large["joint_velocity"].shape == (mm, 18, 3)
+    assert list(large["joint_names"]) == m.JOINT24_NAMES
+    assert large["joint_rotation"].shape == (mm, 24, 4)
+    assert large["joint_velocity"].shape == (mm, 24, 3)
     assert large["root_velocity"].shape == (mm, 3)
     assert large["smpl_global_orientation_world"].shape == (mm, 24, 4)
     assert "smpl_global_orientation_prism_world" not in large   # PRISM-specific name dropped for AMASS
@@ -123,10 +124,30 @@ def test_large_reduced_model_and_trajectory_reconstruction():
 
 
 @NEEDS_DATA
+def test_large_local_rotations_reproduce_the_global_orientations():
+    """Large is the source pose: FK of joint_rotation gives smpl_global_orientation_world."""
+    m = _mod()
+    _small, large, _anthro, _manifest = m.build(_spec(m, "KIT", _first("KIT")))
+
+    def matrices(q):
+        q = np.asarray(q, np.float64)
+        return Rotation.from_quat(np.concatenate([q[..., 1:], q[..., :1]], -1).reshape(-1, 4)) \
+            .as_matrix().reshape(q.shape[:-1] + (3, 3))
+
+    local = matrices(large["joint_rotation"])
+    world = matrices(large["smpl_global_orientation_world"])
+    glob = np.empty_like(local)
+    glob[:, 0] = local[:, 0]
+    for j in range(1, 24):
+        glob[:, j] = glob[:, int(m.SMPL24_PARENTS[j])] @ local[:, j]
+    assert np.abs(glob - world).max() < 1e-5
+
+
+@NEEDS_DATA
 def test_anthro_amass_overrides():
     m = _mod()
     small, large, anthro, manifest = m.build(_spec(m, "KIT", _first("KIT")))
-    assert anthro["joint_position"].shape == (2, 22, 3)
+    assert anthro["joint_position"].shape == (2, 24, 3)
     assert anthro["betas"].shape == (16,)
     # AMASS constants are sequence-level (per-sequence betas), not subject-shared
     assert str(anthro["subject_scope"]) == "sequence_constant_frame_invariant"

@@ -1,4 +1,4 @@
-"""AddBiomechanics -> a `qmd_unified8_smpl18` dataset the generator-independent validator can check.
+"""AddBiomechanics -> a `qmd_unified8` dataset the generator-independent validator can check.
 
 Emitted from the retarget corpus `addbio_smpl24_raw`, not from the 8-channel corpus
 `addbio_smpl24_synth`, even though the latter is one step closer. The synth corpus is already
@@ -29,7 +29,6 @@ subject, or of no trial, stops the run before the output directory is created.
 from __future__ import annotations
 
 import argparse
-import functools
 import hashlib
 import importlib.util as _ilu
 import json
@@ -56,7 +55,6 @@ def _load(path: pathlib.Path, name: str):
 
 
 EMIT = _load(_HERE.parent / "unified8_emit.py", "unified8_emit")
-REDUCED = EMIT.REDUCED
 SYNTH = _load(_HERE.parent / "generate_addbio_faithful.py", "generate_addbio_faithful")
 # The same scan `scripts/diagnostics/pose_discontinuity_scan.py --apply` used to be run by hand
 # after this generator (24 takes of the retired bundle); since 2026-09-15 it is applied while the
@@ -170,8 +168,7 @@ def identity_for(take: pathlib.Path, meta: dict) -> "EMIT.SourceIdentity":
         anthro_namespace="anthro_reference/addbio_smpl_v1",
         subject_scope="subject_constant_trial_frame_invariant",
         subject_scope_note="betas are fit once per subject over sampled frames of that subject's "
-                           "trials; the frozen-joint constants are fitted once per subject over all "
-                           "of its trials (smpl18.reduce) and shared the same way.",
+                           "trials and shared across them.",
         height_m=None,
         height_provenance="estimated:smpl_rest_stature_yup (the retarget corpus does not carry the "
                           "b3d subject height forward)",
@@ -208,43 +205,12 @@ def identity_for(take: pathlib.Path, meta: dict) -> "EMIT.SourceIdentity":
     )
 
 
-@functools.lru_cache(maxsize=1)
-def reduction_settings():
-    """The addbiomechanics smpl18 profile's reduce settings, loaded once per process."""
-    return REDUCED.settings_for_source("addbiomechanics")
-
-
 def take_dirname(study: str, subject: str, take: pathlib.Path) -> str:
     return f"addbio_{study}_{subject}_{take.stem}"
 
 
-def fit_subject(study: str, subject: str, takes: list[pathlib.Path], models: dict):
-    """The subject's frozen-joint fit over all of its trials (`CorpusFits`).
-
-    The rest skeleton is the one `build_bundle` derives, the gendered clean model at the trial's
-    betas; a trial that cannot be read is left out here and fails on its own in `convert`."""
-    members = []
-    for take in takes:
-        try:
-            with np.load(take, allow_pickle=False) as z:
-                gender = str(z["gender"])
-                betas = np.asarray(z["betas"], np.float64)
-                pose = np.asarray(z["pose"], np.float64)
-        except Exception:                                       # noqa: BLE001
-            continue
-        if gender not in models:
-            models[gender] = load_clean_model(clean_model_path_for_gender(gender))
-        members.append((take_dirname(study, subject, take), pose,
-                        EMIT.ANTHRO.rest_joints(models[gender], betas)))
-    fits = REDUCED.CorpusFits(reduction_settings())
-    if members:
-        fits.fit(f"addbio_{study}_{subject}", members,
-                 basis="every readable trial of the subject, native rate")
-    return fits
-
-
 def convert(take: pathlib.Path, study: str, subject: str, out_root: pathlib.Path,
-            models: dict, reduction=None) -> dict:
+            models: dict) -> dict:
     with np.load(take, allow_pickle=False) as z:
         meta = {
             "study": study, "subject": subject,
@@ -276,8 +242,7 @@ def convert(take: pathlib.Path, study: str, subject: str, out_root: pathlib.Path
         models[gender] = load_clean_model(clean_model_path_for_gender(gender))
     source = identity_for(take, meta)
     bundle = EMIT.build_bundle(pose24=pose, trans=trans, betas=betas, gender=gender,
-                               model=models[gender], src_fps=meta["source_rate_hz"], source=source,
-                               reduction=reduction)
+                               model=models[gender], src_fps=meta["source_rate_hz"], source=source)
     take_id = take_dirname(study, subject, take)
     EMIT.write_bundle(out_root / take_id, bundle)
     return {"take_id": take_id, "rel": take_id, "status": "ok",
@@ -288,16 +253,12 @@ def convert(take: pathlib.Path, study: str, subject: str, out_root: pathlib.Path
 
 def convert_subject(study: str, subject: str, out_root: str, trials: int | None,
                     force: bool) -> dict:
-    """{"entries": INDEX entries, "groups": fit records, "takes": take -> fit group}.
-
-    The fit covers every trial of the subject, resumed ones included, so a resumed subject's
-    record is the same one the takes were written with."""
+    """{"entries": the subject's INDEX entries}."""
     root = pathlib.Path(out_root)
     takes = sorted((retarget_corpus() / study / subject).glob("*.npz"))
     if trials:
         takes = takes[:trials]
     models: dict[str, dict] = {}
-    fits = fit_subject(study, subject, takes, models)
     entries = []
     for take in takes:
         take_id = take_dirname(study, subject, take)
@@ -306,12 +267,11 @@ def convert_subject(study: str, subject: str, out_root: str, trials: int | None,
                             "resumed": True})
             continue
         try:
-            entries.append(convert(take, study, subject, root, models,
-                                   reduction=fits.by_take.get(take_id)))
+            entries.append(convert(take, study, subject, root, models))
         except Exception as error:                              # noqa: BLE001
             entries.append({"take_id": take_id, "rel": take_id, "status": "failed",
                             "reason": f"{type(error).__name__}: {error}"})
-    return {"entries": entries, "groups": fits.groups, "takes": fits.takes}
+    return {"entries": entries}
 
 
 def _worker(args) -> dict:
@@ -321,8 +281,7 @@ def _worker(args) -> dict:
     except Exception as error:                                  # noqa: BLE001
         return {"entries": [{"take_id": f"addbio_{study}_{subject}",
                              "rel": f"addbio_{study}_{subject}", "status": "failed",
-                             "reason": f"{type(error).__name__}: {error}"}],
-                "groups": {}, "takes": {}}
+                             "reason": f"{type(error).__name__}: {error}"}]}
 
 
 def main(argv=None) -> int:
@@ -338,8 +297,7 @@ def main(argv=None) -> int:
                              f"$SOMA_DATA_ROOT/{paths.POC_DEMO}/{RETARGET_LINEAGE}")
     parser.add_argument("--only", action="append", type=SYNTH.study_subject, default=None,
                         metavar="STUDY/SUBJECT",
-                        help="emit only this subject of the corpus (repeatable); the subject's "
-                             "frozen-joint fit still covers all of its trials")
+                        help="emit only this subject of the corpus (repeatable)")
     args = parser.parse_args(argv)
 
     if args.raw:
@@ -361,7 +319,7 @@ def main(argv=None) -> int:
 
     try:
         studies, pairs = SYNTH.enumerate_subjects(raw, args.studies, args.subjects, args.only)
-        # an empty selection would still write INDEX.json, the fit record and the description
+        # an empty selection would still write INDEX.json and the description
         SYNTH.require_trials(raw, pairs, args.trials, SYNTH.selection_caps(args))
     except ValueError as error:
         print(error)
@@ -372,11 +330,9 @@ def main(argv=None) -> int:
     print(f"{len(work)} subjects across {len(studies)} studies -> {out_root}", flush=True)
     started = time.time()
     entries: list[dict] = []
-    fits = REDUCED.CorpusFits(reduction_settings())
 
     def collect(result: dict) -> None:
         entries.extend(result["entries"])
-        fits.add_records(result["groups"], result["takes"])
 
     if args.jobs > 1:
         with ProcessPoolExecutor(max_workers=args.jobs,
@@ -442,10 +398,9 @@ def main(argv=None) -> int:
     }
     (out_root / "INDEX.json").write_text(json.dumps(index, ensure_ascii=False, indent=2),
                                          encoding="utf-8", newline="\n")
-    fits.write(out_root)
     EMIT.write_data_description(
         out_root, index,
-        title="AddBiomechanics - synthetic IMU reference (qmd_unified8_smpl18)",
+        title="AddBiomechanics - synthetic IMU reference (qmd_unified8)",
         body=(
             "## Read this before using the eight channels\n\n"
             "**Four of the eight sites are not driven by the source.** AddBiomechanics' OpenSim "

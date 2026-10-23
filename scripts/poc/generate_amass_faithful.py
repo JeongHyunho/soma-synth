@@ -17,17 +17,16 @@ anthro/00_anthropometry) and the PRISM faithful recipe:
   * Frame = AMASS world, empirically **Z-up** for every sub-dataset (head-foot dz > 0) = spec frame G;
     gravity g=[0,0,-9.80665]; no frame conversion.
   * SMPL-H poses[:, :66] = the 22 body joints == SMPL joints 0..21; a 24-joint pose is formed with the
-    two hands (22,23) at identity. The tested `anthro_smpl` module supplies rest joints / FK / the
-    reduced-model refit.
+    two hands (22,23) at identity. The tested `anthro_smpl` module supplies rest joints and FK.
   * Source framerate is resampled to 100 Hz (per-joint Slerp on local rotations + linear interp on trans);
     a no-op for KIT (already 100 Hz).
   * Small 8ch (back_T4,wrist_l/r,shank_l/r,occiput,foot_l/r): orientation from the SMPL segment global
     rotation, specific force f=R^T(a_world-g) from butter-filtered double-diff world position, angular
     velocity from the rotation-log. Insole channels keep the 6-axis heading=False flag (sensor model),
     though the synthetic orientation is model-exact.
-  * Large = root_velocity + joint_rotation[18] (reduced-model) + joint_velocity[18] + pelvis position aux
+  * Large = root_velocity + joint_rotation[24] (the source pose) + joint_velocity[24] + pelvis position aux
     + raw smpl_global_orientation[24], identical in shape/convention to PRISM.
-  * Anthro = SMPL rest skeleton constants + fixed-joint weld; betas are AMASS 16-dim but the clean model
+  * Anthro = SMPL rest skeleton constants; betas are AMASS 16-dim but the clean model
     carries 10 (smpl10_beta_truncation); height is an SMPL stature estimate, body_mass is unavailable.
 """
 from __future__ import annotations
@@ -57,7 +56,7 @@ _SRC_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path
 if _SRC_ROOT not in sys.path:
     sys.path.insert(0, _SRC_ROOT)
 from soma_synth.contracts import source_attribution as _attribution  # noqa: E402
-from soma_synth.pipeline import paths, reduced_model  # noqa: E402
+from soma_synth.pipeline import paths  # noqa: E402
 
 # --------------------------------------------------------------------------
 # 0. Pins / constants (mirror the PRISM faithful recipe)
@@ -67,7 +66,7 @@ from soma_synth.pipeline import paths, reduced_model  # noqa: E402
 
 #: The spec lineage every manifest and INDEX names (layout section 6). Written by the generator
 #: since 2026-09-15; earlier bundles received these two keys in a reconcile pass after the fact.
-SPEC_ID = "qmd_unified8_smpl18"
+SPEC_ID = "qmd_unified8"
 SPEC_VERSION = "faithful-v2"
 SEX_PROVENANCE = ("source_derived:amass npz 'gender' field (SMPL-H subject gender; 'neutral' when "
                   "the field is absent)")
@@ -133,17 +132,36 @@ SITE_POS_JOINT = {
 }
 SITE_CONFIDENCE = {"back_T4": 0.4, "foot_l": 0.5, "foot_r": 0.5}  # others default below
 
-# Large kinematics (large/02_kinematics.qmd): pelvis(root) + 17 joints, the 18 smpl18 keeps
-# (spine1, spine2, both collars frozen; hands dropped). The package owns the list.
-JOINT18_NAMES = list(reduced_model.JOINT18_NAMES)
-SMPL18_INDICES = np.array(reduced_model.KEEP18, np.int64)
+# Large kinematics (large/02_kinematics.qmd): pelvis (root) + the 23 moving SMPL joints, the
+# source pose as it is.
+JOINT24_NAMES = list(anthro_smpl.JOINT24_NAMES)
 
-# Reduced-model QC (spec sec-anthro-fit): fixed-joint downstream sets + the p95 position-residual bar.
-RIGID_WELD_TAU_P95_M = 0.05
-FIXED_JOINT_DOWNSTREAM = {
-    "left_collar": [16, 18, 20], "right_collar": [17, 19, 21],
-    "spine1": [9, 12, 15], "spine2": [9, 12, 15],
-}
+#: How a reader rebuilds the body from a bundle; one sentence for every source.
+RECONSTRUCTION_RECIPE = (
+    "world_joint[j] = pelvis_position_world_aux + FK(anthro.joint_position[t_pose], "
+    "large.joint_rotation); joint_rotation[:,0] is the pelvis global orientation and "
+    "joint_rotation[:,1:] the 23 SMPL local rotations, so the result is the source SMPL body and "
+    "its global orientations equal large.smpl_global_orientation_world."
+)
+
+
+def anthro_reconstruction_block() -> dict:
+    """The manifest's ``anthro_reconstruction`` block."""
+    return {"recipe": RECONSTRUCTION_RECIPE,
+            "joint_position_frame": "smpl_canonical_rest_yup (rest geometry; world via Large)"}
+
+
+def large_joint_arrays(global_R, local_R, dt):
+    """Large ``joint_rotation`` (T,24,4) and ``joint_velocity`` (T,24,3) deg/s.
+
+    ``[:, 0]`` is the pelvis global orientation and its angular velocity, ``[:, 1:]`` the 23 SMPL
+    local (parent-relative) rotations and their angular velocities, all straight from the pose.
+    Per joint, so the quaternion sign continuity of ``rotmat_to_quat_wxyz`` applies along time.
+    """
+    series = [global_R[:, 0]] + [local_R[:, j] for j in range(1, 24)]
+    rotation = np.stack([rotmat_to_quat_wxyz(r) for r in series], axis=1).astype(np.float32)
+    velocity = np.stack([angular_velocity_deg_s(r, dt) for r in series], axis=1).astype(np.float32)
+    return rotation, velocity
 
 
 class AmassSeqSpec:
@@ -428,31 +446,12 @@ def sanitize_dirname(s):
 # --------------------------------------------------------------------------
 def model_gender_letter(gender):
     """The letter `build` selects the body model with. Neutral AMASS sequences get the male model,
-    as they always have; the fit group keys on this so it pools sequences posed on one skeleton."""
+    as they always have."""
     return "F" if gender.startswith("f") else "M"
 
 
-def fit_group_of(spec):
-    """The fit group a motion sequence belongs to: (group name, model gender letter, betas).
-
-    A group is what one set of frozen-joint constants may be shared across: one subject, one body
-    model, one set of MoSh betas. AMASS stores betas per sequence, so a subject whose sequences
-    disagree on betas is split, and the group name carries a betas digest to say so. Reads only
-    the two small fields; the poses are loaded per group, not all at once."""
-    with np.load(spec.source_npz, allow_pickle=False) as d:
-        betas = np.asarray(d["betas"], np.float64)
-        gender = normalize_gender(d["gender"]) if "gender" in d.files else "neutral"
-    letter = model_gender_letter(gender)
-    digest = hashlib.sha256(np.ascontiguousarray(betas, "<f8").tobytes()).hexdigest()[:12]
-    return f"{spec.subject_id}|{letter}|betas:{digest}", letter, betas
-
-
-def build(spec, reduction=None):
-    """One sequence -> (small, large, anthro, manifest).
-
-    ``reduction`` is the subject's fit (``reduced_model.SubjectFit``); the batch runner pools the
-    subject's sequences first. Without it the constants are fitted on this sequence alone, and
-    every record says ``take`` scope."""
+def build(spec):
+    """One sequence -> (small, large, anthro, manifest)."""
     d = load_amass_safe(spec.source_npz, dataset=spec.dataset)
     src_fps = d["fps"]
     gender = d["gender"]
@@ -539,36 +538,22 @@ def build(spec, reduction=None):
         "frame_count": np.int64(m),
     }
 
-    # ---- LARGE: pelvis(root) + 17 joints (reduced-model), identical convention to PRISM ----
+    # ---- LARGE: pelvis(root) + 23 joints (the source SMPL pose), identical convention to PRISM ----
     pelvis_position = world[:, 0].astype(np.float64)   # == trans (pelvis anchored at origin in Jp); self-consistent
                                                        # with anthro_reconstruction (offsets are pelvis-relative)
     # [M,24,4] lossless. Per-joint so the (w,x,y,z) sign-continuity in rotmat_to_quat_wxyz (2-D path)
     # is applied along time for every joint, not skipped as it would be on the bulk [M,24,3,3] array.
     smpl_global_orientation = np.stack(
         [rotmat_to_quat_wxyz(gR[:, j]) for j in range(24)], axis=1).astype(np.float32)
-    if reduction is None:
-        reduction = reduced_model.fit_subject(
-            [p24], j_rest, reduced_model.settings_for_source("amass"),
-            group=f"{spec.subject_id}/{spec.sequence_id}", basis="this sequence, native rate",
-            scope="take")
-    fixed_C = reduction.constants
-    Lrefit = reduced_model.reduce_local(local, fixed_C)
 
     root_velocity = np.zeros((m, 3), np.float64)
     root_velocity[1:] = (pelvis_position[1:] - pelvis_position[:-1]) / dt
     root_velocity = root_velocity.astype(np.float32)
 
-    joint_rotation = np.zeros((m, 18, 4), np.float32)
-    joint_velocity = np.zeros((m, 18, 3), np.float32)
-    joint_rotation[:, 0, :] = rotmat_to_quat_wxyz(gR[:, 0]).astype(np.float32)
-    joint_velocity[:, 0, :] = angular_velocity_deg_s(gR[:, 0], dt).astype(np.float32)
-    for k in range(1, 18):
-        idx = int(SMPL18_INDICES[k])
-        joint_rotation[:, k, :] = rotmat_to_quat_wxyz(Lrefit[:, idx]).astype(np.float32)
-        joint_velocity[:, k, :] = angular_velocity_deg_s(Lrefit[:, idx], dt).astype(np.float32)
+    joint_rotation, joint_velocity = large_joint_arrays(gR, local, dt)
 
     large = {
-        "joint_names": np.array(JOINT18_NAMES, dtype="U"),
+        "joint_names": np.array(JOINT24_NAMES, dtype="U"),
         "root_velocity": root_velocity,
         "joint_rotation": joint_rotation,
         "joint_velocity": joint_velocity,
@@ -577,25 +562,14 @@ def build(spec, reduction=None):
         "pair_id": pair_id, "timestamps_s": timestamps_s, "frame_count": np.int64(m),
     }
 
-    # ---- ANTHRO: SMPL rest skeleton constants + fixed-joint weld (AMASS-specific overrides) ----
+    # ---- ANTHRO: SMPL rest skeleton constants (AMASS-specific overrides) ----
     subj_info = {"gender": "F" if gender.startswith("f") else ("M" if gender.startswith("m") else "U")}
-    anthro = anthro_smpl.compute_anthro(
-        model, betas, subj_info, pair_id, fixed_joint_local_R=fixed_C,
-        fixed_joint_provenance=reduced_model.anthro_provenance(reduction))
+    anthro = anthro_smpl.compute_anthro(model, betas, subj_info, pair_id)
     anthro["namespace"] = "anthro_reference/amass_smpl_v1"
-    # AMASS stores MoSh betas per sequence. The frozen-joint constants are shared by every sequence
-    # of the subject posed on the same betas and body model (one fit group); a take-scope fit shares
-    # nothing, and the label says which.
-    if reduction.record["scope"] == "subject":
-        anthro["subject_scope"] = "subject_constant_trial_frame_invariant"
-        anthro["subject_scope_note"] = (
-            "betas are the sequence's MoSh betas; the frozen-joint constants are fitted once over "
-            f"the {reduction.record['takes']} sequence(s) of this subject that share these betas and "
-            "body model, and are the same in each of them.")
-    else:
-        anthro["subject_scope"] = "sequence_constant_frame_invariant"
-        anthro["subject_scope_note"] = ("betas and the frozen-joint constants are this sequence's own; "
-                                        "nothing here is shared with the subject's other sequences.")
+    # AMASS stores MoSh betas per sequence, so the skeleton is the sequence's own.
+    anthro["subject_scope"] = "sequence_constant_frame_invariant"
+    anthro["subject_scope_note"] = ("betas and the rest skeleton are this sequence's own MoSh fit; "
+                                    "nothing here is shared with the subject's other sequences.")
     anthro["subject_id"] = spec.subject_id
     anthro["source_asset_id"] = spec.relative_path or ("extracted/amass/%s/%s.npz" % (spec.dataset, spec.sequence_id))
     anthro["gender"] = gender
@@ -633,23 +607,6 @@ def build(spec, reduction=None):
         "derivative (mild on real mocap, a few percent of |a| near gravity). PRISM avoided this by interior "
         "windowing; AMASS sequences are standalone, so their boundaries are included.")
 
-    raw_pos = anthro_smpl.fk_positions_batch(j_rest, local)
-    ref_pos = anthro_smpl.fk_positions_batch(j_rest, Lrefit)
-    qc = np.linalg.norm(raw_pos - ref_pos, axis=2)
-    aff = list(reduced_model.AFFECTED_BY_FREEZE)
-    weld = {}
-    for fname, js in FIXED_JOINT_DOWNSTREAM.items():
-        p95 = float(np.percentile(qc[:, js], 95))
-        weld[fname] = {"p95_m": p95, "max_m": float(qc[:, js].max()),
-                       "exceeds_tau": bool(p95 > RIGID_WELD_TAU_P95_M)}
-    v["reduced_model_fit_residual_m"] = {
-        "overall_max": float(qc.max()), "affected_mean": float(qc[:, aff].mean()),
-        "per_joint_max": {anthro_smpl.JOINT24_NAMES[j]: float(qc[:, j].max()) for j in aff},
-        "rigid_weld_threshold_p95_m": RIGID_WELD_TAU_P95_M, "fixed_joint_weld_residual": weld,
-        "note": "reduced-model (Large 18 refit + Anthro 4 fixed constants) vs raw SMPL joint-center "
-                "position residual; distal global orientation exact (sec-anthro-fit). This is the "
-                "accepted rigid-weld cost, reported as a quality metric (no promotion).",
-    }
 
     manifest = {
         "spec_id": SPEC_ID, "spec_version": SPEC_VERSION,
@@ -699,7 +656,7 @@ def build(spec, reduction=None):
             "large_kinematics": "large/02_kinematics.qmd",
             "anthropometry": "anthro/00_anthropometry.qmd",
         },
-        "large_joint_names": JOINT18_NAMES,
+        "large_joint_names": JOINT24_NAMES,
         "deliverables": ["small_reference.npz", "large_reference.npz", "anthro_reference.npz",
                          "smpl_root_translation.npz", "manifest.json"],
         "faithful_content": {
@@ -709,15 +666,15 @@ def build(spec, reduction=None):
                      "from SMPL rest geometry (no imu_gt needed); specific force (gravity-included) + "
                      "rotation-log gyro in S. No measured imu_gt/insole; small_mode=synthetic_from_smpl, "
                      "axis_convention=spec_S_v2.",
-            "large": "root_velocity[M,3] + joint_rotation[M,18,4] (reduced-model: spine3/shoulders refit) + "
-                     "joint_velocity[M,18,3] + pelvis_position_world_aux; raw smpl_global_orientation[M,24,4] kept.",
-            "anthro": "SMPL rest skeleton constants (joint_position[2,22,3], segment_length[13], "
-                      "fixed_joint_rotation[4,4]) + betas(16, model uses 10) + gender. height=SMPL stature "
+            "large": "root_velocity[M,3] + joint_rotation[M,24,4] (the source SMPL pose: [0] pelvis global, "
+                     "[1:] local) + joint_velocity[M,24,3] + pelvis_position_world_aux + "
+                     "smpl_global_orientation[M,24,4].",
+            "anthro": "SMPL rest skeleton constants (joint_position[2,24,3], segment_length[15]) + "
+                      "betas(16, model uses 10) + gender. height=SMPL stature "
                       "estimate; body_mass unavailable (AMASS has no subject anthropometry).",
             "development_reference": "NONE — AMASS has no measured GRF/insole/kinetics.",
         },
-        "anthro_reconstruction": reduced_model.reconstruction_block(
-            reduction, "large.smpl_global_orientation_world[M,24,4] + resampled raw SMPL poses"),
+        "anthro_reconstruction": anthro_reconstruction_block(),
         "unavailable_or_not_applied": [
             "development_reference / measured GRF / CoP / insole (AMASS has none)",
             "measured subject height & body_mass (height is an SMPL stature estimate; mass is NaN)",

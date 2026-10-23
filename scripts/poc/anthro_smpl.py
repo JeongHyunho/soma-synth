@@ -1,37 +1,24 @@
 """Anthro (anthropometry) deliverable — SMPL rest-pose skeleton constants.
 
 Per ``anthro/00_anthropometry.qmd`` the Anthro dataset holds subject-level,
-trial/frame-invariant skeleton constants. Combined with Large's motion joints they
-reconstruct the full SMPL 22-chain (24 joints minus the two hands) and the rigid
-biomechanical skeleton:
+trial/frame-invariant skeleton constants. Combined with Large's joint rotations they
+reconstruct the SMPL 24-joint chain and the rigid biomechanical skeleton:
 
-* ``joint_position``      [2, 22, 3]  root-relative rest joint centres, two reference
+* ``joint_position``      [2, 24, 3]  root-relative rest joint centres, two reference
                                       poses (0 = T-pose = SMPL rest; 1 = upright-neutral)
-* ``segment_length``      [13]        major bone lengths (pose-invariant)
-* ``fixed_joint_rotation``[4, 4]      spine1/spine2/left_collar/right_collar constants
+* ``segment_length``      [15]        major bone lengths (pose-invariant)
 * ``sex`` / ``height`` / ``body_mass``            measured subject anthropometry
 * ``betas`` (+ ``gender``)            SMPL shape (source-derived reference layer)
 
 **Frame.** ``joint_position`` is stored in the SMPL *canonical rest frame* (Y-up, arms
 along X) — the frame the SMPL pose parameters are defined against. To place the skeleton
-in the PRISM world (Z-up, spec frame ``G``) combine these rest offsets with Large's pelvis
-global orientation via forward kinematics (see ``reconstruct_positions_frozen_fixed``).
-
-**Fixed joints.** In the SMPL parameterisation spine1/spine2/left_collar/right_collar are
-zero at *rest*, but the subject holds a habitual shoulder-girdle/trunk posture (e.g. the
-collars sit ~24 deg off rest for this take). The SOMA Large model *freezes* these 4 joints
-(folding trunk motion into ``spine3`` and treating the shoulder girdle as rigid); freezing at
-identity leaves ~0.3 m of wrist reconstruction error. Which joints freeze, how the joint below
-absorbs them and how the four constants are fitted all belong to ``smpl18.reduce``
-(``packages/smpl18``); the pipeline fits them once per subject through
-``soma_synth.pipeline.reduced_model`` and hands them to :func:`compute_anthro`. The
-residual per-frame articulation the freeze discards is preserved losslessly in the raw SMPL
-reference layer, not here.
+in the world (Z-up, spec frame ``G``) combine these rest offsets with Large's joint
+rotations via forward kinematics (``fk_positions_batch``); the result is the source SMPL
+body exactly.
 
 Pure NumPy/scipy for the math; no body-model asset is required to import this module (the model
-is passed in), so it is unit-testable on a tiny synthetic model. The two things it does not decide
-for itself -- which file a gender selects (``smpl18.model.select``) and which joints the reduced
-model freezes (``smpl18.skeleton.definition``) -- come from ``packages/smpl18``.
+is passed in), so it is unit-testable on a tiny synthetic model. Which file a gender selects
+comes from ``smpl18.model.select`` (``packages/smpl18``).
 """
 from __future__ import annotations
 
@@ -52,7 +39,6 @@ if _SRC.is_dir() and str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))          # soma_synth.pipeline.paths: where the models are
 
 from smpl18.model import select as smpl18_select   # noqa: E402
-from smpl18.skeleton import definition as smpl18_skeleton   # noqa: E402
 from soma_synth.pipeline import paths as data_paths
 
 
@@ -69,15 +55,7 @@ JOINT24_NAMES = [
     "left_elbow", "right_elbow", "left_wrist", "right_wrist", "left_hand", "right_hand",
 ]
 
-HAND_INDICES = (22, 23)
-KEEP22 = [i for i in range(24) if i not in HAND_INDICES]        # SMPL chain minus hands
-JOINT22_NAMES = [JOINT24_NAMES[i] for i in KEEP22]
-
-# Joints Anthro freezes as subject constants (spine1, spine2, L/R collar), as smpl18 defines them.
-FIXED_JOINTS = smpl18_skeleton.FROZEN_JOINTS
-FIXED_JOINT_NAMES = smpl18_skeleton.FROZEN_JOINT_NAMES
-
-# Major segments (name, parent_joint, child_joint) — hands excluded (spec §origin·remark).
+# Major segments (name, parent_joint, child_joint), anthro/00_anthropometry.qmd.
 SEGMENTS = [
     ("thigh_l", 1, 4), ("thigh_r", 2, 5),
     ("shank_l", 4, 7), ("shank_r", 5, 8),
@@ -85,6 +63,7 @@ SEGMENTS = [
     ("trunk", 0, 9), ("neck", 9, 12), ("head", 12, 15),
     ("upperarm_l", 16, 18), ("upperarm_r", 17, 19),
     ("forearm_l", 18, 20), ("forearm_r", 19, 21),
+    ("hand_l", 20, 22), ("hand_r", 21, 23),
 ]
 SEGMENT_NAMES = [s[0] for s in SEGMENTS]
 
@@ -188,23 +167,6 @@ def upright_neutral_local_R() -> np.ndarray:
     return local
 
 
-def reconstruct_positions_frozen_fixed(
-    j_rest: np.ndarray,
-    local_R_full: np.ndarray,
-    fixed_local_R: np.ndarray | None = None,
-) -> np.ndarray:
-    """Reconstruct joint positions the SOMA way: freeze the 4 fixed joints to a constant,
-    keep every other joint's source rotation. Models what Large(18)+Anthro(4 frozen) yields.
-
-    ``fixed_local_R`` is (4,3,3) in FIXED_JOINTS order; defaults to identity.
-    """
-    local = local_R_full.copy()
-    for i, j in enumerate(FIXED_JOINTS):
-        local[j] = np.eye(3) if fixed_local_R is None else fixed_local_R[i]
-    Jp, _ = smpl_fk_positions(j_rest, local)
-    return Jp
-
-
 def fk_positions_batch(j_rest: np.ndarray, local_R: np.ndarray) -> np.ndarray:
     """[T,24,3,3] local rotation matrices -> [T,24,3] joint-center positions (pelvis at origin)."""
     T = local_R.shape[0]
@@ -228,18 +190,9 @@ def compute_anthro(
     betas: np.ndarray,
     subj_info: dict[str, Any],
     pair_id: str,
-    fixed_joint_local_R: np.ndarray | None = None,
     j_rest: np.ndarray | None = None,
-    fixed_joint_provenance: str | None = None,
 ) -> dict[str, Any]:
-    """Assemble the anthro_reference payload from an SMPL model + subject metadata.
-
-    ``fixed_joint_local_R`` (4,3,3, FIXED_JOINTS order) holds the fitted constants of
-    spine1/spine2/left_collar/right_collar, and ``fixed_joint_provenance`` says how they were
-    fitted (the caller knows whether it pooled a subject or had one take). Without constants the
-    fixed joints default to the SMPL-rest identity (higher reconstruction error -- see module
-    docstring).
-    """
+    """Assemble the anthro_reference payload from an SMPL model + subject metadata."""
     betas = np.asarray(betas, np.float64)
     # The skeleton to publish. A generator may have corrected the betas-derived one -- HKNU scales it
     # onto the subject's measured bone lengths, since ten betas cannot reach that cohort's hip
@@ -249,26 +202,8 @@ def compute_anthro(
     j_rest = rest_joints(model, betas) if j_rest is None else np.asarray(j_rest, np.float64)
     j_root = j_rest - j_rest[0]
 
-    jp_tpose = j_root[KEEP22]
     Jp_neutral, _ = smpl_fk_positions(j_rest, upright_neutral_local_R())
-    jp_neutral = (Jp_neutral - Jp_neutral[0])[KEEP22]
-    joint_position = np.stack([jp_tpose, jp_neutral]).astype(np.float32)   # (2,22,3)
-
-    if fixed_joint_local_R is None:
-        fixed_quat = np.tile(np.array([1.0, 0.0, 0.0, 0.0]), (len(FIXED_JOINTS), 1))
-        fixed_provenance = (
-            "smpl_rest_identity (fixed joints identity at SMPL rest; higher reconstruction error)"
-        )
-    else:
-        fixed_quat = _rotmat_to_wxyz(np.asarray(fixed_joint_local_R, np.float64))
-        fixed_provenance = fixed_joint_provenance or (
-            "reduced_model_fit: constants fitted by smpl18.reduce.fit_constants to minimise the "
-            "joint-centre displacement the freeze causes; the absorbing joints (spine3, shoulders) "
-            "in Large take over the removed rotation so distal global orientation is preserved "
-            "exactly."
-        )
-    # One constant per joint over the whole motion, not a per-pose snapshot.
-    fixed_joint_rotation = fixed_quat.astype(np.float32)  # (4,4)
+    joint_position = np.stack([j_root, Jp_neutral - Jp_neutral[0]]).astype(np.float32)   # (2,24,3)
 
     sex = str(subj_info.get("gender", "")).strip().upper()[:1] or "U"
     gender = {"M": "male", "F": "female"}.get(sex, "neutral")
@@ -277,16 +212,13 @@ def compute_anthro(
         "namespace": "anthro_reference/prism_smpl_v1",
         "subject_scope": "subject_constant_trial_frame_invariant",
         # Name arrays are numpy 'U', never object: an object array forces allow_pickle on every
-        # reader (ADR-0040 D2), and the 57,827 AMASS warnings of 2026-09-07 were exactly these
-        # four arrays written as object by this function and re-typed afterwards.
+        # reader (ADR-0040 D2).
         "reference_poses": np.array(["t_pose", "upright_neutral"], dtype="U"),
-        "joint_names": np.array(JOINT22_NAMES, dtype="U"),                   # (22,)
-        "joint_position": joint_position,                                    # (2,22,3) m, root-rel
+        "joint_names": np.array(JOINT24_NAMES, dtype="U"),                   # (24,)
+        "joint_position": joint_position,                                    # (2,24,3) m, root-rel
         "joint_position_frame": "smpl_canonical_rest_yup",
-        "segment_names": np.array(SEGMENT_NAMES, dtype="U"),                 # (13,)
-        "segment_length": segment_lengths(j_rest).astype(np.float32),        # (13,) m
-        "fixed_joint_names": np.array(FIXED_JOINT_NAMES, dtype="U"),         # (4,)
-        "fixed_joint_rotation": fixed_joint_rotation,                        # (4,4) wxyz
+        "segment_names": np.array(SEGMENT_NAMES, dtype="U"),                 # (15,)
+        "segment_length": segment_lengths(j_rest).astype(np.float32),        # (15,) m
         "sex": sex,                                                          # 'M'/'F'
         "height": np.float32(_height_to_m(subj_info.get("height", 0.0))),   # m
         "body_mass": np.float32(subj_info.get("weight", 0.0)),              # kg
@@ -304,13 +236,11 @@ def compute_anthro(
             "source's measured bone lengths, directions unchanged"
             if scaled else
             "derived:SMPL rest-pose J_regressor@(v_template+shapedirs·betas)"),
-        "fixed_joint_rotation_provenance": fixed_provenance,
         "reconstruction_note": (
-            "Large motion joints (18, reduced-model: spine3/shoulders re-fitted to absorb the weld) "
-            "+ these fixed_joint_rotation (4, weld constants) = SMPL 22-chain. Distal global "
-            "orientations match raw SMPL exactly; only a small trunk position offset remains. "
-            "joint_position (T-pose) supplies rest offsets; map to PRISM world via Large's pelvis "
-            "global orientation (pelvis_position_world_aux as the world anchor)."
+            "joint_position (T-pose) supplies the rest offsets of the 24 SMPL joints; forward "
+            "kinematics with Large joint_rotation ([0] pelvis global, [1:] local) and "
+            "pelvis_position_world_aux as the world anchor reproduces the source SMPL body's joint "
+            "positions and orientations."
         ),
         "pair_id": pair_id,
     }

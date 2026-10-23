@@ -110,25 +110,8 @@ across-subject generalisation bound (n=6 subjects).
     (out_root / "DATA_DESCRIPTION_EN.md").write_text(md, encoding="utf-8")
 
 
-def compute_subject_constants(specs):
-    """Each subject's frozen-joint constants, fitted once by smpl18.reduce over the pooled frames of
-    all of its takes and reused for every one of them (reduced_model.CorpusFits, keyed by take
-    directory). Takes posed on different skeletons are fitted apart."""
-    reduced_model = _gen.reduced_model
-    fits = reduced_model.CorpusFits(reduced_model.settings_for_source("prism"))
-    by_subj: dict = {}
-    for s in specs:
-        by_subj.setdefault(s.subject_id, []).append(s)
-    for subject_id, subj_specs in by_subj.items():
-        members = [(_take_dirname(s), *_gen.subject_fit_inputs(s)) for s in subj_specs]
-        fits.fit(subject_id, members, basis="every take of the subject, whole take")
-    return fits
-
-
-def run(specs, out_root: str, build=None, force: bool = False, fits=None) -> dict:
-    """`fits` is the subjects' `CorpusFits`; a take it does not name is fitted on its own."""
+def run(specs, out_root: str, build=None, force: bool = False) -> dict:
     build = build or _gen.build
-    by_take = fits.by_take if fits is not None else {}
     out_root = Path(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
     results = []
@@ -140,8 +123,7 @@ def run(specs, out_root: str, build=None, force: bool = False, fits=None) -> dic
             results.append({"take": _take_dirname(spec), "status": "skipped"})
             continue
         try:
-            small, large, dev, anthro, manifest = build(
-                spec, reduction=by_take.get(_take_dirname(spec)))
+            small, large, dev, anthro, manifest = build(spec)
             _gen.write_outputs(str(out_dir), small, large, dev, anthro, manifest)
             counts["ok"] += 1
             results.append({"take": _take_dirname(spec), "status": "ok",
@@ -152,8 +134,6 @@ def run(specs, out_root: str, build=None, force: bool = False, fits=None) -> dic
             results.append({"take": _take_dirname(spec), "status": "failed",
                             "reason": "%s: %s" % (type(exc).__name__, exc)})
     _write_dataset_description(out_root, counts, len(specs))
-    if fits is not None:
-        fits.write(out_root)
     index = {"dataset": DATASET_DIRNAME, "distribution_scope": "internal_only",
              "artifact_class": "experimental_non_candidate",
              "total_specs": len(specs), "counts": counts, "takes": results}
@@ -166,7 +146,7 @@ def require_subject_folders(root, flag: str | None = None) -> None:
     """Refuse a PRISM source folder in which no subject folder holds a *.pkl take.
 
     `enumerate_specs` would select nothing there, and `run` still rewrites the bundle's INDEX.json,
-    fit record and description over zero takes. The likely cause is a source root (the folder
+    and description over zero takes. The likely cause is a source root (the folder
     holding prism/ beside the other sources) given where the PRISM folder itself is meant, so when
     the folder came from `flag` the refusal names the folder that was probably meant."""
     root = Path(root)
@@ -195,7 +175,7 @@ def no_take_selected(source, args) -> str:
 
 def only_subject(specs, subject_id: str, where) -> list:
     """The specs of one subject. A subject the source does not hold is an error: an empty
-    selection would still rewrite the bundle's INDEX.json, policy file and description with zero
+    selection would still rewrite the bundle's INDEX.json and description with zero
     takes."""
     chosen = [s for s in specs if s.subject_id == subject_id]
     if not chosen:
@@ -247,12 +227,10 @@ def main(argv=None) -> int:
     if args.limit:
         specs = specs[: args.limit]
     if not specs:
-        # run() rewrites INDEX.json, the fit record and the description over whatever is selected
+        # run() rewrites INDEX.json and the description over whatever is selected
         print(no_take_selected(source, args))
         return 2
-    print("fitting per-subject frozen-joint constants (smpl18.reduce) ...")
-    fits = compute_subject_constants(specs)
-    index = run(specs, out_root, force=args.force, fits=fits)
+    index = run(specs, out_root, force=args.force)
     print("INDEX:", json.dumps(index["counts"]), "->", out_root)
     return 0
 

@@ -64,7 +64,6 @@ def _load(path: pathlib.Path, name: str):
 
 
 EMIT = _load(_HERE.parent / "unified8_emit.py", "unified8_emit")
-REDUCED = EMIT.REDUCED
 
 from soma_synth.addbio_retarget.attribution import attribution_fields  # noqa: E402
 from soma_synth.addbio_retarget.shape_fit import (  # noqa: E402
@@ -353,10 +352,7 @@ def prepare(take: pathlib.Path, models: dict, coverage: dict[str, dict],
             settings: marker_small.SynthesisSettings, extracted: pathlib.Path,
             config_digest: str) -> SimpleNamespace:
     """Everything one take needs before its bundle is built: the retarget arrays, the marker
-    synthesis and the pair window, the worn-unit comparison, and the source identity.
-
-    Split from `emit` so a subject's frozen-joint constants can be fitted over the rows every one
-    of its bundles will carry -- which only the pair window says -- before any bundle is built."""
+    synthesis and the pair window, the worn-unit comparison, and the source identity."""
     with np.load(take, allow_pickle=False) as handle:
         subject = str(handle["subject"])
         # The retarget writes one file per condition and names it after that condition, so the
@@ -469,15 +465,8 @@ def prepare(take: pathlib.Path, models: dict, coverage: dict[str, dict],
         model=models[gender], rel=take_dirname(subject, condition), extracted=extracted)
 
 
-def fit_member(prepared: SimpleNamespace) -> tuple[str, np.ndarray, np.ndarray]:
-    """(take directory, the window's pose rows, rest joints) for the subject's pooled fit; the rest
-    skeleton is the one `build_bundle` derives from the gendered model and the betas."""
-    return (prepared.rel, prepared.pose[prepared.rows],
-            EMIT.ANTHRO.rest_joints(prepared.model, prepared.betas))
-
-
-def emit(prepared: SimpleNamespace, out_root: pathlib.Path, reduction=None) -> dict:
-    """Build and write the take's bundle from what `prepare` read, with the subject's fit."""
+def emit(prepared: SimpleNamespace, out_root: pathlib.Path) -> dict:
+    """Build and write the take's bundle from what `prepare` read."""
     take, condition = prepared.take, prepared.condition
     pose, trans, rows, window = prepared.pose, prepared.trans, prepared.rows, prepared.window
     syntheses, confidence = prepared.syntheses, prepared.confidence
@@ -487,7 +476,7 @@ def emit(prepared: SimpleNamespace, out_root: pathlib.Path, reduction=None) -> d
     stream, imu_stream, comparison = prepared.stream, prepared.imu_stream, prepared.comparison
     bundle = EMIT.build_bundle(
         pose24=pose[rows], trans=trans[rows], betas=prepared.betas, gender=prepared.gender,
-        model=prepared.model, src_fps=prepared.rate, source=source, reduction=reduction,
+        model=prepared.model, src_fps=prepared.rate, source=source,
     )
 
     # the shared anthro emitter stamps every source with PRISM's sex provenance; this source's is declared
@@ -619,7 +608,7 @@ def emit(prepared: SimpleNamespace, out_root: pathlib.Path, reduction=None) -> d
 
 
 DATA_DESCRIPTION_TITLE = (
-    "GAITEX - synthetic IMU reference (qmd_unified8_smpl18), small from the markers"
+    "GAITEX - synthetic IMU reference (qmd_unified8), small from the markers"
 )
 
 
@@ -720,7 +709,7 @@ def select_subjects(retarget: pathlib.Path, wanted=None) -> list[str]:
     Names are matched exactly against the folder listing, case included (on NTFS the joined path
     exists whatever its case, while this selection compares strings). A name the corpus lacks, and
     a selection that holds no take (``<subject>/*.npz``), raise ValueError: the run would write
-    INDEX.json, the fit record and the description over zero takes and exit 0."""
+    INDEX.json and the description over zero takes and exit 0."""
     subjects = sorted(p.name for p in retarget.iterdir() if p.is_dir())
     if wanted:
         unknown = sorted(set(wanted) - set(subjects))
@@ -781,7 +770,6 @@ def main(argv=None) -> int:
     out_root.mkdir(parents=True, exist_ok=True)
 
     entries: list[dict] = []
-    fits = REDUCED.CorpusFits(REDUCED.settings_for_source("gaitex"))
     started = time.time()
 
     def failed(subject: str, take: pathlib.Path, error: Exception) -> dict:
@@ -790,27 +778,12 @@ def main(argv=None) -> int:
                 "status": "failed", "reason": f"{type(error).__name__}: {error}"}
 
     for subject in subjects:
-        takes = sorted((arguments.retarget / subject).glob("*.npz"))
-        results: dict[pathlib.Path, object] = {}
-        for take in takes:
+        for take in sorted((arguments.retarget / subject).glob("*.npz")):
             try:
-                results[take] = prepare(take, models, coverage, joint_ranges, registry, settings,
-                                        arguments.extracted, config_digest)
+                result = emit(prepare(take, models, coverage, joint_ranges, registry, settings,
+                                      arguments.extracted, config_digest), out_root)
             except Exception as error:                          # noqa: BLE001
-                results[take] = failed(subject, take, error)
-        # One set of frozen-joint constants per subject, over exactly the rows its bundles carry.
-        prepared = [r for r in results.values() if isinstance(r, SimpleNamespace)]
-        if prepared:
-            fits.fit(f"gaitex_{subject}", [fit_member(p) for p in prepared],
-                     basis="every take of the subject, the pair-window rows its bundle carries, "
-                           "native rate")
-        for take in takes:
-            result = results[take]
-            if isinstance(result, SimpleNamespace):
-                try:
-                    result = emit(result, out_root, reduction=fits.by_take[result.rel])
-                except Exception as error:                      # noqa: BLE001
-                    result = failed(subject, take, error)
+                result = failed(subject, take, error)
             entries.append(result)
         print(f"  {subject}: {len(entries)} takes so far ({time.time() - started:.0f}s)", flush=True)
 
@@ -832,7 +805,6 @@ def main(argv=None) -> int:
     (out_root / "INDEX.json").write_text(
         json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8", newline="\n"
     )
-    fits.write(out_root)
     EMIT.write_data_description(
         out_root, index,
         title=DATA_DESCRIPTION_TITLE,

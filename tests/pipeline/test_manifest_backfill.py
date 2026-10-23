@@ -32,7 +32,7 @@ bf = _load()
 
 
 PRISM_MANIFEST = {
-    "spec_id": "qmd_unified8_smpl18",
+    "spec_id": "qmd_unified8",
     "source": {"source_name": "prism", "native_rate_hz": 100, "native_frames_total": 13160},
     "global_frame": {"convention": "PRISM world, right-handed, Z-up, gravity along -Z"},
     "canonicalization_config": {

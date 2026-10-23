@@ -34,7 +34,7 @@ def test_enumerate_specs_covers_declared_counts(tmp_path):
     assert {s.subject_id: s.gender for s in specs}["prism_subj002"] == "F"
 
 
-def _fake_build(spec, reduction=None):
+def _fake_build(spec):
     if spec.take_id == "bad":
         raise ValueError("boom")
     small = {"frame_count": np.int64(3), "pair_id": "p"}

@@ -15,7 +15,7 @@
 # presence/equality judgement (DETERMINISTIC_EXECUTION_CONFIG_HOLD).
 
 schema: dataset_profiles_v1
-spec_id: qmd_unified8_smpl18
+spec_id: qmd_unified8
 spec_version: faithful-v2
 
 universal:
@@ -29,10 +29,6 @@ universal:
     # (contracts/dataset_limitations.py). Rendered from configs/datasets/known_limitations_v1.yaml
     # by scripts/write_known_limitations.py; the validator checks the copy matches the config.
     - KNOWN_LIMITATIONS.json
-    # The 18-joint reduced model's record: each subject's frozen-joint constants as
-    # smpl18.reduce fitted them, their residuals and settings, and which fit every take carries
-    # (soma_synthetic_imu.pipeline.reduced_model.FIT_FILE; smpl18 docs/primer.md section 5.3).
-    - reduced_model_fit.json
 
   # Files a bundle needs before it may be shared, but which do not exist yet when it is first
   # validated -- two of them are validation's own output, and requiring them to run validation
@@ -148,8 +144,6 @@ profiles:
       source_attribution_keys:
         - source_name
         - attribution_note
-      bundle_files:
-        - prism_faithful_reduced_model_policy_v1.json
     # No waivers. The up_axis and resample waivers that stood here are gone. On 2026-09-09
       # `scripts/backfill_manifest_fields.py` derived both from the manifests' own contents --
       # the frame convention and the gravity vector agreeing on Z-up, and four frame counts

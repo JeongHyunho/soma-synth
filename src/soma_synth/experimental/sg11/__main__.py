@@ -30,7 +30,7 @@ def main():
         gravity_world_m_per_s2=[0, 0, -9.81], offline_noncausal=True,
         input_sha256=hashlib.sha256(args.input.read_bytes()).hexdigest(),
         orientation='baseline smoothed cluster orientation; not corrected orientation',
-        limitations=['Not a validated qmd_unified8_smpl18 bundle', 'No anatomical mounting calibration',
+        limitations=['Not a validated qmd_unified8 bundle', 'No anatomical mounting calibration',
                      'No external-dataset accuracy claim', 'Input quality mask must be supplied'],
         physics_valid_frames=int(valid.sum()))
     if args.checkpoint:

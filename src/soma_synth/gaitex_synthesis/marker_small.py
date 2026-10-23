@@ -38,7 +38,7 @@ from typing import Mapping, Sequence
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from soma_synth.contracts.qmd_unified8_smpl18_spec import SITE_ORDER, SITE_TO_JOINT
+from soma_synth.contracts.qmd_unified8_spec import SITE_ORDER, SITE_TO_JOINT
 from soma_synth.kinematics import gap_policy, markers, rigid_body
 from soma_synth.sensors import lever_arm, site_registry, virtual_imu
 from soma_synth.validation import gaitex_reference

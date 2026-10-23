@@ -269,11 +269,9 @@ def measured_small(raw, small_ideal, relabels, gR, win_start, win_end, dt):
     }
 
 
-def build_measured(spec, reduction=None):
-    """Faithful build with `small` swapped for the PHYSICAL-measured version (Small-only revision).
-
-    `reduction` is the subject's frozen-joint fit, passed straight to the faithful build."""
-    small_ideal, large, dev, anthro, manifest = faithful.build(spec, reduction)
+def build_measured(spec):
+    """Faithful build with `small` swapped for the PHYSICAL-measured version (Small-only revision)."""
+    small_ideal, large, dev, anthro, manifest = faithful.build(spec)
     raw = faithful.load_prism_safe(spec.source_pkl)
     n = int(raw["smpl_params"]["poses"].shape[0])
     win_start, win_end = spec.window if spec.window is not None else (0, n)
@@ -320,7 +318,7 @@ def build_measured(spec, reduction=None):
         "subject_scope_note",
         "PRISM subject-constant anthropometry: identical across every frame of a take "
         "(subject_constant_trial_frame_invariant).")
-    for _k in ("joint_names", "segment_names", "fixed_joint_names", "reference_poses"):
+    for _k in ("joint_names", "segment_names", "reference_poses"):
         if _k not in anthro:
             continue
         _a = np.asarray(anthro[_k])
@@ -330,7 +328,7 @@ def build_measured(spec, reduction=None):
     for _k in ("sensor_codes", "mount_id", "gyro_provenance"):
         small[_k] = np.asarray(small[_k], dtype="U")
     # manifest: spec lineage (layout §6) + corrected deliverables (drop the absent README, add root translation)
-    manifest["spec_id"] = "qmd_unified8_smpl18"
+    manifest["spec_id"] = "qmd_unified8"
     manifest["spec_version"] = "faithful-v2"
     manifest["quality_gate"] = "NOT_EVALUATED"
     manifest["deliverables"] = [
@@ -374,7 +372,4 @@ def build_measured(spec, reduction=None):
     }
     manifest["faithful_content"]["large"] = manifest["faithful_content"]["large"].replace(
         "smpl_global_orientation_prism_world", "smpl_global_orientation_world")
-    manifest["anthro_reconstruction"]["lossless_alternative"] = (
-        manifest["anthro_reconstruction"]["lossless_alternative"].replace(
-            "smpl_global_orientation_prism_world", "smpl_global_orientation_world"))
     return small, large, dev, anthro, manifest

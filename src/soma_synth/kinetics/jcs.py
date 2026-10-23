@@ -31,19 +31,26 @@ __all__ = [
     "project",
 ]
 
-# The 17 moving joints of the Large kinematics, SMPL index order (large/02_kinematics.qmd).
-# name, SMPL joint (= child body), JCS parent body, kind, side, primary component, distal point
+# The 23 moving joints of the Large kinematics, SMPL index order (large/02_kinematics.qmd).
+# name, SMPL joint (= child body), JCS parent body, kind, side, primary component, distal point.
+# The shoulders take the thorax (spine3) as their JCS parent, as ISB does, rather than the collar.
+# The collars' primary component is the floating axis e2, the girdle's elevation. The hands have no
+# joint beyond them, so their distal point continues the wrist-hand line ("beyond:<joint>").
 JOINTS: tuple[tuple[str, int, int, str, str, int, str], ...] = (
     ("left_hip", 1, 0, "sagittal", "L", 0, "joint:4"),
     ("right_hip", 2, 0, "sagittal", "R", 0, "joint:5"),
+    ("spine1", 3, 0, "sagittal", "M", 0, "joint:6"),
     ("left_knee", 4, 1, "sagittal", "L", 0, "joint:7"),
     ("right_knee", 5, 2, "sagittal", "R", 0, "joint:8"),
+    ("spine2", 6, 3, "sagittal", "M", 0, "joint:9"),
     ("left_ankle", 7, 4, "sagittal", "L", 0, "joint:10"),
     ("right_ankle", 8, 5, "sagittal", "R", 0, "joint:11"),
     ("spine3", 9, 6, "sagittal", "M", 0, "joint:12"),
     ("left_foot", 10, 7, "sagittal", "L", 0, "forward"),
     ("right_foot", 11, 8, "sagittal", "R", 0, "forward"),
     ("neck", 12, 9, "sagittal", "M", 0, "joint:15"),
+    ("left_collar", 13, 9, "sagittal", "L", 1, "joint:16"),
+    ("right_collar", 14, 9, "sagittal", "R", 1, "joint:17"),
     ("head", 15, 12, "sagittal", "M", 0, "up"),
     ("left_shoulder", 16, 9, "shoulder", "L", 1, "joint:18"),
     ("right_shoulder", 17, 9, "shoulder", "R", 1, "joint:19"),
@@ -51,15 +58,18 @@ JOINTS: tuple[tuple[str, int, int, str, str, int, str], ...] = (
     ("right_elbow", 19, 17, "sagittal", "R", 0, "joint:21"),
     ("left_wrist", 20, 18, "sagittal", "L", 0, "joint:22"),
     ("right_wrist", 21, 19, "sagittal", "R", 0, "joint:23"),
+    ("left_hand", 22, 20, "sagittal", "L", 0, "beyond:20"),
+    ("right_hand", 23, 21, "sagittal", "R", 0, "beyond:21"),
 )
 
 # Direction the distal point moves in the positive primary motion, from the rest (T) pose.
 # hip/elbow/trunk/neck/head flexion: forward; knee flexion: backward; ankle/MTP dorsiflexion: up;
-# shoulder elevation: up (the arm is already abducted 90 degrees at rest); wrist flexion: down
-# (the SMPL rest palm faces down, so flexion moves the hand toward the floor).
+# shoulder and collar elevation: up (the arm is already abducted 90 degrees at rest); wrist and hand
+# flexion: down (the SMPL rest palm faces down, so flexion moves the hand toward the floor).
 POSITIVE_MOTION = {
-    "hip": "forward", "knee": "backward", "ankle": "up", "foot": "up", "spine3": "forward",
-    "neck": "forward", "head": "forward", "shoulder": "up", "elbow": "forward", "wrist": "down",
+    "hip": "forward", "knee": "backward", "ankle": "up", "foot": "up", "spine1": "forward",
+    "spine2": "forward", "spine3": "forward", "neck": "forward", "head": "forward",
+    "collar": "up", "shoulder": "up", "elbow": "forward", "wrist": "down", "hand": "down",
 }
 
 # body -> (frame kind, proximal joint, distal joint) for the anatomical frame
@@ -141,6 +151,8 @@ def calibrate(j_rest: np.ndarray) -> JcsCalibration:
         p = j_rest[child]
         if distal.startswith("joint:"):
             d = j_rest[int(distal.split(":")[1])]
+        elif distal.startswith("beyond:"):
+            d = 2.0 * p - j_rest[int(distal.split(":")[1])]
         else:
             d = p + 0.1 * direction[distal]
         group = name.split("_")[-1] if "_" in name else name

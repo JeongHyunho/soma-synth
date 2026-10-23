@@ -1,4 +1,4 @@
-"""Milestone-2 (KAIST EXO Lab) -> a `qmd_unified8_smpl18` dataset with Large kinetics.
+"""Milestone-2 (KAIST EXO Lab) -> a `qmd_unified8` dataset with Large kinetics.
 
 The source is SMPL fits of overground-reconstructed treadmill walking (MoSh++, 300 betas, neutral
 model) and the split-belt treadmill's force plates, frame-aligned with the fits. Small, Large
@@ -50,7 +50,6 @@ def _load(path: pathlib.Path, name: str):
 
 
 EMIT = _load(_HERE.parent / "unified8_emit.py", "unified8_emit")
-REDUCED = EMIT.REDUCED
 
 from soma_synth.addbio_retarget.shape_fit import load_clean_model  # noqa: E402
 from soma_synth.contracts import source_attribution as ATTRIBUTION  # noqa: E402
@@ -181,8 +180,7 @@ def kinetics_block(k: "milestone2.TakeKinetics", cfg: dict, recorded_mass: float
     }
 
 
-def convert(take: str, root: pathlib.Path, out_root: pathlib.Path, models: dict, cfg: dict,
-            reduction=None) -> dict:
+def convert(take: str, root: pathlib.Path, out_root: pathlib.Path, models: dict, cfg: dict) -> dict:
     fit_path = root / FITS_DIR / f"{take}{FIT_SUFFIX}"
     plate_path = root / PLATES_DIR / f"{take}{PLATE_SUFFIX}"
     fit = dict(np.load(fit_path, allow_pickle=False))
@@ -222,9 +220,7 @@ def convert(take: str, root: pathlib.Path, out_root: pathlib.Path, models: dict,
                        "NOT quality-gate PASS. INTERNAL-ONLY.",
         anthro_namespace="anthro_reference/milestone2_smpl300_v1",
         subject_scope="subject_constant_trial_frame_invariant",
-        subject_scope_note="betas are the provider's per-subject fit, identical across the subject's takes; "
-                           "the frozen-joint constants are fitted once per subject over all of its takes "
-                           "(smpl18.reduce).",
+        subject_scope_note="betas are the provider's per-subject fit, identical across the subject's takes.",
         height_m=float(height) / 1000.0,
         height_provenance="measured:H5 sub_info height (mm)",
         body_mass_kg=float(plates["subj_weight"]),
@@ -257,7 +253,7 @@ def convert(take: str, root: pathlib.Path, out_root: pathlib.Path, models: dict,
     )
     bundle = EMIT.build_bundle(pose24=pose.reshape(-1, 72), trans=trans, betas=betas, gender=SEX,
                                model=models["anthro"], src_fps=float(fit["fps"]), source=source,
-                               reduction=reduction, rest_joints=j_rest)
+                               rest_joints=j_rest)
     bundle["anthro"]["gender"] = np.str_("neutral")    # the SMPL model the fits used
 
     # -------- kinetics into Large, in the bundle world
@@ -323,7 +319,7 @@ def convert(take: str, root: pathlib.Path, out_root: pathlib.Path, models: dict,
     }
     man["faithful_content"]["large"] += (
         " Kinetics (large/03_kinetics.qmd): grf[M,2,3], cop[M,2,2], free_moment[M,2] measured; "
-        "com_acceleration, angular_momentum, joint_torque[M,17], joint_power[M,17] by inverse "
+        "com_acceleration, angular_momentum, joint_torque[M,23], joint_power[M,23] by inverse "
         "dynamics, with joint_moments_jcs, joint_power_total, the GRF/kinetics validity masks and "
         "the pelvis residual.")
     man["faithful_content"]["development_reference"] = (
@@ -373,23 +369,15 @@ def main(argv=None) -> int:
     models = {"anthro": load_clean_model(mpath), "smpl_body": smpl_body.load_model(mpath)}
     out_root.mkdir(parents=True, exist_ok=True)
 
-    fits = REDUCED.CorpusFits(REDUCED.settings_for_source(SOURCE))
     entries: list[dict] = []
     started = time.time()
     by_subject: dict[str, list[str]] = {}
     for t in takes:
         by_subject.setdefault(subject_of(t), []).append(t)
     for subject, group in by_subject.items():
-        members = []
-        for t in group:
-            fit = np.load(root / FITS_DIR / f"{t}{FIT_SUFFIX}", allow_pickle=False)
-            _, j_rest = smpl_body.shaped(models["smpl_body"], np.asarray(fit["betas"], np.float64))
-            pose, _, _ = turned_pose(fit, j_rest)
-            members.append((t, pose, j_rest))
-        fits.fit(f"milestone2_{subject}", members, basis="every take of the subject, native rate")
         for t in group:
             try:
-                entries.append(convert(t, root, out_root, models, cfg, reduction=fits.by_take[t]))
+                entries.append(convert(t, root, out_root, models, cfg))
             except Exception as error:                          # noqa: BLE001
                 entries.append({"take_id": t, "rel": t, "status": "failed",
                                 "reason": f"{type(error).__name__}: {error}"})
@@ -412,10 +400,9 @@ def main(argv=None) -> int:
     }
     (out_root / "INDEX.json").write_text(json.dumps(index, ensure_ascii=False, indent=2),
                                          encoding="utf-8", newline="\n")
-    fits.write(out_root)
     EMIT.write_data_description(
         out_root, index,
-        title="Milestone-2 (KAIST EXO Lab) - synthetic IMU reference with Large kinetics (qmd_unified8_smpl18)",
+        title="Milestone-2 (KAIST EXO Lab) - synthetic IMU reference with Large kinetics (qmd_unified8)",
         body=(
             "## What this is\n\n"
             "Treadmill walking of 20 subjects (level, belt speeds 0.75 / 1.00 / 1.25 m/s) on a split-belt "
@@ -424,7 +411,7 @@ def main(argv=None) -> int:
             "(`small_mode: synthetic_from_smpl`).\n\n"
             "**`large_reference.npz` carries kinetics** (large/03_kinetics.qmd): measured `grf`, `cop` and "
             "`free_moment` per foot, and `com_acceleration`, `angular_momentum`, `joint_torque` and "
-            "`joint_power` of the 17 moving joints by inverse dynamics on the subject's SMPL body, with "
+            "`joint_power` of the 23 moving joints by inverse dynamics on the subject's SMPL body, with "
             "the lossless `joint_moments_jcs` and `joint_power_total`, `foot_contact`, `grf_valid_mask`, "
             "`kinetics_valid_mask` and the pelvis residual `inverse_dynamics_residual`. Joint moments are "
             "internal (parent-on-child) moments in N m; `joint_torque` is the primary JCS component "

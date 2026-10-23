@@ -384,7 +384,7 @@ bundles:
       - joint_rotation
       files:
       - large_reference.npz
-    statement: joint_rotation holds the pelvis global orientation and 17 SMPL parent-relative local quaternions;
+    statement: joint_rotation holds the pelvis global orientation and 23 SMPL parent-relative local quaternions;
       no ISB/JCS clinical joint angles (joint_angles_jcs_deg) are produced because no ISB/JCS convention
       was applied.
     consequence: Do not read joint_rotation as anatomical flexion/abduction/rotation angles; derive clinical
@@ -495,37 +495,6 @@ bundles:
       not added)'); configs/datasets/prism_usage_policy_v1.yaml world_translation (disagreement_metres,
       provenance_requirement)
     status: open
-    since: '2026-08-18'
-  - id: prism.reduced_model_weld_residual
-    kind: approximation
-    severity: caution
-    scope:
-      level: array
-      arrays:
-      - joint_rotation
-      - fixed_joint_rotation
-      files:
-      - large_reference.npz
-      - anthro_reference.npz
-    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
-      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject over the pooled
-      frames of all of its takes, and spine3 and the shoulders absorb the removed rotation; distal global
-      orientation is exact but a joint-centre position residual remains on the trunk/arm chain. Across
-      the 6 fit groups the fitted residual RMS is 47.3-70.6 mm (the mean-rotation starting guess 49.4-76.1
-      mm) and the worst frame is 257.6 mm (prism_subj006). Per take, overall_max is 0.050-0.259 m (worst
-      prism-subj006-take009) and 128 of 150 takes flag at least one fixed joint above the 0.05 m p95 promotion
-      threshold (471 flagged pairs); promotion to Large motion is a candidate decision, not applied.'
-    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
-      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
-      read them before relying on reconstructed positions.
-    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
-      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
-      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance; prism_faithful_reduced_model_policy_v1.json
-      at the bundle root (takes_with_any_candidate 128, flagged_pairs)
-    status: mitigated
-    mitigation: large_reference.npz smpl_global_orientation_prism_world keeps all 24 SMPL joints' global
-      orientation losslessly; use it with the raw SMPL data (manifest.anthro_reconstruction.lossless_alternative)
-      when exact joint positions matter.
     since: '2026-08-18'
   - id: prism.imu_confidence_semantics
     kind: approximation
@@ -655,7 +624,7 @@ bundles:
       level: bundle
     statement: The source is CC BY 4.0 (Lee and Lee, Hankyong National University, Zenodo concept DOI
       10.5281/zenodo.17188465; Scientific Data 2026) and the manifest records changes_made (SMPL-24 retarget,
-      18-joint reduction, synthetic IMU).
+      synthetic IMU).
     consequence: Any figure, report or derivative must name the authors, the concept DOI, the CC BY 4.0
       licence and the changes made.
     evidence: DATA_DESCRIPTION_EN.md section 8 'Provenance and attribution (mandatory)'; manifest.json
@@ -937,34 +906,6 @@ bundles:
       HKNU full-body conversion audit report (parent project record, 2026-08-29) limit L3 and section
       4.3
     status: open
-    since: '2026-08-30'
-  - id: hknu.reduced_model_weld_residual
-    kind: approximation
-    severity: info
-    scope:
-      level: array
-      arrays:
-      - joint_rotation
-      - fixed_joint_rotation
-      files:
-      - large_reference.npz
-      - anthro_reference.npz
-    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
-      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject over the pooled
-      frames of all of its takes, and spine3 and the shoulders absorb the removed rotation; distal global
-      orientation is exact but a joint-centre position residual remains on the trunk/arm chain. Across
-      the 12 fit groups the fitted residual RMS is 4.2-44.1 mm (the mean-rotation starting guess 4.3-47.7
-      mm) and the worst frame is 196.0 mm (hknu_S03).'
-    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
-      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
-      read them before relying on reconstructed positions.
-    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
-      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
-      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance
-    status: mitigated
-    mitigation: large_reference.npz smpl_global_orientation_world[M,24,4] keeps all 24 SMPL joints' global
-      orientation losslessly (manifest.anthro_reconstruction.lossless_alternative); use it when exact
-      per-joint orientation matters.
     since: '2026-08-30'
   - id: hknu.sex_provenance_mislabelled
     kind: pipeline_defect
@@ -1711,34 +1652,6 @@ bundles:
       lineage)
     status: open
     since: '2026-09-06'
-  - id: gaitex.reduced_model_weld_residual
-    kind: approximation
-    severity: info
-    scope:
-      level: array
-      arrays:
-      - joint_rotation
-      - fixed_joint_rotation
-      files:
-      - large_reference.npz
-      - anthro_reference.npz
-    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
-      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject over the pooled
-      frames of all of its takes, and spine3 and the shoulders absorb the removed rotation; distal global
-      orientation is exact but a joint-centre position residual remains on the trunk/arm chain. Across
-      the 19 fit groups the fitted residual RMS is 5.6-27.5 mm (the mean-rotation starting guess 5.6-29.5
-      mm) and the worst frame is 140.0 mm (gaitex_katee).'
-    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
-      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
-      read them before relying on reconstructed positions.
-    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
-      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
-      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance
-    status: mitigated
-    mitigation: large_reference.npz smpl_global_orientation_world[M,24,4] keeps all 24 SMPL joints' global
-      orientation losslessly (manifest.anthro_reconstruction.lossless_alternative); use it when exact
-      per-joint orientation matters.
-    since: '2026-09-06'
   - id: gaitex.generation_provenance_unrecoverable
     kind: pipeline_defect
     severity: info
@@ -1953,7 +1866,7 @@ bundles:
       - joint_rotation
       files:
       - large_reference.npz
-    statement: joint_rotation holds the pelvis global orientation and 17 SMPL parent-relative local quaternions;
+    statement: joint_rotation holds the pelvis global orientation and 23 SMPL parent-relative local quaternions;
       no ISB/JCS clinical joint angles (joint_angles_jcs_deg) are produced because no ISB/JCS convention
       was applied.
     consequence: Do not read joint_rotation as anatomical flexion/abduction/rotation angles; derive clinical
@@ -2007,44 +1920,13 @@ bundles:
       files:
       - anthro_reference.npz
     statement: Each AMASS npz carries its own MoSh betas, so betas and the rest skeleton are stored per
-      sequence, and the frozen-joint constants are shared only by the sequences of one subject that have
-      the same betas and body model (one fit group in reduced_model_fit.json). In this corpus every subject's
-      sequences carry identical betas, so each of the 249 subjects is exactly one group; a future source
-      release that varies betas within a subject would split it.
+      sequence (subject_scope sequence_constant_frame_invariant). In this corpus every subject's sequences
+      carry identical betas, but nothing in the bundle relies on that.
     consequence: Do not assume one skeleton per subject across takes; key anthro constants by pair_id,
-      or by the fit group reduced_model_fit.json names for the take, not by subject_id.
-    evidence: anthro_reference.npz subject_scope and subject_scope_note; reduced_model_fit.json takes
-      and groups; DATA_DESCRIPTION_EN.md section 5 opening paragraph
+      not by subject_id.
+    evidence: anthro_reference.npz subject_scope and subject_scope_note; DATA_DESCRIPTION_EN.md section 5
+      opening paragraph
     status: open
-    since: '2026-08-13'
-  - id: amass.reduced_model_weld_residual
-    kind: approximation
-    severity: info
-    scope:
-      level: array
-      arrays:
-      - joint_rotation
-      - fixed_joint_rotation
-      files:
-      - large_reference.npz
-      - anthro_reference.npz
-    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
-      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject group (one subject,
-      one body model and one set of MoSh betas) over the pooled frames of all of its takes, and spine3
-      and the shoulders absorb the removed rotation; distal global orientation is exact but a joint-centre
-      position residual remains on the trunk/arm chain. Across the 249 fit groups the fitted residual
-      RMS is 8.8-96.2 mm (the mean-rotation starting guess 8.8-108.3 mm) and the worst frame is 334.1
-      mm (amass_CMU_26|M|betas:2b13b2858784).'
-    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
-      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
-      read them before relying on reconstructed positions.
-    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
-      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
-      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance
-    status: mitigated
-    mitigation: large_reference.npz smpl_global_orientation_world[M,24,4] keeps all 24 SMPL joints' global
-      orientation losslessly; use it with the resampled raw poses (manifest.anthro_reconstruction.lossless_alternative)
-      when exact joint positions matter.
     since: '2026-08-13'
   - id: amass.resampled_to_100hz
     kind: approximation
@@ -2095,14 +1977,13 @@ bundles:
       - joint_names
       - reference_poses
       - segment_names
-      - fixed_joint_names
-    statement: The 2026-08-13 generation stored seven one-dimensional string arrays per take with numpy
+    statement: The 2026-08-13 generation stored its one-dimensional string arrays per take with numpy
       object dtype, which forced allow_pickle=True on every reader and handed arbitrary-code-execution
       risk to the consumer (57,827 arrays across 8,261 takes); the 2026-09-07 generation had them reserialised
       to U after the fact. This generation writes them as U.
     consequence: 'Every string array is U dtype: load with allow_pickle=False.'
     evidence: small_reference.npz sensor_codes and mount_id, large_reference.npz joint_names, anthro_reference.npz
-      reference_poses / joint_names / segment_names / fixed_joint_names, all dtype U; scripts/poc/generate_amass_faithful.py
+      reference_poses / joint_names / segment_names, all dtype U; scripts/poc/generate_amass_faithful.py
       small and large dicts and scripts/poc/anthro_smpl.py compute_anthro (dtype 'U'); _superseded/amass_faithful_full_v2/RESERIALIZATION.json
       for the retired generation; ADR-0040 D2 and D5
     status: fixed
@@ -2689,35 +2570,6 @@ bundles:
       scripts/poc/unified8_emit.py FAITHFUL.SITE_CONFIDENCE
     status: open
     since: '2026-08-31'
-  - id: addbiomechanics.reduced_model_weld_residual
-    kind: approximation
-    severity: info
-    scope:
-      level: array
-      arrays:
-      - joint_rotation
-      - fixed_joint_rotation
-      files:
-      - large_reference.npz
-      - anthro_reference.npz
-    statement: 'large is an 18-joint reduced model: spine1, spine2, left_collar and right_collar are frozen
-      to constants (anthro.fixed_joint_rotation) that smpl18.reduce fits once per subject over the pooled
-      frames of all of its takes, and spine3 and the shoulders absorb the removed rotation; distal global
-      orientation is exact but a joint-centre position residual remains on the trunk/arm chain. Across
-      the 1085 fit groups the fitted residual RMS is 0.0-65.3 mm (the mean-rotation starting guess 0.0-86.4
-      mm) and the worst frame is 162.0 mm (addbio_Camargo2021_Formatted_No_Arm_AB15_split2). 1 group(s)
-      stopped at the evaluation cap without converging: addbio_Tiziana2019_Formatted_No_Arm_Subject26.'
-    consequence: FK from large + anthro reproduces shoulder, elbow, wrist, neck and head positions only
-      to the residual recorded per fit group in reduced_model_fit.json and per take in manifest.validation.reduced_model_fit_residual_m;
-      read them before relying on reconstructed positions.
-    evidence: reduced_model_fit.json at the bundle root (groups[*].residual_fitted_m, residual_initial_m,
-      per_joint_rms_m, converged, settings); manifest.json anthro_reconstruction.reduced_model_fit and
-      validation.reduced_model_fit_residual_m; anthro_reference.npz fixed_joint_rotation_provenance
-    status: mitigated
-    mitigation: large_reference.npz smpl_global_orientation_world[M,24,4] keeps all 24 SMPL joints' global
-      orientation losslessly (manifest.anthro_reconstruction.lossless_alternative); use it when exact
-      per-joint orientation matters.
-    since: '2026-08-31'
   - id: addbiomechanics.generation_provenance_unrecoverable
     kind: pipeline_defect
     severity: info
@@ -2973,11 +2825,14 @@ bundles:
       files:
       - large_reference.npz
     statement: 'SMPL has no anatomical MTP joint: the left_foot/right_foot moments are those of the SMPL
-      toe segment, loaded only while the CoP is ahead of the toe joint. Upper-limb and neck moments carry
-      no external load and depend on segment inertia alone; their non-primary JCS components follow the
-      right-side axes mirrored for the left.'
-    consequence: Use the toe moments as a proxy, not an anatomical MTP moment; treat upper-limb moments as
-      small inertial estimates.
+      toe segment, loaded only while the CoP is ahead of the toe joint. spine1, spine2 and the collars
+      are boundaries between SMPL trunk and shoulder-girdle segments, not anatomical joints: their moments
+      are the moments carried across those boundaries (the collars'' primary component is girdle elevation).
+      Collar, upper-limb, hand and neck moments carry no external load and depend on segment inertia alone;
+      their non-primary JCS components follow the right-side axes mirrored for the left.'
+    consequence: Use the toe moments as a proxy, not an anatomical MTP moment; read the spine1/spine2 moments
+      as distributed lumbar loading rather than one vertebral joint; treat collar, upper-limb and hand moments
+      as small inertial estimates.
     evidence: manifest.json kinetics.method and kinetics.joint_torque_component
     status: open
     since: '2026-10-19'

@@ -59,7 +59,7 @@
 # first). A PC without the corpora gets them from the corpus stage, under the same names.
 
 schema: source_pipelines_v2
-spec_id: qmd_unified8_smpl18
+spec_id: qmd_unified8
 spec_version: faithful-v2
 
 # The decision a run generates under when no --authorized-by record is given. Copied into every

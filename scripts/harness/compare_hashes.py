@@ -10,11 +10,9 @@ Every difference found is put in one category. The declared difference categorie
 code change may legitimately introduce):
 
   C0 scope        a sample run against a full production bundle: the bundle-root aggregates
-                  (INDEX.json, DATA_DESCRIPTION_EN.md, reduced_model_fit.json, the PRISM policy
-                  file) describe different take sets, and README / VALIDATION_REPORT /
-                  validation_ledger exist only where validate and readme were run
-  C1 smpl18       the smpl18 settings/profile hashes: reduced_model_fit.json settings and each
-                  manifest's anthro_reconstruction.reduced_model_fit.settings
+                  (INDEX.json, DATA_DESCRIPTION_EN.md) describe different take sets, and
+                  README / VALIDATION_REPORT / validation_ledger exist only where validate and
+                  readme were run
   C2 corpus code  the retarget corpus content_hashes (code=) and the corpus-file digests that follow.
                   A content_hashes value (`adapter=..;config=..;code=..;model=..`, in the corpus
                   npz and copied into the AddBio manifests) is C2 only when both values are
@@ -25,8 +23,7 @@ code change may legitimately introduce):
   C3 pair_id      pair_id changes that follow from the corpus file bytes (C2, or C4 for HKNU)
   C4 hknu env     an HKNU corpus built under a different Python/numpy build than the compared
                   run; a rebuild differs at the float32 last digit there, and
-                  everything downstream of it moves (the spine1/spine2 reduce fit is flat, so
-                  its constants move visibly). Only declared against a reference; between two
+                  everything downstream of it moves. Only declared against a reference; between two
                   harness runs in one environment an HKNU difference is undeclared
   C5 prefix       the corpus-location prefix tmp/harness/<run>/ in source_asset_id / relative_path
                   (absorbed when --normalize-prefix is given; counted as `normalized`)
@@ -61,8 +58,7 @@ import pathlib
 
 CORPUS_OF = {"hknu_unified8": "hknu_smpl24_paired", "gaitex_unified8": "gaitex_smpl24",
              "addbio_unified8": "addbio_smpl24_raw"}
-SCOPE_FILES = {"INDEX.json", "DATA_DESCRIPTION_EN.md", "reduced_model_fit.json",
-               "prism_faithful_reduced_model_policy_v1.json"}
+SCOPE_FILES = {"INDEX.json", "DATA_DESCRIPTION_EN.md"}
 STEP_FILES = {"README.md", "VALIDATION_REPORT.json", "validation_ledger.json"}
 #: Depth-3 manifest subtrees that hold a declared digest (C2) next to a path that may be rewritten
 #: (relative_path). Without the depth-4 split on both sides their difference cannot be attributed
@@ -70,10 +66,9 @@ STEP_FILES = {"README.md", "VALIDATION_REPORT.json", "validation_ledger.json"}
 COMPOSITES = ("small_synthesis.inputs.retarget_npz",)
 #: The wall-clock fields hash_outputs.py masks (kept in step with its MASK).
 MASK = {"generated_utc", "applied_utc", "generated_at", "elapsed_s", "elapsed_seconds"}
-DECLARED = ("C0", "C1", "C2", "C3", "C4", "C5")
+DECLARED = ("C0", "C2", "C3", "C4", "C5")
 LABELS = {
     "C0": "scope (sample vs full bundle; validate/readme not run)",
-    "C1": "smpl18 settings/profile hashes",
     "C2": "corpus code= / content_hashes / corpus-file digest",
     "C3": "pair_id following the corpus file bytes",
     "C4": "HKNU corpus built under a different interpreter/numpy",
@@ -233,8 +228,6 @@ def classify_path(bundle: str, path: str, corpus_evidence: dict, split: bool = T
     single hash covering a declared digest and a rewritten path together: that is UL, not C2."""
     fed = bundle in CORPUS_OF
     hknu_env = bundle == "hknu_unified8" and corpus_evidence.get("hknu_smpl24_paired", {}).get("numeric")
-    if "reduced_model_fit" in path and (path.endswith(".settings") or ".settings." in path):
-        return "C1"
     if path == "identity.pair_id" and fed:
         return "C3"
     if path in COMPOSITES and fed and not split:
@@ -504,43 +497,6 @@ def compare_index_file(rep: Report, name: str, a: dict, b: dict, fa: dict, fb: d
                                        "differs (the entries are compared separately)")
 
 
-def compare_fit(rep: Report, name: str, fa: dict, fb: dict, same_scope: bool,
-                evidence: dict) -> None:
-    if fa.get("settings_sha") != fb.get("settings_sha"):
-        sa, sb = fa.get("settings") or {}, fb.get("settings") or {}
-        keys = sorted(k for k in set(sa) | set(sb) if sa.get(k) != sb.get(k))
-        rep.add(name, "C1", "<root>/reduced_model_fit.json", "settings",
-                "; ".join(f"{k}: A={json.dumps(sa.get(k))[:160]} B={json.dumps(sb.get(k))[:160]}" for k in keys))
-    for group in sorted(set(fa["groups"]) | set(fb["groups"])):
-        ga, gb = fa["groups"].get(group), fb["groups"].get(group)
-        if ga is None or gb is None:
-            rep.add(name, "XX", f"fit[{group}]", "group", "only in " + ("A" if ga else "B"))
-            continue
-        if ga["settings_sha"] != gb["settings_sha"]:
-            rep.add(name, "C1", f"fit[{group}]", "settings", "")
-        if ga["record_without_settings_sha"] != gb["record_without_settings_sha"]:
-            cat = "C4" if name == "hknu_unified8" and evidence.get("hknu_smpl24_paired", {}).get("numeric") else "XX"
-            detail = (f"constants {'equal' if ga['constants_sha'] == gb['constants_sha'] else 'differ'}; "
-                      f"residual A={ga.get('residual_fitted_m')} B={gb.get('residual_fitted_m')}")
-            rep.add(name, cat, f"fit[{group}]", "record (constants/residuals)", detail)
-    if fa.get("takes", {}) != fb.get("takes", {}):
-        rep.add(name, "XX", "fit.takes", "take -> group", f"A={len(fa.get('takes', {}))} B={len(fb.get('takes', {}))}")
-    if fa.get("unfitted", {}) != fb.get("unfitted", {}):
-        rep.add(name, "XX", "fit.unfitted", "unfitted takes",
-                f"A={json.dumps(fa.get('unfitted'))[:100]} B={json.dumps(fb.get('unfitted'))[:100]}")
-    ha, hb = fa.get("head"), fb.get("head")
-    if same_scope and ha is not None and hb is not None:
-        for key in sorted(k for k in set(ha) | set(hb) if ha.get(k) != hb.get(k)):
-            rep.add(name, "XX", "<root>/reduced_model_fit.json", f"head {key}",
-                    f"A={json.dumps(ha.get(key))[:100]} B={json.dumps(hb.get(key))[:100]}")
-
-
-def _fit_covers_file(a: dict, b: dict) -> bool:
-    """True when both `fit` summaries describe the whole file (format 2, not sample-filtered)."""
-    fa, fb = a.get("fit") or {}, b.get("fit") or {}
-    return all(f.get("complete") and f.get("head") is not None for f in (fa, fb))
-
-
 def compare_bundle(rep: Report, name: str, a: dict, b: dict, A: Side, B: Side, evidence: dict) -> None:
     scope_differs = (a.get("counts") or {}).get("total") != (b.get("counts") or {}).get("total")
     rep.stats[name]["takes_A"] = len(a.get("takes", {}))
@@ -574,10 +530,6 @@ def compare_bundle(rep: Report, name: str, a: dict, b: dict, A: Side, B: Side, e
         if fn == "INDEX.json":
             compare_index_file(rep, name, a, b, ra[fn], rb[fn], A, B)
             continue
-        if fn == "reduced_model_fit.json" and ra[fn].get("sha256") != rb[fn].get("sha256") \
-                and _fit_covers_file(a, b):
-            rep.stats[name]["fit_file_compared_by_summary"] += 1
-            continue
         compare_file(rep, name, f"<root>/{fn}", ("root", fn), ra[fn], rb[fn], A, B, evidence)
     # --- INDEX entries of the compared takes
     ia = {e["rel"]: e for e in a.get("index_sample", [])}
@@ -594,10 +546,6 @@ def compare_bundle(rep: Report, name: str, a: dict, b: dict, A: Side, B: Side, e
             if not cat:
                 cat = ("C3" if name in CORPUS_OF else "XX") if key == "pair_id" else "XX"
             rep.add(name, cat, f"INDEX[{rel}]", key, f"A={str(va)[:100]!r} B={str(vb)[:100]!r}")
-    # --- the fit records of the compared subjects
-    fa, fb = a.get("fit"), b.get("fit")
-    if fa and fb:
-        compare_fit(rep, name, fa, fb, same_scope=not scope_differs, evidence=evidence)
 
 
 def compare_corpus(rep: Report, name: str, a: dict, b: dict, A: Side, B: Side,

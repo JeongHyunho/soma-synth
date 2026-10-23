@@ -3,7 +3,7 @@
 import pytest
 
 from soma_synth.contracts import field_docs_v1 as fd
-from soma_synth.contracts import qmd_unified8_smpl18_spec as spec
+from soma_synth.contracts import qmd_unified8_spec as spec
 
 
 def _spec_fields(artifact_name):

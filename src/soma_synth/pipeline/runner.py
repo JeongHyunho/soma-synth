@@ -1848,7 +1848,7 @@ class PipelineRunner:
         return StepOutcome("readme", "ok", str(Path(written).name))
 
     def _step_register(self, run: RunDirectory, *, catalog_dir: Path) -> StepOutcome:
-        from soma_synth.contracts import qmd_unified8_smpl18_spec as spec
+        from soma_synth.contracts import qmd_unified8_spec as spec
         from soma_synth.datasets import catalog
 
         self._refuse_unfinished_bundle("register")

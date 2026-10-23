@@ -1,4 +1,4 @@
-"""Declarative dataset spec for lineage ``spec_id=qmd_unified8_smpl18``, ``spec_version=faithful-v2``.
+"""Declarative dataset spec for lineage ``spec_id=qmd_unified8``, ``spec_version=faithful-v2``.
 
 This is the single source of truth for the on-disk schema of the poc-demo / experimental synthetic-IMU
 datasets (PRISM measured + AMASS synthetic small/large/anthro). It validates **structure and declared
@@ -26,7 +26,7 @@ from typing import Mapping
 
 from . import dataset_profiles
 
-SPEC_ID = "qmd_unified8_smpl18"
+SPEC_ID = "qmd_unified8"
 SPEC_VERSION = "faithful-v2"
 
 # Allowed enum values (structural gate; the spec does not assert numeric values).
@@ -156,9 +156,9 @@ _SMALL = ArtifactSpec(
 _LARGE = ArtifactSpec(
     filename="large_reference.npz",
     core=(
-        _ks("joint_names", "U", "18"),
-        _ks("joint_rotation", "f4", "T", "18", "4"),
-        _ks("joint_velocity", "f4", "T", "18", "3"),
+        _ks("joint_names", "U", "24"),
+        _ks("joint_rotation", "f4", "T", "24", "4"),
+        _ks("joint_velocity", "f4", "T", "24", "3"),
         _ks("root_velocity", "f4", "T", "3"),
         _ks("pelvis_position_world_aux", "f4", "T", "3"),
         _ks("smpl_global_orientation_world", "f4", "T", "24", "4"),
@@ -176,11 +176,11 @@ _LARGE = ArtifactSpec(
             _ks("grf", "f4", "T", "2", "3"),
             _ks("cop", "f4", "T", "2", "2"),
             _ks("free_moment", "f4", "T", "2"),
-            _ks("joint_torque", "f4", "T", "17"),
-            _ks("joint_power", "f4", "T", "17"),
-            _ks("kinetics_joint_names", "U", "17"),
-            _ks("joint_moments_jcs", "f4", "T", "17", "3"),
-            _ks("joint_power_total", "f4", "T", "17"),
+            _ks("joint_torque", "f4", "T", "23"),
+            _ks("joint_power", "f4", "T", "23"),
+            _ks("kinetics_joint_names", "U", "23"),
+            _ks("joint_moments_jcs", "f4", "T", "23", "3"),
+            _ks("joint_power_total", "f4", "T", "23"),
             _ks("foot_contact", "bool", "T", "2"),
             _ks("grf_valid_mask", "bool", "T"),
             _ks("kinetics_valid_mask", "bool", "T"),
@@ -197,13 +197,11 @@ _ANTHRO = ArtifactSpec(
         _ks("subject_scope", "U"),
         _ks("subject_scope_note", "U"),
         _ks("reference_poses", "U", "2"),
-        _ks("joint_names", "U", "22"),
-        _ks("joint_position", "f4", "2", "22", "3"),
+        _ks("joint_names", "U", "24"),
+        _ks("joint_position", "f4", "2", "24", "3"),
         _ks("joint_position_frame", "U"),
-        _ks("segment_names", "U", "13"),
-        _ks("segment_length", "f4", "13"),
-        _ks("fixed_joint_names", "U", "4"),
-        _ks("fixed_joint_rotation", "f4", "4", "4"),
+        _ks("segment_names", "U", "15"),
+        _ks("segment_length", "f4", "15"),
         _ks("sex", "U"),
         _ks("height", "f4"),
         _ks("body_mass", "f4"),
@@ -215,7 +213,6 @@ _ANTHRO = ArtifactSpec(
         _ks("sex_provenance", "U"),
         _ks("betas_provenance", "U"),
         _ks("skeleton_provenance", "U"),
-        _ks("fixed_joint_rotation_provenance", "U"),
         _ks("reconstruction_note", "U"),
         _ks("pair_id", "U"),
         _ks("subject_id", "U"),

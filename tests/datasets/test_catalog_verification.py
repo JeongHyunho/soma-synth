@@ -114,7 +114,7 @@ def test_register_dataset_appends_v1_assets(tmp_path: Path) -> None:
     ac = catalog.load_asset_catalog(catdir)
     assert ac["schema"] == catalog.SCHEMA_ASSET
     ids = [a["asset_id"] for a in ac["assets"]]
-    assert any(i.startswith("qmd_unified8_smpl18:faithful-v2:amass:") and i.endswith(":small") for i in ids)
+    assert any(i.startswith("qmd_unified8:faithful-v2:amass:") and i.endswith(":small") for i in ids)
     a0 = ac["assets"][0]
     assert {"asset_id", "role", "relative_path", "sha256", "bytes", "source", "spec_id", "spec_version"} <= set(a0)
     # relative path is SOMA_DATA_ROOT-relative (no drive), forward slashes
@@ -161,7 +161,7 @@ def test_register_dataset_prism_includes_development(tmp_path: Path) -> None:
         timestamps_s=(np.arange(T) * 0.01).astype(np.float64),
     )
     index = {
-        "spec_id": "qmd_unified8_smpl18", "spec_version": "faithful-v2", "dataset_dirname": "prism_x",
+        "spec_id": "qmd_unified8", "spec_version": "faithful-v2", "dataset_dirname": "prism_x",
         "source": "prism", "artifact_class": "experimental_non_candidate", "distribution_scope": "internal_only",
         "generated_utc": "2026-08-18T00:00:00+00:00", "counts": {"ok": 1, "failed": 0, "excluded": 0, "total": 1},
         "complete": True,

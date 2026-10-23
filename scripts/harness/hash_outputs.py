@@ -25,8 +25,6 @@ On top of that, so a difference can be located and classified rather than only d
 * INDEX.json (format 2): everything but the take list, verbatim and masked (`index_head`), and the
   take order (`index_order`); with `index_sample` (the take entries themselves) that is the whole
   file, so no INDEX difference is left unlocalized;
-* reduced_model_fit.json: its settings block verbatim, a per-group digest, the take -> group map,
-  the unfitted list and (format 2) the remaining top-level fields verbatim (`fit`);
 * the retarget corpora (hknu_smpl24_paired, gaitex_smpl24, addbio_smpl24_raw): every file, npz
   members as in the corpus ARRAY_SHA256.json evidence (data_sha256, npy_sha256, dtype, shape, fortran).
 
@@ -72,13 +70,11 @@ SAMPLES = {
     "addbio_unified8": ["Hamner2013_Formatted_No_Arm_subject01", "Hammer2013_Formatted_With_Arm_subject01",
                         "Tiziana2019_Formatted_With_Arm_Subject43"],
 }
-#: Format 2 adds deep_subtrees, index_head / index_order and fit.head. compare_hashes.py reads both.
+#: Format 2 adds deep_subtrees and index_head / index_order. compare_hashes.py reads both.
 FORMAT = 2
 SUBTREE_DEPTH = 3
 DEEP_LEVEL = SUBTREE_DEPTH + 1
 SUBTREE_MAX_BYTES = 2 << 20
-#: The top-level fields of reduced_model_fit.json the `fit` summary carries in its own form.
-FIT_BODY = ("settings", "groups", "takes", "unfitted")
 VALUE_MAX_CHARS = 1000
 #: json string fields recorded verbatim wherever they sit (compare_hashes.py reads their tokens).
 VALUE_KEYS = ("content_hashes", "retarget_content_hashes")
@@ -236,34 +232,6 @@ def hash_file(path: pathlib.Path, norm: Normalizer, *, corpus: bool = False,
     return record
 
 
-def fit_summary(path: pathlib.Path, groups_wanted=None) -> dict:
-    document = json.loads(path.read_text(encoding="utf-8"))
-    groups = {}
-    for name, rec in document.get("groups", {}).items():
-        if groups_wanted is not None and name not in groups_wanted:
-            continue
-        rest = {k: v for k, v in rec.items() if k != "settings"}
-        groups[name] = {
-            "record_sha": sha(canonical(rec))[:DIGEST],
-            "record_without_settings_sha": sha(canonical(rest))[:DIGEST],
-            "settings_sha": sha(canonical(rec.get("settings")))[:DIGEST],
-            "constants_sha": sha(canonical(rec.get("constants_wxyz")))[:DIGEST],
-            "takes": rec.get("takes"), "frames_pooled": rec.get("frames_pooled"),
-            "frames_measured": rec.get("frames_measured"), "converged": rec.get("converged"),
-            "residual_fitted_m": rec.get("residual_fitted_m"),
-        }
-    takes = {t: g for t, g in document.get("takes", {}).items()
-             if groups_wanted is None or g in groups_wanted}
-    return {"settings": document.get("settings"), "settings_sha": sha(canonical(document.get("settings")))[:DIGEST],
-            "groups": groups, "takes": takes,
-            "unfitted": {k: v for k, v in document.get("unfitted", {}).items()
-                         if groups_wanted is None or k in takes},
-            # the rest of the file (schema, method, source, counts), so that with the fields above
-            # the summary covers every top-level key; counts differ with the scope, like INDEX
-            "head": masked({k: v for k, v in document.items() if k not in FIT_BODY}),
-            "complete": groups_wanted is None}
-
-
 def in_sample(bundle: str, entry: dict) -> bool:
     text = entry.get("subject_id", "") + "|" + entry.get("take_id", "")
     return any(p in text for p in SAMPLES[bundle])
@@ -283,16 +251,8 @@ def hash_bundle(bundle: str, root: pathlib.Path, norm: Normalizer, sample_only: 
         result["takes_outside_sample"] = outside
     for path in sorted(root.iterdir()):
         if path.is_file() and not path.name.startswith("INDEX_shard"):
-            big = path.name in ("INDEX.json", "reduced_model_fit.json", "validation_ledger.json",
-                                "VALIDATION_REPORT.json")
+            big = path.name in ("INDEX.json", "validation_ledger.json", "VALIDATION_REPORT.json")
             result["root_files"][path.name] = hash_file(path, norm, detail=not big)
-    fit_path = root / "reduced_model_fit.json"
-    if fit_path.is_file():
-        wanted = None
-        if sample_only:
-            document = json.loads(fit_path.read_text(encoding="utf-8"))
-            wanted = {document["takes"][e["rel"]] for e in entries if e["rel"] in document["takes"]}
-        result["fit"] = fit_summary(fit_path, wanted)
     for entry in entries:
         take_dir = root / entry["rel"]
         if not take_dir.is_dir():

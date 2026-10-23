@@ -75,7 +75,7 @@ synthesis and emission this lineage adds after them.
 | 6 | `convert_intermediate` | SMPL-24 retarget | Separate corpus generation stage — `corpus` in registry v2, run by the runner (§1.3) |
 | 7 | `emit_source_qc_and_provenance` | Emit source QC and provenance | `SourceIdentity` (31 fields) |
 | 8 | `fit_shape` | betas, rest skeleton | `addbio_retarget.shape_fit` |
-| 9 | `build_large` | 18-joint kinematics | `unified8_emit.build_bundle`; the reduction is `pipeline.reduced_model` (§2.2) |
+| 9 | `build_large` | SMPL-24 kinematics | `unified8_emit.build_bundle`; the source pose as it is (§2.2) |
 | 10 | `build_anthro` | rest constants | `unified8_emit.build_bundle` |
 | 11 | `synthesise_small` | 8-channel IMU | **The only stage that differs per source** |
 | 12 | `resample_100hz` | 100 Hz grid | `unified8_emit.build_bundle` |
@@ -209,15 +209,14 @@ that the same command can re-run a sample).
 puts the moved folder on the list this run will restore. It then copies the small evidence files
 (`INDEX.json`, `INDEX_shard_*.json`, `SUMMARY.json`, `_run.json`, `VALIDATION_REPORT.json`,
 `validation_ledger.json`, `KNOWN_LIMITATIONS.json`, `README.md`, `DATA_DESCRIPTION_EN.md`,
-`reduced_model_fit.json`, the corpus fingerprint and so on, `runner.REPLACED_EVIDENCE_FILES`) to the run
+the corpus fingerprint and so on, `runner.REPLACED_EVIDENCE_FILES`) to the run
 record's `replaced/<bundle|corpus>/`, writes them in `manifest.json` `replaced.<bundle|corpus>` with their
 SHA-256, what the folder held (`found`) and where it was moved, and then runs the entry point on an empty
 folder. `<run>` is the first 12 characters of the run identity (a run that repeats the same identity gets
 `-2` and so on, as the record folder does). So the old generation's takes, shard indexes, validation
 reports and corpus files cannot remain in the new generation, and the entry point never needs a flag to
 rebuild skipped takes. Registry v2 has no such flag (`force_arg`) and no resume fields, and a
-`--bundle-arg=--force` given by the operator is passed on like any other argument. Because it builds in an
-empty folder, `amass` no longer rewrites the subject fits in `reduced_model_fit.json`. The bundle folder is
+`--bundle-arg=--force` given by the operator is passed on like any other argument. The bundle folder is
 moved after the corpus stage and its class check are finished, just before the bundle entry point. If the
 corpus stage fails, the bundle is left untouched.
 
@@ -294,11 +293,6 @@ by a **separate repository**, which this repository mounts as a **submodule** at
 `JeongHyunho/smpl18`, switched on 2026-09-16). The runner and generators use it through `import smpl18`, so
 the submodule must be populated and its path must be in the execution environment.
 
-The package was renamed from `smpl24` to `smpl18` on 2026-09-16 — the corpus it produces is an 18-joint
-reduced model (after going through the full 24-joint SMPL pose, four joints are fixed to per-subject
-constants and the two hand joints are dropped) — and the remote repository moved to
-`JeongHyunho/smpl18`. No paths or imports under the old name remain.
-
 ```bash
 # Once: populate the submodule (for a fresh clone, git clone --recurse-submodules)
 git submodule update --init
@@ -340,41 +334,15 @@ cd packages/smpl18 && git commit -am "..." && git push && cd ../..
 git add packages/smpl18 && git commit -m "bump the smpl18 pin"
 ```
 
-### 2.2 The 18-joint reduction — `smpl18` defines it, fitted once per subject (2026-09-16)
+### 2.2 Large is the source SMPL pose
 
-The 18 joints of `large_reference.npz` are SMPL-24 with `spine1`, `spine2` and both `collar` joints fixed to
-per-subject constants and the two hand joints dropped. What is fixed, how the joints below them (`spine3`,
-both shoulders) absorb the removed rotation, and how the four constants are fitted are all defined by
-`smpl18.reduce`. Until 2026-09-16 this repository had its own copy of the same computation in
-`scripts/poc/anthro_smpl.py`, and four of the five sources (hknu, addbiomechanics, gaitex, amass) fitted the
-constants **per take**.
-
-Now everything goes through `soma_synth.pipeline.reduced_model`. This module does only the two things the
-package leaves to the caller.
-
-| What | How |
-|---|---|
-| Which frames are pooled | Sampled evenly as if **all takes** of one subject were concatenated (a long take counts in proportion to its length). Takes on different rest skeletons are not mixed; they form separate groups |
-| Where the numbers come from | The `reduce` section (`sample_frames`, `optimiser`, `max_evaluations`) of the profile named by the registry's `smpl18_profile`. The code has no defaults |
-
-The pooling unit per source:
-
-| source | Fit group | Frames used for the fit |
-|---|---|---|
-| `hknu` | subject | Every trial in the corpus, at the native sample rate, on the bone-length-corrected skeleton |
-| `addbiomechanics` | subject | Every readable trial, at the native sample rate |
-| `gaitex` | subject | The pair-window rows of every take — exactly the rows the bundle carries |
-| `amass` | subject × sex model × MoSh betas | Every motion sequence in the group, at the native sample rate. Even when several shards run at once the fit happens once (lock file); the other shards read its result file |
-| `prism` | subject | All frames of every take |
-
-The record is kept in two places. `reduced_model_fit.json` at the bundle root holds, per group, the four
-constants (`constants_wxyz`), the absorbing joints, the residual before and after the fit (RMS and maximum,
-m), per-joint RMS, the number of frames used, convergence, and the settings and profile hash, and it says
-which group's constants each take used. Every bundle must have this file
-(`dataset_profiles_v1.yaml` `universal.bundle_files`). Each take's `manifest.json` carries the same record
-as `anthro_reconstruction.reduced_model_fit`, and the take's own residual is, as before, in
-`validation.reduced_model_fit_residual_m`. When the fit used a single take without a group (a generator
-called on its own), the record's `scope` is `take`.
+`large_reference.npz` carries all 24 SMPL joints: `joint_rotation[:, 0]` is the pelvis global orientation and
+`joint_rotation[:, 1:]` the 23 local (parent-relative) rotations of the pose each source was converted to,
+unchanged; `joint_velocity` is their rotation-log angular velocity. `anthro_reference.npz` carries the rest
+skeleton of the same 24 joints (`joint_position[2, 24, 3]`, 15 segments). Forward kinematics of the two, from
+`pelvis_position_world_aux`, reproduces the source SMPL body, and its global orientations equal
+`smpl_global_orientation_world`. No constant is fitted per subject, so a take's bundle depends on that take
+alone.
 
 ### 2.3 Preparing sources — the list and staging (`hash-sources`, `stage-sources`)
 
@@ -958,7 +926,7 @@ project's rule for sealed documents).
 |---|---|---|
 | `PIPELINE_GOVERNANCE.md` §0 | Three sources, `AMASS`, `PRISM`, `AddBiomechanics` | **5** (+`gaitex`, `hknu`) |
 | `PIPELINE_GOVERNANCE.md` §0 | `6 IMU Small` | **8-channel** |
-| `PIPELINE_GOVERNANCE.md` §0 | `15-joint Large` | **18-joint** |
+| `PIPELINE_GOVERNANCE.md` §0 | `15-joint Large` | **24-joint (SMPL)** |
 | `PIPELINE_GOVERNANCE.md` §10.1 | `run_id` is the identity hash | `run_id` is a take label; §3.1 works around it with `run_identity` |
 | `PIPELINE_GOVERNANCE.md` §2 | Pipeline location `src/soma_synthetic_imu/` | The generation pipeline moved to the separate repository `soma-synth` (package `soma_synth`, the parent project's submodule `packages/soma-synth`) (ADR-0041 decision 1) |
 | `LOCAL_DATA_PLANE.md` §1, §5, §8 | Assumes one fixed data area | On each PC `SOMA_DATA_ROOT` is the output area and the sources are `SOMA_SOURCE_ROOT` (ADR-0041 decision 3). Distributing originals on the shared drive only after §8 is updated |

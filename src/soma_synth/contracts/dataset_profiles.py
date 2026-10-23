@@ -2,7 +2,7 @@
 
 Backed by ``configs/datasets/dataset_profiles_v1.yaml`` and authorised by ADR-0040. Before this
 module the same per-source rule was written out four times -- once in
-``qmd_unified8_smpl18_spec.derive_capabilities`` and three more in ``validation.checks`` -- so a
+``qmd_unified8_spec.derive_capabilities`` and three more in ``validation.checks`` -- so a
 change to one of them silently disagreed with the other three.
 
 The registry is a whitelist. ``universal`` is what every bundle owes; ``additive`` is what a

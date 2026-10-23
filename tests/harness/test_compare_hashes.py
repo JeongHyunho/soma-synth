@@ -42,8 +42,8 @@ CONTENT_HASHES = "adapter=b133211b389262e4;config=none;code={code};model={model}
 
 def _write_run(data_root: Path, run: str, *, corpus: str = "gaitex_smpl24",
                retarget_sha: str = "a" * 64, pair_id: str = "p" * 64, frames: int = 100,
-               asset_id: str | None = None, spec_id: str = "qmd_unified8_smpl18",
-               settings_hash: str = "s1", content_hashes: str | None = None) -> Path:
+               asset_id: str | None = None, spec_id: str = "qmd_unified8",
+               content_hashes: str | None = None) -> Path:
     """One gaitex_unified8 take under <data_root>/tmp/harness/<run>, named as a generator names it.
 
     `content_hashes` adds the manifest copy of the corpus value (as the AddBio bundle carries it)."""
@@ -59,7 +59,6 @@ def _write_run(data_root: Path, run: str, *, corpus: str = "gaitex_smpl24",
         "small_synthesis": {"inputs": {
             "retarget_npz": {"relative_path": rel_path, "sha256": retarget_sha, "frames": frames},
             "note": "the marker and imu files are the small's own inputs"}},
-        "anthro_reconstruction": {"reduced_model_fit": {"settings": {"hash": settings_hash}}},
     }
     if content_hashes is not None:
         manifest["source_attribution"] = {"retarget_content_hashes": content_hashes}
@@ -73,13 +72,6 @@ def _write_run(data_root: Path, run: str, *, corpus: str = "gaitex_smpl24",
              "takes": [{"rel": REL, "take_id": REL, "subject_id": "gaitex_austra",
                         "pair_id": pair_id, "relative_path": rel_path, "status": "ok"}]}
     (bundle / "INDEX.json").write_text(json.dumps(index, indent=2), encoding="utf-8", newline="\n")
-    fit = {"schema": "reduced_model_fit", "source": "gaitex", "group_count": 1, "take_count": 1,
-           "settings": {"hash": settings_hash},
-           "groups": {"gaitex_austra": {"settings": {"hash": settings_hash},
-                                         "constants_wxyz": [[1.0, 0.0, 0.0, 0.0]],
-                                         "residual_fitted_m": 0.005}},
-           "takes": {REL: "gaitex_austra"}, "unfitted": {}}
-    (bundle / "reduced_model_fit.json").write_text(json.dumps(fit), encoding="utf-8", newline="\n")
     return scratch
 
 
@@ -128,8 +120,6 @@ def _as_format1(path: Path) -> Path:
     for bundle in doc["bundles"].values():
         bundle.pop("index_head", None)
         bundle.pop("index_order", None)
-        (bundle.get("fit") or {}).pop("head", None)
-        (bundle.get("fit") or {}).pop("complete", None)
         for take in bundle["takes"].values():
             for record in take["files"].values():
                 record.pop("deep_subtrees", None)
@@ -171,7 +161,6 @@ def test_a_run_records_the_index_head_order_and_the_split_composite(data_root, r
     manifest = bundle["takes"][REL]["files"]["manifest.json"]
     assert "small_synthesis.inputs.retarget_npz.relative_path" in manifest["deep_subtrees"]
     assert "small_synthesis.inputs.retarget_npz.relative_path" in manifest["norm_deep_subtrees"]
-    assert bundle["fit"]["complete"] is True and bundle["fit"]["head"]["schema"] == "reduced_model_fit"
 
 
 # ------------------------------------------------------------------------ the prefix
@@ -392,16 +381,6 @@ def test_a_corpus_file_only_one_harness_run_wrote_is_undeclared(data_root, tmp_p
     assert code == 1
     assert [(i["category"], i["where"], i["detail"]) for i in items] == [
         ("XX", "SUMMARY.json", "only in B")]
-
-
-# ------------------------------------------------------------------------ reduced_model_fit.json
-def test_the_fit_file_is_compared_through_its_summary(data_root, tmp_path, reference):
-    """Only the smpl18 settings hash moved: C1 in the summary and the manifests, no UL."""
-    h2 = _hash(data_root, _write_run(data_root, "h2_r1", settings_hash="s2"), tmp_path / "h2.json")
-    code, items = _compare(reference, h2, tmp_path / "d.json", "auto")
-    assert code == 0, items
-    assert {item["category"] for item in items} == {"C1"}
-    assert ("C1", "settings") in _found(items)
 
 
 # ------------------------------------------------------------------------ run_harness

@@ -60,7 +60,7 @@ def test_full_window_covers_all_frames():
     small, large, dev, anthro, manifest = g.build(spec)
     assert int(small["frame_count"]) == n
     assert small["imu_orientation"].shape == (n, 8, 4)
-    assert large["joint_rotation"].shape == (n, 18, 4)
+    assert large["joint_rotation"].shape == (n, 24, 4)
     assert manifest["window"]["frame_count"] == n
     assert manifest["window"]["frame_start"] == 0
 
@@ -81,16 +81,3 @@ def test_policy_alignment_fields():
     pol = manifest["prism_usage_policy"]
     assert pol["config_id"] == "prism_usage_policy_v1"
     assert "trans" in json.dumps(manifest).lower()
-
-
-@NEEDS_DATA
-def test_promotion_candidate_flagging():
-    g = _gen()
-    small, large, dev, anthro, manifest = g.build(_subj001_spec(g, (1000, 2000)))
-    r = manifest["validation"]["reduced_model_fit_residual_m"]
-    assert r["promotion_threshold_p95_m"] == 0.05
-    fp = r["fixed_joint_promotion"]
-    assert set(fp) == {"left_collar", "right_collar", "spine1", "spine2"}
-    for d in fp.values():
-        assert "p95_m" in d and "max_m" in d and isinstance(d["promotion_candidate"], bool)
-    assert isinstance(r["promotion_candidates"], list)

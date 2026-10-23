@@ -269,7 +269,7 @@ def _copy_file(src: pathlib.Path, dst: pathlib.Path) -> int:
 
 
 def stage_amass(data_root: pathlib.Path, scratch: pathlib.Path) -> tuple[pathlib.Path, int]:
-    """Whole fit groups: every npz of each sample subject, in the source's own layout."""
+    """Whole subjects: every npz of each sample subject, in the source's own layout."""
     root = scratch / "src" / "amass"
     copied = 0
     for dataset, subject in AMASS_GROUPS:

@@ -101,7 +101,7 @@ def _big_catalog(path: Path, count: int) -> None:
                "relative_path": f"runs/experimental_generation_poc_demo/amass_faithful_full/"
                                 f"take{index:06d}/{role}_reference.npz",
                "sha256": hashlib.sha256(f"{index}{role}".encode()).hexdigest(), "bytes": 123456,
-               "source": "amass", "spec_id": "qmd_unified8_smpl18", "spec_version": "faithful-v1"}
+               "source": "amass", "spec_id": "qmd_unified8", "spec_version": "faithful-v1"}
               for index in range(count) for role in ("small",)]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(catalog.serialise({"schema": catalog.SCHEMA_ASSET, "assets": assets}))

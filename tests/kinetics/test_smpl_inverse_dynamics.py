@@ -114,7 +114,8 @@ def _tpose():
         ("right_hip", -1), ("left_hip", -1),          # backward swing = hip extension
         ("right_knee", +1), ("left_knee", +1),        # backward swing = knee flexion
         ("right_ankle", -1), ("left_ankle", -1),      # toes move down = plantarflexion
-        ("spine3", +1), ("neck", +1),                  # top moves forward = flexion
+        ("spine1", +1), ("spine2", +1),                # top moves forward = flexion
+        ("spine3", +1), ("neck", +1),
     ],
 )
 def test_sagittal_primary_signs_follow_the_anatomical_motion(joint, primary_sign):
@@ -133,7 +134,7 @@ def test_sagittal_primary_signs_follow_the_anatomical_motion(joint, primary_sign
 
 def test_every_joint_gets_a_primary_sign_and_left_secondaries_are_mirrored():
     cal = jcs.calibrate(_tpose())
-    assert len(cal.names) == 17
+    assert len(cal.names) == 23
     assert np.all(np.abs(cal.sign) == 1)
     for i, n in enumerate(cal.names):
         if n.startswith("left_"):

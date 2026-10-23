@@ -272,15 +272,6 @@ class TestAmassGroups:
         with pytest.raises(ValueError, match="KIT/10"):
             amass_all.enumerate_specs(root, ["CMU"], [("KIT", "10")])
 
-    def test_the_selected_groups_fit_exactly_as_in_the_full_run(self, amass_all, tmp_path):
-        root = _amass_tree(tmp_path)
-        _s, full_groups, full_takes, _u = amass_all.fit_all_groups(amass_all.enumerate_specs(root))
-        _s, groups, takes, _u = amass_all.fit_all_groups(
-            amass_all.enumerate_specs(root, None, [("CMU", "01")]))
-        assert len(groups) == 2                       # both betas groups of the subject, whole
-        assert {rel: full_takes[rel] for rel in takes} == takes
-        assert {name: full_groups[name] for name in groups} == groups
-
     def test_main_refuses_an_unknown_group_before_writing(self, amass_all, data_root, tmp_path, capsys):
         root = _amass_tree(tmp_path)
         out = tmp_path / "bundle"
@@ -306,19 +297,9 @@ class TestAmassGroups:
         assert "lineage container" in capsys.readouterr().out
         assert not poc.exists()
 
-    def test_limit_does_not_combine_with_groups(self, amass_all, data_root, tmp_path, capsys):
-        """--limit cut the spec list after --groups and before the fits, so a group could be fitted
-        on part of its sequences and get other frozen-joint constants than a full run gives it."""
-        root = _amass_tree(tmp_path)
-        out = tmp_path / "bundle"
-        assert amass_all.main(["--amass-root", root, "--out-root", str(out),
-                               "--groups", "CMU/01", "--limit", "1"]) == 2
-        assert "--limit cannot be combined with --groups" in capsys.readouterr().out
-        assert not out.exists()
-
     def test_explicit_roots_still_need_the_body_models_configured(self, amass_all, clean_env,
                                                                   tmp_path, capsys):
-        """Refused before anything is written, not by a traceback from inside the fits."""
+        """Refused before anything is written, not by a traceback from inside the run."""
         root = _amass_tree(tmp_path)
         out = tmp_path / "bundle"
         assert amass_all.main(["--amass-root", root, "--out-root", str(out)]) == 2
@@ -329,7 +310,7 @@ class TestAmassGroups:
 # ================================================================ an empty selection writes nothing
 #
 # An existing but empty source folder selected nothing, and the AMASS and PRISM batch mains still
-# rewrote INDEX.json, reduced_model_fit.json and the description (PRISM: its policy file too) in
+# rewrote INDEX.json and the description in
 # their output, which defaults to the production lineage. Each test puts a stand-in production
 # INDEX.json there first and requires it byte-identical, and alone, afterwards.
 
@@ -354,7 +335,7 @@ def _lineage(data_root: Path, name: str) -> Path:
 
 
 class TestAnEmptySelectionWritesNothing:
-    @pytest.mark.parametrize("merge", [[], ["--merge"]], ids=["fit", "merge"])
+    @pytest.mark.parametrize("merge", [[], ["--merge"]], ids=["run", "merge"])
     def test_amass_an_empty_source_folder(self, amass_all, data_root, capsys, merge):
         source = data_root / "extracted" / "amass"
         source.mkdir()
@@ -576,7 +557,7 @@ class TestAddbioOnly:
                             "--only", "Tiziana2019_Formatted_With_Arm/subject43"])
         assert code == 2
         assert "Tiziana2019_Formatted_With_Arm/subject43" in capsys.readouterr().out
-        assert not out.exists()          # no INDEX.json, SUMMARY.json or fit record over zero takes
+        assert not out.exists()          # no INDEX.json or SUMMARY.json over zero takes
 
     def test_the_corpus_variable_stays_an_alias_for_raw(self, addbio_faithful, addbio_unified8,
                                                         data_root, clean_env, tmp_path):
@@ -613,7 +594,7 @@ class TestAddbioOnly:
     def test_unified8_refuses_a_corpus_outside_the_data_root_before_writing(
             self, addbio_unified8, data_root, tmp_path, capsys):
         """Every take's relative_path is written against the data root: a corpus elsewhere failed
-        take by take and still left INDEX.json, reduced_model_fit.json and a description."""
+        take by take and still left INDEX.json and a description."""
         corpus = _corpus(tmp_path / "corpus")
         out = data_root / "tmp" / "out"
         assert addbio_unified8.main(["--out", str(out), "--raw", str(corpus)]) == 2
@@ -786,7 +767,7 @@ class TestGaitexInputIds:
     def test_unified8_refuses_a_corpus_outside_the_data_root_before_writing(
             self, gaitex_unified8, data_root, tmp_path, capsys):
         """Every take's relative_path is written against the data root: a corpus elsewhere failed
-        take by take and still left an INDEX, a fit record and a description behind."""
+        take by take and still left an INDEX and a description behind."""
         retarget = tmp_path / "corpus_elsewhere"
         retarget.mkdir()
         out = data_root / "tmp" / "out"
@@ -859,8 +840,8 @@ class TestEveryMainCallsTheOutputGuard:
 
 # ================================================================ a partial run needs a scratch output
 #
-# A selection flag narrows the run to part of the corpus, and the batch mains then rewrite INDEX.json,
-# the fit record and the description over that part and exit 0. Into the production lineage (the
+# A selection flag narrows the run to part of the corpus, and the batch mains then rewrite INDEX.json
+# and the description over that part and exit 0. Into the production lineage (the
 # default output) that leaves a bundle describing a sample under the production name, so each main
 # requires an output of its own there. Each test puts a stand-in production INDEX.json in the
 # lineage first and requires it byte-identical, and alone, afterwards.

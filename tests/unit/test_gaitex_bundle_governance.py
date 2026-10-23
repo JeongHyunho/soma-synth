@@ -87,7 +87,7 @@ class TestTheDeclaredLabel:
         assert manifest["quality_gate"] == "NOT_EVALUATED"
 
     def test_the_spec_is_the_one_the_other_corpora_use(self, index) -> None:
-        assert index["spec_id"] == "qmd_unified8_smpl18"
+        assert index["spec_id"] == "qmd_unified8"
 
     def test_the_data_description_carries_the_internal_only_banner(self) -> None:
         """L4 looks for this substring, and a rename must not be able to drop it."""

@@ -35,11 +35,11 @@ class TakeKinetics:
     foot_contact: np.ndarray        # (T,2) bool
     com_acceleration: np.ndarray    # (T,3)
     angular_momentum: np.ndarray    # (T,3)
-    joint_torque: np.ndarray        # (T,17) primary JCS component
-    joint_power: np.ndarray         # (T,17) primary component power
-    joint_moments_jcs: np.ndarray   # (T,17,3)
-    joint_power_total: np.ndarray   # (T,17)
-    primary_component: np.ndarray   # (17,)
+    joint_torque: np.ndarray        # (T,23) primary JCS component
+    joint_power: np.ndarray         # (T,23) primary component power
+    joint_moments_jcs: np.ndarray   # (T,23,3)
+    joint_power_total: np.ndarray   # (T,23)
+    primary_component: np.ndarray   # (23,)
     residual_force: np.ndarray      # (T,3)
     residual_moment: np.ndarray     # (T,3)
     grf_valid: np.ndarray           # (T,)

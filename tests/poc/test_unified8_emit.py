@@ -34,7 +34,7 @@ SMALL_KEYS = ("imu_orientation", "imu_acceleration", "imu_angular_velocity",
 LARGE_KEYS = ("joint_rotation", "joint_velocity", "root_velocity",
               "pelvis_position_world_aux", "smpl_global_orientation_world",
               "timestamps_s", "frame_count")
-ANTHRO_KEYS = ("joint_position", "segment_length", "fixed_joint_rotation", "betas")
+ANTHRO_KEYS = ("joint_position", "segment_length", "betas")
 
 
 def _load(path: Path, name: str):
@@ -73,14 +73,7 @@ def both_bundles():
     data = gen.load_amass_safe(str(SEQUENCE), dataset=spec.dataset)
     gender = data["gender"]
     model = gen.anthro_smpl.load_smpl_model_for_gender(gen.model_gender_letter(gender))
-    # One fit handed to both builders: this test is about the two assemblies agreeing, and the
-    # constants are an input to both, not something either should choose on its own.
-    reduced = gen.reduced_model
-    reduction = reduced.fit_subject(
-        [gen.build_pose24(data["poses"])], gen.anthro_smpl.rest_joints(model, data["betas"]),
-        reduced.settings_for_source("amass"), group="equivalence_probe", basis="probe",
-        scope="take")
-    small_ref, large_ref, anthro_ref, _ = gen.build(spec, reduction=reduction)
+    small_ref, large_ref, anthro_ref, _ = gen.build(spec)
     identity = emit.SourceIdentity(
         source_name="equivalence_probe", dataset=spec.dataset, subject_id=spec.subject_id,
         sequence_id=spec.sequence_id, relative_path=spec.relative_path, asset_sha256="0" * 64,
@@ -95,7 +88,7 @@ def both_bundles():
     )
     bundle = emit.build_bundle(
         pose24=gen.build_pose24(data["poses"]), trans=data["trans"], betas=data["betas"],
-        gender=gender, model=model, src_fps=data["fps"], source=identity, reduction=reduction,
+        gender=gender, model=model, src_fps=data["fps"], source=identity,
     )
     return {"small": (small_ref, bundle["small"]),
             "large": (large_ref, bundle["large"]),
@@ -155,7 +148,7 @@ def test_the_string_arrays_agree_by_value_even_where_the_dtype_was_tightened(bot
     order it would be a silent schema change dressed up as a lint fix.
     """
     reference, produced = both_bundles["anthro"]
-    for key in ("joint_names", "segment_names", "reference_poses", "fixed_joint_names"):
+    for key in ("joint_names", "segment_names", "reference_poses"):
         assert [str(v) for v in produced[key]] == [str(v) for v in reference[key]]
         assert produced[key].dtype.kind == "U", f"{key} should be U, got {produced[key].dtype}"
 

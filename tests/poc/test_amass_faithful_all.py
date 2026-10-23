@@ -93,7 +93,7 @@ def test_index_entries_name_the_take_directory_and_the_bundle_has_five_files(tmp
     out = tmp_path / "out"
     specs = m.enumerate_specs(amass)
     idx = m.run(specs, str(out), build_fn=_fake_build, write_fn=m.write_outputs_generic)
-    assert idx["spec_id"] == "qmd_unified8_smpl18" and idx["source"] == "amass"
+    assert idx["spec_id"] == "qmd_unified8" and idx["source"] == "amass"
     ok = next(e for e in idx["takes"] if e["status"] == "ok")
     assert ok["take_id"] == ok["rel"] == ok["relative_path"]
     assert (out / ok["rel"] / "manifest.json").is_file()            # rel IS the take directory

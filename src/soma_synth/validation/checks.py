@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from soma_synth.contracts import dataset_limitations, dataset_profiles
-from soma_synth.contracts import qmd_unified8_smpl18_spec as spec
+from soma_synth.contracts import qmd_unified8_spec as spec
 from soma_synth.validation import npz_io
 from soma_synth.validation.report import Finding
 

@@ -1,4 +1,4 @@
-"""Emit a `qmd_unified8_smpl18` take bundle from SMPL motion, whatever the source.
+"""Emit a `qmd_unified8` take bundle from SMPL motion, whatever the source.
 
 PRISM and AMASS reach the validator because their generators write the spec's five-file bundle.
 HKNU and AddBiomechanics do not: they were written as one npz per trial under their own spec_id, so
@@ -51,10 +51,8 @@ def _load(path: pathlib.Path, name: str):
 
 FAITHFUL = _load(_HERE.parent / "generate_amass_faithful.py", "generate_amass_faithful")
 ANTHRO = FAITHFUL.anthro_smpl
-#: The reduced model's fit and application (smpl18.reduce), through the pipeline module.
-REDUCED = FAITHFUL.reduced_model
 
-SPEC_ID = "qmd_unified8_smpl18"
+SPEC_ID = "qmd_unified8"
 SPEC_VERSION = "faithful-v2"
 DELIVERABLES = (
     "small_reference.npz",
@@ -129,18 +127,13 @@ def build_bundle(
     model: dict,
     src_fps: float,
     source: SourceIdentity,
-    reduction=None,
     rest_joints: np.ndarray | None = None,
 ) -> dict:
     """SMPL motion -> the five-file bundle's payloads. Returns a dict of artifact -> mapping.
 
-    `reduction` is the subject's frozen-joint fit (`reduced_model.SubjectFit`), which the generator
-    fits once over all of the subject's takes. Omitted, the constants are fitted on this take
-    alone and every record says `take` scope.
-
     `rest_joints` is the skeleton the pose was fitted against. Given, it drives the forward
-    kinematics, the sensor sites, the reduced-model refit and the published anthro alike, so the
-    five files describe one body. Omitted, it is derived from `betas` as before -- which is the
+    kinematics, the sensor sites and the published anthro alike, so the five files describe one
+    body. Omitted, it is derived from `betas` as before -- which is the
     same thing only while no generator corrects the skeleton after fitting the betas, and the HKNU
     generator now does.
     """
@@ -230,27 +223,13 @@ def build_bundle(
     # ------------------------------------------------------------------ large
     pelvis_position = world[:, 0].astype(np.float64)
     smpl_global_orientation = _quat_per_joint(gR)
-    if reduction is None:
-        reduction = REDUCED.fit_subject(
-            [pose24], j_rest, REDUCED.settings_for_source(source.source_name),
-            group=f"{source.subject_id}/{source.sequence_id}", basis="this take, native rate",
-            scope="take")
-    fixed_C = reduction.constants
-    refit = REDUCED.reduce_local(local, fixed_C)
 
     root_velocity = np.zeros((m, 3), np.float64)
     root_velocity[1:] = (pelvis_position[1:] - pelvis_position[:-1]) / dt
-    joint_rotation = np.zeros((m, 18, 4), np.float32)
-    joint_velocity = np.zeros((m, 18, 3), np.float32)
-    joint_rotation[:, 0, :] = FAITHFUL.rotmat_to_quat_wxyz(gR[:, 0]).astype(np.float32)
-    joint_velocity[:, 0, :] = FAITHFUL.angular_velocity_deg_s(gR[:, 0], dt).astype(np.float32)
-    for k in range(1, 18):
-        idx = int(FAITHFUL.SMPL18_INDICES[k])
-        joint_rotation[:, k, :] = FAITHFUL.rotmat_to_quat_wxyz(refit[:, idx]).astype(np.float32)
-        joint_velocity[:, k, :] = FAITHFUL.angular_velocity_deg_s(refit[:, idx], dt).astype(np.float32)
+    joint_rotation, joint_velocity = FAITHFUL.large_joint_arrays(gR, local, dt)
 
     large = {
-        "joint_names": np.array(FAITHFUL.JOINT18_NAMES, dtype=np.str_),
+        "joint_names": np.array(ANTHRO.JOINT24_NAMES, dtype=np.str_),
         "joint_rotation": joint_rotation,
         "joint_velocity": joint_velocity,
         "root_velocity": root_velocity.astype(np.float32),
@@ -264,9 +243,8 @@ def build_bundle(
     # ----------------------------------------------------------------- anthro
     sex_letter = {"f": "F", "m": "M"}.get(str(gender).strip().lower()[:1], "U")
     anthro = ANTHRO.compute_anthro(model, np.asarray(betas, np.float64),
-                                   {"gender": sex_letter}, pair_id, fixed_joint_local_R=fixed_C,
-                                   j_rest=None if rest_joints is None else j_rest,
-                                   fixed_joint_provenance=REDUCED.anthro_provenance(reduction))
+                                   {"gender": sex_letter}, pair_id,
+                                   j_rest=None if rest_joints is None else j_rest)
     anthro["namespace"] = source.anthro_namespace
     anthro["subject_scope"] = source.subject_scope
     anthro["subject_scope_note"] = source.subject_scope_note
@@ -283,11 +261,6 @@ def build_bundle(
     if source.sex_provenance:
         anthro["sex_provenance"] = source.sex_provenance
     anthro["pair_id"] = np.str_(pair_id)
-    # `compute_anthro` writes its name lists as object arrays, which the spec accepts only as a
-    # WARN ("object-where-U"). AMASS and PRISM carry that warning; there is no reason for a new
-    # dataset to inherit it, and re-typing here leaves their artifacts untouched.
-    for name in ("joint_names", "segment_names", "reference_poses", "fixed_joint_names"):
-        anthro[name] = np.asarray(anthro[name], dtype=np.str_)
 
     # -------------------------------------------------------- root translation
     root_translation = {
@@ -320,24 +293,6 @@ def build_bundle(
     validation["root_velocity_cumsum_recon_max_abs_err_m"] = float(
         np.max(np.abs(reconstructed - pelvis_position))
     )
-    residual = np.linalg.norm(
-        ANTHRO.fk_positions_batch(j_rest, local) - ANTHRO.fk_positions_batch(j_rest, refit), axis=2
-    )
-    validation["reduced_model_fit_residual_m"] = {
-        "overall_max": float(residual.max()),
-        "affected_mean": float(residual[:, list(REDUCED.AFFECTED_BY_FREEZE)].mean()),
-        "rigid_weld_threshold_p95_m": FAITHFUL.RIGID_WELD_TAU_P95_M,
-        "fixed_joint_weld_residual": {
-            name: {"p95_m": float(np.percentile(residual[:, js], 95)),
-                   "max_m": float(residual[:, js].max()),
-                   "exceeds_tau": bool(np.percentile(residual[:, js], 95)
-                                       > FAITHFUL.RIGID_WELD_TAU_P95_M)}
-            for name, js in FAITHFUL.FIXED_JOINT_DOWNSTREAM.items()
-        },
-        "note": "reduced-model (Large 18 refit + Anthro 4 fixed constants) vs raw SMPL joint-centre "
-                "position residual; distal global orientation exact (sec-anthro-fit). Reported as a "
-                "quality metric, not a promotion.",
-    }
 
     manifest = {
         "spec_id": SPEC_ID, "spec_version": SPEC_VERSION,
@@ -387,19 +342,18 @@ def build_bundle(
             "large_kinematics": "large/02_kinematics.qmd",
             "anthropometry": "anthro/00_anthropometry.qmd",
         },
-        "large_joint_names": list(FAITHFUL.JOINT18_NAMES),
+        "large_joint_names": list(ANTHRO.JOINT24_NAMES),
         "deliverables": list(DELIVERABLES),
         "faithful_content": {
             "small": source.small_content_note,
-            "large": "root_velocity[M,3] + joint_rotation[M,18,4] (reduced model: spine3/shoulders "
-                     "refit) + joint_velocity[M,18,3] + pelvis_position_world_aux; raw "
-                     "smpl_global_orientation[M,24,4] kept.",
-            "anthro": "SMPL rest skeleton constants (joint_position[2,22,3], segment_length[13], "
-                      "fixed_joint_rotation[4,4]) + betas + gender.",
+            "large": "root_velocity[M,3] + joint_rotation[M,24,4] (the source SMPL pose: [0] pelvis "
+                     "global, [1:] local) + joint_velocity[M,24,3] + pelvis_position_world_aux + "
+                     "smpl_global_orientation[M,24,4].",
+            "anthro": "SMPL rest skeleton constants (joint_position[2,24,3], segment_length[15]) + "
+                      "betas + gender.",
             "development_reference": "NONE.",
         },
-        "anthro_reconstruction": REDUCED.reconstruction_block(
-            reduction, "large.smpl_global_orientation_world[M,24,4]"),
+        "anthro_reconstruction": FAITHFUL.anthro_reconstruction_block(),
         "unavailable_or_not_applied": list(source.unavailable),
         "validation": validation,
         "safety": {"npz_loader": "np.load(allow_pickle=False); audited core fields only; "
@@ -431,13 +385,11 @@ def write_data_description(out_root, index: dict, *, title: str, body: str) -> p
         f"- generated: {index['generated_utc']}\n\n"
         "## Per-take deliverables\n\n"
         "`small_reference.npz` (8-channel synthetic IMU in the spec sensor frame S) - "
-        "`large_reference.npz` (18-joint reduced-model kinematics) - "
+        "`large_reference.npz` (SMPL 24-joint kinematics) - "
         "`anthro_reference.npz` (SMPL rest-skeleton constants) - "
         "`smpl_root_translation.npz` - `manifest.json`.\n\n"
-        "The 18 joints are SMPL-24 with `spine1`, `spine2` and both collars frozen and the hands "
-        "dropped. `smpl18.reduce` fits the four constants once per subject over all of its takes; "
-        "`reduced_model_fit.json` at the bundle root records them, the residual they leave and which "
-        "fit each take carries.\n\n"
+        "Large carries all 24 SMPL joints as the source pose: `joint_rotation[:, 0]` is the pelvis "
+        "global orientation and `joint_rotation[:, 1:]` the 23 local rotations.\n\n"
         f"{body}\n"
     )
     path.write_text(text, encoding="utf-8", newline="\n")

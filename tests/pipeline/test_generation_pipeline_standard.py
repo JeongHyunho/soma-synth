@@ -202,7 +202,7 @@ def test_an_unmeasurable_item_is_unavailable_with_a_reason_not_a_guess():
 
 def test_provenance_covers_every_item_section_10_2_requires():
     record = prov.ProvenanceRecord(
-        source_name="gaitex", spec_id="qmd_unified8_smpl18", spec_version="faithful-v2"
+        source_name="gaitex", spec_id="qmd_unified8", spec_version="faithful-v2"
     ).as_json()
     for key in (
         "code_revision", "contract_versions", "source_assets", "spec_snapshot",
@@ -215,7 +215,7 @@ def test_provenance_covers_every_item_section_10_2_requires():
 # ------------------------------------------------------------ run identity
 def _inputs(**overrides):
     base = {
-        "spec_id": "qmd_unified8_smpl18", "spec_version": "faithful-v2",
+        "spec_id": "qmd_unified8", "spec_version": "faithful-v2",
         "source_name": "gaitex", "entrypoint": "scripts/poc/generate_gaitex_unified8.py",
     }
     base.update(overrides)
@@ -253,7 +253,7 @@ def test_a_closed_run_directory_holds_all_seven_required_artifacts(tmp_path: Pat
     """§10.1's list, in full."""
     root = tmp_path / rid.run_directory_name(_inputs())
     record = prov.ProvenanceRecord(
-        source_name="gaitex", spec_id="qmd_unified8_smpl18", spec_version="faithful-v2"
+        source_name="gaitex", spec_id="qmd_unified8", spec_version="faithful-v2"
     )
     run = RunDirectory(root=root, identity_inputs=_inputs(), provenance=record).open()
     run.close(takes_written=0)
@@ -265,7 +265,7 @@ def test_a_closed_run_directory_holds_all_seven_required_artifacts(tmp_path: Pat
 def test_a_skipped_take_is_recorded_because_a_silent_skip_is_an_omission(tmp_path: Path):
     root = tmp_path / "run_x"
     record = prov.ProvenanceRecord(
-        source_name="hknu", spec_id="qmd_unified8_smpl18", spec_version="faithful-v2"
+        source_name="hknu", spec_id="qmd_unified8", spec_version="faithful-v2"
     )
     run = RunDirectory(root=root, identity_inputs=_inputs(source_name="hknu"), provenance=record).open()
     run.record_skip("take-0007")
@@ -283,7 +283,7 @@ def test_a_closed_run_cannot_be_reopened(tmp_path: Path):
     """§10.1 calls the run directory immutable."""
     root = tmp_path / "run_y"
     record = prov.ProvenanceRecord(
-        source_name="amass", spec_id="qmd_unified8_smpl18", spec_version="faithful-v2"
+        source_name="amass", spec_id="qmd_unified8", spec_version="faithful-v2"
     )
     run = RunDirectory(root=root, identity_inputs=_inputs(source_name="amass"), provenance=record).open()
     run.close(takes_written=1)
@@ -296,7 +296,7 @@ def test_the_run_manifest_says_it_is_not_the_take_manifest(tmp_path: Path):
     left to infer which contract governs it."""
     root = tmp_path / "run_z"
     record = prov.ProvenanceRecord(
-        source_name="prism", spec_id="qmd_unified8_smpl18", spec_version="faithful-v2"
+        source_name="prism", spec_id="qmd_unified8", spec_version="faithful-v2"
     )
     run = RunDirectory(root=root, identity_inputs=_inputs(source_name="prism"), provenance=record).open()
     run.close(takes_written=1)
@@ -316,7 +316,7 @@ def test_the_standard_records_the_sealed_documents_stale_scope_rather_than_editi
     """§0 of the pinned document still says three sources, 6 IMU and 15 joints. The pinned
     document is not edited from this repository, so the standard records the discrepancy itself."""
     text = STANDARD.read_text(encoding="utf-8")
-    assert "8-channel" in text and "18-joint" in text
+    assert "8-channel" in text and "24-joint (SMPL)" in text
 
 
 def test_the_per_source_table_is_generated_and_matches_the_registry():

@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from soma_synth.contracts import field_docs_v1 as fd
-from soma_synth.contracts import qmd_unified8_smpl18_spec as spec
+from soma_synth.contracts import qmd_unified8_spec as spec
 from soma_synth.validation import checks, npz_io
 
 _BANNER = "> **INTERNAL-ONLY.** Do not upload to public git / cloud / model or dataset hubs. experimental_non_candidate."
@@ -128,10 +128,8 @@ def render_dataset_readme(dataset_dir) -> str:
     lines.append("One subdirectory per take; each take holds: "
                  + ", ".join(f"`{spec.ARTIFACTS[a].filename}`" for a in p["present"]) + ", `manifest.json`.")
     lines.append("")
-    lines.append("The bundle root holds `INDEX.json` (select takes by `status == \"ok\"`), "
-                 "`KNOWN_LIMITATIONS.json`, and `reduced_model_fit.json`: the four frozen-joint "
-                 "constants (spine1, spine2, both collars) that `smpl18.reduce` fitted once per "
-                 "subject, the residual they leave, and which fit each take carries.")
+    lines.append("The bundle root holds `INDEX.json` (select takes by `status == \"ok\"`) and "
+                 "`KNOWN_LIMITATIONS.json`.")
     lines.append("")
     lines.append("## Conventions")
     lines.append("")
@@ -171,11 +169,11 @@ def render_dataset_readme(dataset_dir) -> str:
     an = _load_names(td / "anthro_reference.npz", "joint_names")
     sn = _load_names(td / "anthro_reference.npz", "segment_names")
     if jn:
-        lines.append(f"- `large.joint_names` (18): {', '.join(jn)}")
+        lines.append(f"- `large.joint_names` ({len(jn)}): {', '.join(jn)}")
     if an:
-        lines.append(f"- `anthro.joint_names` (22): {', '.join(an)}")
+        lines.append(f"- `anthro.joint_names` ({len(an)}): {', '.join(an)}")
     if sn:
-        lines.append(f"- `anthro.segment_names` (13): {', '.join(sn)}")
+        lines.append(f"- `anthro.segment_names` ({len(sn)}): {', '.join(sn)}")
     lines.append("")
 
     # enums
@@ -210,7 +208,7 @@ def render_top_level_readme(dataset_dirs) -> str:
     lines.append(_BANNER)
     lines.append("")
     lines.append(f"All datasets share `spec_id` **{spec.SPEC_ID}** (spec_version **{spec.SPEC_VERSION}**): the "
-                 "same 8-site spec_S_v2 IMU + 18-joint kinematics + anthro contract. Each dataset's own "
+                 "same 8-site spec_S_v2 IMU + SMPL 24-joint kinematics + anthro contract. Each dataset's own "
                  "`README.md` has the full field tables; this file is the shared spec + how they differ.")
     lines.append("")
     lines.append("## Conventions (shared)")

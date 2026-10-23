@@ -1,8 +1,8 @@
 """Tests for the Anthro (anthropometry) deliverable computation.
 
 Anthro is the third dataset (per ``anthro/00_anthropometry.qmd``): subject-level,
-trial/frame-invariant skeleton constants that, combined with Large's motion joints,
-reconstruct the full SMPL 22-chain / rigid skeleton.
+trial/frame-invariant skeleton constants that, combined with Large's joint rotations,
+reconstruct the SMPL 24-joint body / rigid skeleton.
 
 These tests exercise the pure math on a *tiny synthetic* SMPL-like model so they run
 without the real 6890-vertex body-model asset.
@@ -148,10 +148,10 @@ def test_compute_anthro_shapes_and_values():
     subj_info = {"gender": "M", "height": 163.0, "weight": 51.0}
     out = anthro.compute_anthro(model, betas, subj_info, pair_id="deadbeef")
 
-    assert out["joint_position"].shape == (2, 22, 3)
+    assert out["joint_position"].shape == (2, 24, 3)
     assert out["joint_position"].dtype == np.float32
-    assert out["segment_length"].shape == (len(anthro.SEGMENTS),)
-    assert out["fixed_joint_rotation"].shape == (4, 4)
+    assert out["segment_length"].shape == (15,)
+    assert not any(key.startswith("fixed_joint") for key in out)
     assert out["betas"].shape == betas.shape
     # sex / measured anthropometry
     assert str(out["sex"]) == "M"
@@ -160,21 +160,32 @@ def test_compute_anthro_shapes_and_values():
     assert str(out["pair_id"]) == "deadbeef"
     # joint_position is root-relative (pelvis at origin, both poses)
     np.testing.assert_allclose(out["joint_position"][:, 0, :], 0.0, atol=1e-6)
-    # names line up
-    assert len(list(out["joint_names"])) == 22
-    assert list(out["fixed_joint_names"]) == list(anthro.FIXED_JOINT_NAMES)
+    # names line up: the 24 SMPL joints, and the segments end with the two hands
+    assert list(out["joint_names"]) == list(anthro.JOINT24_NAMES)
+    assert list(out["segment_names"])[-2:] == ["hand_l", "hand_r"]
 
 
-def test_fixed_joint_rotation_is_unit_identity_quat():
+def test_tpose_joint_position_is_the_root_relative_rest_skeleton():
     anthro = _load_anthro_module()
     model = _tiny_model(anthro)
-    out = anthro.compute_anthro(model, np.zeros(2), {"gender": "M", "height": 170.0, "weight": 60.0}, "x")
-    fjr = out["fixed_joint_rotation"]
-    assert fjr.shape == (4, 4)
-    # identity quaternion (w,x,y,z) = (1,0,0,0), unit norm
-    np.testing.assert_allclose(fjr[:, 0], 1.0, atol=1e-6)
-    np.testing.assert_allclose(fjr[:, 1:], 0.0, atol=1e-6)
-    np.testing.assert_allclose(np.linalg.norm(fjr, axis=1), 1.0, atol=1e-6)
+    betas = np.array([0.3, 0.0])
+    J = anthro.rest_joints(model, betas)
+    out = anthro.compute_anthro(model, betas, {"gender": "F"}, "x")
+    np.testing.assert_allclose(out["joint_position"][0], J - J[0], atol=1e-6)
+
+
+def test_anthro_rest_and_local_rotations_reproduce_the_source_body():
+    """FK of the published rest skeleton with the source's own local rotations is the source body."""
+    anthro = _load_anthro_module()
+    model = _tiny_model(anthro)
+    J = anthro.rest_joints(model, np.zeros(2))
+    out = anthro.compute_anthro(model, np.zeros(2), {"gender": "M"}, "x")
+    rng = np.random.default_rng(0)
+    local = np.stack([np.stack([Rotation.from_rotvec(rng.normal(0, 0.4, 3)).as_matrix()
+                                for _ in range(24)]) for _ in range(5)])
+    rest = out["joint_position"][0].astype(np.float64)
+    np.testing.assert_allclose(anthro.fk_positions_batch(rest, local),
+                               anthro.fk_positions_batch(J, local), atol=1e-6)
 
 
 def test_load_smpl_model_for_gender_maps_paths(monkeypatch, tmp_path):
@@ -191,136 +202,8 @@ def test_load_smpl_model_for_gender_maps_paths(monkeypatch, tmp_path):
         anthro.smpl_model_path_for_gender("X")
 
 
-def test_reconstruction_frozen_equals_full_when_fixed_joints_are_identity():
-    """Large(18)+Anthro(4 frozen) reconstruction == full-24 FK when the 4 fixed joints
-    are identity in the source pose (the exactness boundary of the SOMA freeze model)."""
-    anthro = _load_anthro_module()
-    model = _tiny_model(anthro)
-    J = anthro.rest_joints(model, np.zeros(2))
-    rng = np.random.default_rng(0)
-    local_full = np.stack([Rotation.from_rotvec(rng.normal(0, 0.3, 3)).as_matrix() for _ in range(24)])
-    # zero-out the 4 fixed joints in the source (identity) -> freeze is lossless here
-    for j in anthro.FIXED_JOINTS:
-        local_full[j] = np.eye(3)
-    full_pos, _ = anthro.smpl_fk_positions(J, local_full)
-    frozen_pos = anthro.reconstruct_positions_frozen_fixed(J, local_full)
-    np.testing.assert_allclose(frozen_pos, full_pos, atol=1e-6)
-
-
-def test_reconstruction_frozen_deviates_when_fixed_joints_move():
-    anthro = _load_anthro_module()
-    model = _tiny_model(anthro)
-    J = anthro.rest_joints(model, np.zeros(2))
-    local_full = np.repeat(np.eye(3)[None], 24, axis=0)
-    # give a collar a real rotation -> frozen reconstruction must differ downstream (wrist)
-    local_full[13] = Rotation.from_rotvec([0, 0, 0.5]).as_matrix()
-    full_pos, _ = anthro.smpl_fk_positions(J, local_full)
-    frozen_pos = anthro.reconstruct_positions_frozen_fixed(J, local_full)
-    assert np.linalg.norm(full_pos[20] - frozen_pos[20]) > 1e-3
-
-
 def test_mean_rotation_of_constant_returns_that_rotation():
     anthro = _load_anthro_module()
     R = Rotation.from_rotvec([0.1, -0.2, 0.3]).as_matrix()
     stack = np.repeat(R[None], 7, axis=0)
     np.testing.assert_allclose(anthro.mean_rotation(stack), R, atol=1e-9)
-
-
-def test_fixed_local_R_matching_source_makes_reconstruction_exact():
-    """When the frozen constant equals the (constant) source fixed-joint rotation, the
-    reconstruction is exact even though the collar is far from identity."""
-    anthro = _load_anthro_module()
-    model = _tiny_model(anthro)
-    J = anthro.rest_joints(model, np.zeros(2))
-    collar = Rotation.from_rotvec([0, 0, 0.42]).as_matrix()      # ~24 deg, like the real take
-    local_full = np.repeat(np.eye(3)[None], 24, axis=0)
-    local_full[13] = collar
-    fixed = np.stack([np.eye(3), np.eye(3), collar, np.eye(3)])  # FIXED_JOINTS order (3,6,13,14)
-    full_pos, _ = anthro.smpl_fk_positions(J, local_full)
-    frozen = anthro.reconstruct_positions_frozen_fixed(J, local_full, fixed_local_R=fixed)
-    np.testing.assert_allclose(frozen, full_pos, atol=1e-9)
-    # and identity freeze would NOT be exact here
-    id_frozen = anthro.reconstruct_positions_frozen_fixed(J, local_full)
-    assert np.linalg.norm(id_frozen[20] - full_pos[20]) > 1e-2
-
-
-def test_compute_anthro_stores_provided_fixed_rotations_as_unit_quats():
-    anthro = _load_anthro_module()
-    model = _tiny_model(anthro)
-    fixed = np.stack([
-        Rotation.from_rotvec([0, 0, 0.04]).as_matrix(),
-        Rotation.from_rotvec([0, 0, 0.16]).as_matrix(),
-        Rotation.from_rotvec([0, 0, 0.42]).as_matrix(),
-        Rotation.from_rotvec([0, 0, 0.43]).as_matrix(),
-    ])
-    out = anthro.compute_anthro(model, np.zeros(2), {"gender": "M", "height": 170.0, "weight": 60.0},
-                                "pid", fixed_joint_local_R=fixed)
-    fjr = out["fixed_joint_rotation"]
-    assert fjr.shape == (4, 4)
-    np.testing.assert_allclose(np.linalg.norm(fjr, axis=1), 1.0, atol=1e-6)
-    # not identity (collars ~24 deg)
-    assert abs(float(fjr[2, 0])) < 0.9999
-    assert "reduced_model_fit" in str(out["fixed_joint_rotation_provenance"])
-
-
-def _random_local(rng, T):
-    return np.stack([
-        np.stack([Rotation.from_rotvec(rng.normal(0, 0.4, 3)).as_matrix() for _ in range(24)])
-        for _ in range(T)
-    ])
-
-
-def _global(anthro, local):
-    P = anthro.SMPL24_PARENTS
-    G = np.zeros_like(local)
-    G[:, 0] = local[:, 0]
-    for j in range(1, 24):
-        G[:, j] = G[:, int(P[j])] @ local[:, j]
-    return G
-
-
-def _reduced_model():
-    _load_anthro_module()          # puts packages/smpl18/src on the path
-    from soma_synth.pipeline import reduced_model
-    return reduced_model
-
-
-def test_refit_preserves_distal_global_orientation_for_any_constant():
-    anthro = _load_anthro_module()
-    reduced_model = _reduced_model()
-    rng = np.random.default_rng(1)
-    local = _random_local(rng, 5)
-    fixed = np.stack([Rotation.from_rotvec(rng.normal(0, 0.5, 3)).as_matrix() for _ in range(4)])
-    refit = reduced_model.reduce_local(local, fixed)
-    Graw, Gref = _global(anthro, local), _global(anthro, refit)
-    # distal joints below the fixed welds: spine3, head, shoulders, wrists — orientation exact
-    for j in (9, 12, 15, 16, 17, 20, 21):
-        d = (np.swapaxes(Graw[:, j], -1, -2) @ Gref[:, j]).reshape(-1, 3, 3)
-        ang = np.degrees(np.linalg.norm(Rotation.from_matrix(d).as_rotvec(), axis=1))
-        assert ang.max() < 1e-6, (j, ang.max())
-    # the 4 fixed joints now hold the constants (np.allclose broadcasts (3,3) over frames)
-    for i, j in enumerate(anthro.FIXED_JOINTS):
-        assert np.allclose(refit[:, j], fixed[i], atol=1e-12)
-
-
-def test_fit_reduces_position_residual_vs_identity():
-    anthro = _load_anthro_module()
-    reduced_model = _reduced_model()
-    model = _tiny_model(anthro)
-    J = anthro.rest_joints(model, np.zeros(2))
-    rng = np.random.default_rng(2)
-    local = _random_local(rng, 40)
-    pose = Rotation.from_matrix(local.reshape(-1, 3, 3)).as_rotvec().reshape(40, 24, 3)
-    settings = reduced_model.settings_for_source("amass")
-    fit = reduced_model.fit_subject([pose], J, settings, group="tiny", basis="test", scope="take")
-    assert fit.constants.shape == (4, 3, 3)
-    affected = list(reduced_model.AFFECTED_BY_FREEZE)
-
-    def mean_res(fixed):
-        r = np.linalg.norm(
-            anthro.fk_positions_batch(J, reduced_model.reduce_local(local, fixed))
-            - anthro.fk_positions_batch(J, local), axis=2)
-        return r[:, affected].mean()
-
-    ident = np.repeat(np.eye(3)[None], 4, axis=0)
-    assert mean_res(fit.constants) <= mean_res(ident) + 1e-9

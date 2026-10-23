@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from soma_synth.contracts import qmd_unified8_smpl18_spec as spec
+from soma_synth.contracts import qmd_unified8_spec as spec
 from soma_synth.validation import checks
 from soma_synth.validation.report import ValidationReport
 

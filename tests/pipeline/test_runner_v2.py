@@ -20,6 +20,7 @@ import pytest
 import yaml
 from smpl18.model import select as smpl18_select
 
+from soma_synth.contracts import qmd_unified8_spec as spec
 from soma_synth.pipeline import body_models, paths
 from soma_synth.pipeline import provenance as provenance_mod
 from soma_synth.pipeline import runner as runner_mod
@@ -160,8 +161,10 @@ class TestRegistryV2:
 
     def test_v2_keeps_what_v1_declared_apart_from_the_declared_changes(self):
         v1, v2 = stages_mod.load(V1), stages_mod.load(V2)
-        assert (v1.spec_id, v1.spec_version, v1.canonical_stages, v1.resume_predicates) == (
-            v2.spec_id, v2.spec_version, v2.canonical_stages, v2.resume_predicates)
+        assert (v1.spec_version, v1.canonical_stages, v1.resume_predicates) == (
+            v2.spec_version, v2.canonical_stages, v2.resume_predicates)
+        # v1 is frozen byte for byte, so it keeps the spec id it was written for; v2 names the spec
+        assert v2.spec_id == spec.SPEC_ID
         # v2 adds the 300-component set and changes none of v1's
         assert {k: v2.body_model_sets[k] for k in v1.body_model_sets} == v1.body_model_sets
         assert set(v2.body_model_sets) - set(v1.body_model_sets) == {"smpl_clean_300"}

@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from soma_synth.contracts import dataset_profiles
-from soma_synth.contracts import qmd_unified8_smpl18_spec as spec
+from soma_synth.contracts import qmd_unified8_spec as spec
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -26,7 +26,7 @@ def test_importing_the_spec_does_not_parse_the_registry():
     code = (
         "import json\n"
         "from soma_synth.contracts import dataset_profiles\n"
-        "from soma_synth.contracts import qmd_unified8_smpl18_spec as spec\n"
+        "from soma_synth.contracts import qmd_unified8_spec as spec\n"
         "before = dataset_profiles.default_registry.cache_info().currsize\n"
         "fields = spec.MANIFEST_CORE_FIELDS\n"
         "after = dataset_profiles.default_registry.cache_info().currsize\n"
@@ -52,7 +52,7 @@ def test_the_value_is_the_registry_universal_manifest_keys():
 
 
 def test_it_is_still_importable_by_name():
-    from soma_synth.contracts.qmd_unified8_smpl18_spec import (
+    from soma_synth.contracts.qmd_unified8_spec import (
         MANIFEST_CORE_FIELDS,
     )
 

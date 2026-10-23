@@ -125,8 +125,8 @@ def _files_digest(files: dict[str, object]) -> str:
 def smpl18_revision(package_dir: Path | str | None = None) -> dict[str, object]:
     """The ``smpl18`` the run imported: the commit of its checkout, else its version and files.
 
-    ``smpl18`` is the second code base a bundle depends on (the SMPL-24 conversion, the model
-    selection and the 18-joint reduction), mounted at ``packages/smpl18`` as a submodule. When
+    ``smpl18`` is the second code base a bundle depends on (the SMPL-24 conversion and the
+    model selection), mounted at ``packages/smpl18`` as a submodule. When
     the imported package sits in a git checkout (``<checkout>/src/smpl18`` with
     ``<checkout>/.git``), its HEAD, dirty flag and patch hash are recorded, like
     :func:`code_revision`; an installed copy has no checkout, so its version and the sha256 of

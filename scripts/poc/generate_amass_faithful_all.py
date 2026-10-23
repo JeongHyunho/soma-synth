@@ -5,8 +5,7 @@ Enumerates all *_poses.npz across the audited AMASS sub-datasets, calls the per-
 dataset root. Resumable (a sequence whose 4 files already validate is skipped), per-sequence error
 isolation (a bad file becomes INDEX status 'failed'+reason; the run continues), and shardable
 (`--shard i/N`) so several detached processes can cover the ~8354 sequences in parallel with disjoint
-output. `--groups <dataset>/<subject>` (repeatable) restricts the run to whole subjects, and so to
-whole fit groups. LOCAL-ONLY: reads `$SOMA_SOURCE_ROOT/amass` and writes under `$SOMA_DATA_ROOT`
+output. `--groups <dataset>/<subject>` (repeatable) restricts the run to whole subjects. LOCAL-ONLY: reads `$SOMA_SOURCE_ROOT/amass` and writes under `$SOMA_DATA_ROOT`
 unless `--amass-root` / `--out-root` say otherwise; never pushes to any shared drive.
 
 A partial selection (`--datasets`, `--groups`, `--limit`) needs an `--out-root` other than the
@@ -20,7 +19,6 @@ import glob
 import importlib.util as _ilu
 import json
 import os
-import time
 from datetime import datetime, timezone
 
 import numpy as np
@@ -30,7 +28,6 @@ _GEN_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generate_a
 _gen_spec = _ilu.spec_from_file_location("generate_amass_faithful", _GEN_PATH)
 gen = _ilu.module_from_spec(_gen_spec)
 _gen_spec.loader.exec_module(gen)
-reduced_model = gen.reduced_model
 paths = gen.paths
 
 DATASET_DIRNAME = "amass_faithful_full"    # no version suffix (retention rule 1.1)
@@ -61,8 +58,7 @@ def enumerate_specs(amass_root, datasets=None, groups=None):
     run index (status `excluded_non_motion`) rather than silently dropped; see `is_motion_spec`.
 
     `groups` is a collection of `(dataset, subject)`: only the files whose folder is that subject
-    of that dataset are kept, every one of them, so each fit group (one subject, one body model,
-    one set of betas) is enumerated whole. A group that matches no file is an error.
+    of that dataset are kept, every one of them. A group that matches no file is an error.
     """
     datasets = list(datasets) if datasets else list(gen.AMASS_DATASETS)
     wanted = set(groups) if groups else None
@@ -187,115 +183,14 @@ def _resumed_entry_fields(out_dir):
             "pair_id": (manifest.get("identity") or {}).get("pair_id")}
 
 
-# --------------------------------------------------------------------------
-# frozen-joint constants: one fit per group, shared by every shard
-# --------------------------------------------------------------------------
-#: Held while one process fits the groups; the others wait for FIT_FILE instead of fitting too.
-FIT_LOCK = reduced_model.FIT_FILE + ".lock"
-#: How often a waiting shard looks for the fit file, in seconds. Scheduling only; no data depends on it.
-FIT_WAIT_POLL_S = 10
-
-
-def fit_all_groups(specs, log=None):
-    """Fit every group's constants: (settings, {group: record}, {take rel: group}, {take rel: reason}).
-
-    Groups are found from two small fields per sequence, then each group's poses are loaded, pooled
-    and fitted and dropped before the next, so the whole corpus is never in memory at once."""
-    log = log or (lambda *a: None)
-    settings = reduced_model.settings_for_source("amass")
-    members, meta, unfitted = {}, {}, {}
-    for spec in specs:
-        if not is_motion_spec(spec):
-            continue
-        try:
-            group, letter, betas = gen.fit_group_of(spec)
-        except Exception as error:  # the take fails in build too; say why it pooled nothing
-            unfitted[bundle_dirname(spec)] = "%s: %s" % (type(error).__name__, error)
-            continue
-        members.setdefault(group, []).append(spec)
-        meta[group] = (letter, betas)
-    models, groups, takes = {}, {}, {}
-    for count, group in enumerate(sorted(members), 1):
-        letter, betas = meta[group]
-        poses, used = [], []
-        for spec in members[group]:
-            try:
-                data = gen.load_amass_safe(spec.source_npz, dataset=spec.dataset)
-            except Exception as error:
-                unfitted[bundle_dirname(spec)] = "%s: %s" % (type(error).__name__, error)
-                continue
-            poses.append(gen.build_pose24(data["poses"]))
-            used.append(bundle_dirname(spec))
-        if not poses:
-            continue
-        if letter not in models:
-            models[letter] = gen.anthro_smpl.load_smpl_model_for_gender(letter)
-        rest = gen.anthro_smpl.rest_joints(models[letter], betas)
-        fit = reduced_model.fit_subject(
-            poses, rest, settings, group=group,
-            basis="every loadable motion sequence of the group, native rate")
-        groups[group] = fit.record
-        takes.update({rel: group for rel in used})
-        if count % 50 == 0:
-            log("fitted", count, "of", len(members), "groups")
-    return settings, groups, takes, unfitted
-
-
-def _fits_by_take(document):
-    fits = {name: reduced_model.fit_from_record(record) for name, record in document["groups"].items()}
-    return {rel: fits[group] for rel, group in document["takes"].items()}
-
-
-def _fit_file_covers(document, specs, settings):
-    wanted = {bundle_dirname(s) for s in specs if is_motion_spec(s)}
-    known = set(document["takes"]) | set(document.get("unfitted", {}))
-    return document.get("settings") == dict(settings.provenance) and wanted <= known
-
-
-def ensure_fits(specs, out_root, log=None):
-    """{take rel: SubjectFit}, from FIT_FILE when it already covers `specs`, else fitted now.
-
-    Sharded runs start together; the first to create FIT_LOCK fits, the rest wait for its file.
-    A lock left by a crashed run has to be removed by hand -- the waiting shards say which file."""
-    log = log or (lambda *a: None)
-    os.makedirs(out_root, exist_ok=True)
-    settings = reduced_model.settings_for_source("amass")
-    existing = reduced_model.read_fit_file(out_root)
-    if existing is not None and _fit_file_covers(existing, specs, settings):
-        return _fits_by_take(existing)
-    lock = os.path.join(out_root, FIT_LOCK)
-    try:
-        handle = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        log("waiting for the fit file another process is writing (lock %s)" % lock)
-        while os.path.exists(lock):
-            time.sleep(FIT_WAIT_POLL_S)
-        existing = reduced_model.read_fit_file(out_root)
-        if existing is not None and _fit_file_covers(existing, specs, settings):
-            return _fits_by_take(existing)
-        raise RuntimeError("the fit lock was released without a fit file covering this run: %s" % lock)
-    try:
-        os.close(handle)
-        log("fitting frozen-joint constants per subject group")
-        settings, groups, takes, unfitted = fit_all_groups(specs, log)
-        reduced_model.write_fit_file(out_root, settings, groups, takes, unfitted)
-        log("fit file written:", len(groups), "groups,", len(takes), "takes,", len(unfitted), "unfitted")
-    finally:
-        os.remove(lock)
-    return _fits_by_take(reduced_model.read_fit_file(out_root))
-
-
 def _index_path(out_root, shard):
     if shard is None:
         return os.path.join(out_root, "INDEX.json")
     return os.path.join(out_root, "INDEX_shard_%d_of_%d.json" % (shard[0], shard[1]))
 
 
-def run(specs, out_root, build_fn=None, write_fn=None, force=False, shard=None, log=None, fits=None):
-    """Generate bundles for `specs` (optionally only this shard). Returns the index dict and writes it.
-
-    `fits` maps a take rel to its group's `SubjectFit` (see `ensure_fits`); a take with none is
-    built with a fit of its own, which its records call `take` scope."""
+def run(specs, out_root, build_fn=None, write_fn=None, force=False, shard=None, log=None):
+    """Generate bundles for `specs` (optionally only this shard). Returns the index dict and writes it."""
     build_fn = build_fn or gen.build
     write_fn = write_fn or write_outputs_generic
     log = log or (lambda *a: None)
@@ -323,10 +218,7 @@ def run(specs, out_root, build_fn=None, write_fn=None, force=False, shard=None, 
             entries.append(entry)
             continue
         try:
-            if fits is None:
-                small, large, anthro, manifest = build_fn(spec)
-            else:
-                small, large, anthro, manifest = build_fn(spec, reduction=fits.get(rel))
+            small, large, anthro, manifest = build_fn(spec)
             write_fn(out_dir, small, large, anthro, manifest)
             entry["status"] = "ok"
             entry["frames"] = int(small["frame_count"])
@@ -400,12 +292,12 @@ IMU, and there is **no development_reference** (AMASS has no measured GRF / inso
   `f = R^T (a_world - g)` (gravity-included), `imu_angular_velocity[M,8,3]` deg/s, validity/confidence, and
   `imu_orientation_absolute_heading` (`[True x6, False x2]`; insole channels are 6-axis).
   `small_mode='synthetic_from_smpl'`, `axis_convention='spec_S_v2'`.
-- `large_reference.npz` — `joint_names(18)` + `root_velocity[M,3]` + `joint_rotation[M,18,4]`
-  (`[:,0]`=pelvis global, `[:,1:]`=17 reduced-model local rotations) + `joint_velocity[M,18,3]` +
+- `large_reference.npz` — `joint_names(24)` + `root_velocity[M,3]` + `joint_rotation[M,24,4]`
+  (`[:,0]`=pelvis global, `[:,1:]`=23 SMPL local rotations, the source pose) + `joint_velocity[M,24,3]` +
   `pelvis_position_world_aux[M,3]` + `smpl_global_orientation_world[M,24,4]` (lossless).
   Trajectory: `pos[t] = pelvis_position_world_aux[0] + dt*cumsum(root_velocity)[t]`.
-- `anthro_reference.npz` — subject skeleton constants: `joint_position[2,22,3]`, `segment_length[13]`,
-  `fixed_joint_rotation[4,4]` (spine1/spine2/collars weld), `betas[16]`, `gender`. `height` is an SMPL
+- `anthro_reference.npz` — skeleton constants: `joint_position[2,24,3]`, `segment_length[15]`,
+  `betas[16]`, `gender`. `height` is an SMPL
   rest-stature estimate; `body_mass` is `NaN` (AMASS has no measured subject anthropometry).
 - `manifest.json` — provenance, resample block, validation, and the unavailable list.
 
@@ -422,11 +314,8 @@ gravity `g=[0,0,-9.80665]`; angular velocity rotation-log deg/s. Source framerat
   geometry uses the first 10 (`smpl10_beta_truncation`).
 - **No kinetics**: no GRF / CoP / joint torques / inverse dynamics; no development_reference.
 - **No measured height/mass**: height is an SMPL stature estimate; mass is unavailable.
-- Reduced model: `spine1`, `spine2` and both collars are frozen to constants that `smpl18.reduce`
-  fits **once per subject group** (a subject's sequences that share MoSh betas and body model) over
-  their pooled frames; distal global orientation is exact and a small trunk/arm position residual
-  remains. `reduced_model_fit.json` at the bundle root records every group's constants, residuals and
-  settings; each sequence reports its own residual in `manifest.validation.reduced_model_fit_residual_m`.
+- **Hands**: AMASS SMPL-H body poses carry no hand articulation here, so `left_hand`/`right_hand`
+  are the identity local rotation in every frame.
 - **Loading**: every name/code array is a numpy unicode array, so `np.load(path, allow_pickle=False)`
   reads all of them.
 - Very short sequences (<=16 resampled frames) skip the 7 Hz low-pass before differentiation (too short
@@ -479,20 +368,13 @@ def main(argv=None):
     ap.add_argument("--datasets", nargs="*", default=None)
     ap.add_argument("--groups", action="append", type=parse_group, default=None,
                     metavar="DATASET/SUBJECT",
-                    help="only this subject's files, i.e. its whole fit groups (repeatable)")
+                    help="only this subject's files (repeatable)")
     ap.add_argument("--shard", default=None, help="i/N — process specs where index%%N==i")
     ap.add_argument("--limit", type=int, default=None,
-                    help="cap to the first K specs (sampling); not with --groups, whose fit groups "
-                         "it would cut")
+                    help="cap to the first K specs (sampling)")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--merge", action="store_true", help="merge shard indexes into INDEX.json, then describe")
     args = ap.parse_args(argv)
-    if args.groups and args.limit is not None:
-        # The frozen-joint constants are fitted over a group's pooled frames, so a group cut
-        # partway would get other constants than the full run gives it, and say nothing.
-        print("--limit cannot be combined with --groups: it would cut a fit group partway and fit "
-              "its frozen joints on part of its frames; name fewer groups instead")
-        return 2
 
     try:
         given = args.amass_root is not None
@@ -505,7 +387,7 @@ def main(argv=None):
         paths.refuse_partial_run_into_lineage(args.out_root, DATASET_DIRNAME,
                                               partial_selection(args), "--out-root")
         if not args.merge:
-            paths.body_model_dir()     # ensure_fits loads the models before any take is written
+            paths.body_model_dir()     # the models each sequence's gender selects live here
         paths.existing_source_dir("amass", args.amass_root if given else None)
         specs = enumerate_specs(args.amass_root, args.datasets, args.groups)
     except (paths.PathConfigError, ValueError) as error:
@@ -514,8 +396,8 @@ def main(argv=None):
     if args.limit is not None:
         specs = specs[: args.limit]
     if not specs:
-        # Both branches below rewrite INDEX.json and the description (and the fits their fit
-        # record) in the output, the production lineage by default, over whatever they selected.
+        # Both branches below rewrite INDEX.json and the description in the output, the
+        # production lineage by default, over whatever they selected.
         selection = "datasets: " + ", ".join(args.datasets or gen.AMASS_DATASETS)
         if args.limit is not None:
             selection += f"; --limit {args.limit}"
@@ -536,8 +418,7 @@ def main(argv=None):
         return 0
 
     shard = _parse_shard(args.shard)
-    fits = ensure_fits(specs, args.out_root, log=lambda *a: print(*a, flush=True))
-    idx = run(specs, args.out_root, force=args.force, shard=shard, log=print, fits=fits)
+    idx = run(specs, args.out_root, force=args.force, shard=shard, log=print)
     if shard is None:
         # An un-sharded run is the whole bundle, so it writes the description a sharded run
         # leaves to --merge; without this the bundle lacked the file L0 and L4 require.

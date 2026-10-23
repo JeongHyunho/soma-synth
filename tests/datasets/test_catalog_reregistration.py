@@ -140,9 +140,9 @@ def test_an_append_only_catalog_with_stale_live_entries_is_reconciled_in_one_wri
                 "payload_integrity": "not_rehashed",
                 "index_relative_path": f"{POC}/gaitex_unified8/INDEX.json"}
     stale = [{**a, "registration_evidence": evidence} for a in old_generation]
-    other = {"asset_id": "qmd_unified8_smpl18:faithful-v2:hknu:S01_T01:small", "role": "small",
+    other = {"asset_id": "qmd_unified8:faithful-v2:hknu:S01_T01:small", "role": "small",
              "relative_path": f"{POC}/hknu_unified8/S01_T01/small_reference.npz",
-             "sha256": "0" * 64, "bytes": 1, "source": "hknu", "spec_id": "qmd_unified8_smpl18",
+             "sha256": "0" * 64, "bytes": 1, "source": "hknu", "spec_id": "qmd_unified8",
              "spec_version": "faithful-v2"}
     legacy = {"schema": catalog.SCHEMA_ASSET, "artifact_class": "experimental_non_candidate",
              "quality_gate": "NOT_EVALUATED", "reconciliations": [{"superseded_count": 3}],
@@ -251,9 +251,9 @@ def test_the_cli_says_what_a_registration_did(tmp_path, capsys):
 
 
 def _small(take: str, sha: str, folder: str = f"{POC}/gaitex_unified8") -> dict:
-    return {"asset_id": f"qmd_unified8_smpl18:faithful-v2:gaitex:{take}:small", "role": "small",
+    return {"asset_id": f"qmd_unified8:faithful-v2:gaitex:{take}:small", "role": "small",
             "relative_path": f"{folder}/{take}/small_reference.npz", "sha256": sha, "bytes": 1,
-            "source": "gaitex", "spec_id": "qmd_unified8_smpl18", "spec_version": "faithful-v2"}
+            "source": "gaitex", "spec_id": "qmd_unified8", "spec_version": "faithful-v2"}
 
 
 def test_merge_registration_drops_the_entries_no_registered_asset_stands_for():
@@ -274,7 +274,7 @@ def test_merge_registration_drops_the_entries_no_registered_asset_stands_for():
         {**t2, "superseded": True, "supersession_reason": "registration_dropped",
          "superseded_by": None},
         elsewhere, other_version, new_t1]
-    lineage = ("gaitex", "qmd_unified8_smpl18", "faithful-v2")
+    lineage = ("gaitex", "qmd_unified8", "faithful-v2")
     # a registration with no assets drops the whole folder of its lineage when it names the lineage
     assert catalog.merge_registration([t1, t2], [], folder, lineage=lineage)[4] == 2
     # and nothing without one to go by, or when the folder is the data root itself

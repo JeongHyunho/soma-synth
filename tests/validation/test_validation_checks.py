@@ -48,9 +48,9 @@ def _write_small(path: Path, T: int, source: str, small_mode: str) -> None:
 def _write_large(path: Path, T: int) -> None:
     np.savez(
         path,
-        joint_names=np.array(["j"] * 18),
-        joint_rotation=np.tile(np.array([1, 0, 0, 0], np.float32), (T, 18, 1)),
-        joint_velocity=np.zeros((T, 18, 3), np.float32),
+        joint_names=np.array(["j"] * 24),
+        joint_rotation=np.tile(np.array([1, 0, 0, 0], np.float32), (T, 24, 1)),
+        joint_velocity=np.zeros((T, 24, 3), np.float32),
         root_velocity=np.zeros((T, 3), np.float32),
         pelvis_position_world_aux=np.zeros((T, 3), np.float32),
         smpl_global_orientation_world=np.tile(np.array([1, 0, 0, 0], np.float32), (T, 24, 1)),
@@ -68,13 +68,11 @@ def _write_anthro(path: Path, nbetas: int = 16) -> None:
         subject_scope=_u("sequence_constant_frame_invariant"),
         subject_scope_note=_u("note"),
         reference_poses=np.array(["rest", "neutral"]),
-        joint_names=np.array(["j"] * 22),
-        joint_position=np.zeros((2, 22, 3), np.float32),
+        joint_names=np.array(["j"] * 24),
+        joint_position=np.zeros((2, 24, 3), np.float32),
         joint_position_frame=_u("world"),
-        segment_names=np.array(["s"] * 13),
-        segment_length=np.ones((13,), np.float32),
-        fixed_joint_names=np.array(["f"] * 4),
-        fixed_joint_rotation=np.zeros((4, 4), np.float32),
+        segment_names=np.array(["s"] * 15),
+        segment_length=np.ones((15,), np.float32),
         sex=_u("F"),
         height=np.array(1.7, np.float32),
         body_mass=np.array(60.0, np.float32),
@@ -86,7 +84,6 @@ def _write_anthro(path: Path, nbetas: int = 16) -> None:
         sex_provenance=prov,
         betas_provenance=prov,
         skeleton_provenance=prov,
-        fixed_joint_rotation_provenance=prov,
         reconstruction_note=_u("note"),
         pair_id=_u("pid"),
         subject_id=_u("subj"),
@@ -143,7 +140,7 @@ def make_take(
         "spec_documents": {},
         "validation": {},
         "safety": {},
-        "spec_id": "qmd_unified8_smpl18",
+        "spec_id": "qmd_unified8",
         "spec_version": "faithful-v2",
         "quality_gate": "NOT_EVALUATED",
         # Promoted to universal by ADR-0040 D1. A fixture stands for a conformant bundle, so it
@@ -180,7 +177,7 @@ def make_dataset(root: Path, source: str = "amass", n: int = 2, small_mode: str 
              "rel": tid, "relative_path": tid}
         )
     index = {
-        "spec_id": "qmd_unified8_smpl18",
+        "spec_id": "qmd_unified8",
         "spec_version": "faithful-v2",
         "dataset_dirname": root.name,
         "source": source,
@@ -210,13 +207,6 @@ def make_dataset(root: Path, source: str = "amass", n: int = 2, small_mode: str 
             "status": "open", "since": "2026-09-14",
         }],
     }), encoding="utf-8")
-    # Required of every bundle since 2026-09-16: the reduced model's per-subject fit record.
-    # Presence is the validator's rule; the content here is a minimal well-formed file.
-    (root / "reduced_model_fit.json").write_text(json.dumps({
-        "schema": "reduced_model_fit", "method": "smpl18.reduce.fit_constants",
-        "source": source, "settings": {}, "group_count": 0, "take_count": 0,
-        "groups": {}, "takes": {}, "unfitted": {},
-    }), encoding="utf-8")
     return root
 
 
@@ -232,7 +222,7 @@ def test_read_npz_schema_reads_object_keys_without_pickle(tmp_path: Path) -> Non
 
 
 def checks_dtype(dt):
-    from soma_synth.contracts.qmd_unified8_smpl18_spec import dtype_class
+    from soma_synth.contracts.qmd_unified8_spec import dtype_class
 
     return dtype_class(dt)
 

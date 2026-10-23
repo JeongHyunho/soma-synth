@@ -12,9 +12,9 @@ This is a separate signal-artifact pathway; the existing bundle defaults are unc
 > **INTERNAL-ONLY.** Every bundle this code makes is `experimental_non_candidate` · `internal_only` and
 > **stays on the PC that made it.** The licences of the source datasets apply.
 
-soma-synth generates the SOMA synthetic IMU datasets (spec `qmd_unified8_smpl18`). From motion-capture
+soma-synth generates the SOMA synthetic IMU datasets (spec `qmd_unified8`). From motion-capture
 sources (AMASS, PRISM, HKNU, GAITEX, AddBiomechanics, Milestone-2) it builds bundles of 8-channel virtual IMU
-data (Small) and an 18-joint SMPL reference (Large), and validates, documents and registers them with one
+data (Small) and an SMPL-24 reference (Large), and validates, documents and registers them with one
 command, `soma-synth run`. For Milestone-2, which has force plates, Large also carries the kinetics (GRF, CoP,
 free moment, COM dynamics, joint moments and powers by inverse dynamics).
 
