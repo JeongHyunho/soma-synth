@@ -407,10 +407,14 @@ def register_dataset(
 
 
 def supersede_spec_version(catalog_dir, spec_version: str, superseded_by: str, *,
+                           spec_id: str | None = None,
                            lock_timeout: float = DEFAULT_LOCK_TIMEOUT_S,
                            registered_by: Mapping[str, object] | None = None) -> int:
     """Flag every asset of `spec_version` as superseded_by another version (e.g. faithful-v1 -> v2).
-    Each flagged asset is one "replaced" change of the write's journal record, the old entry in it."""
+
+    With `spec_id`, only the assets of that spec are flagged: a spec renamed without a new version
+    leaves its earlier assets under ids a registration of the new spec never matches. Each flagged
+    asset is one "replaced" change of the write's journal record, the old entry in it."""
     acp = Path(catalog_dir) / "asset_catalog.json"
     with catalog_lock(catalog_dir, timeout=lock_timeout):
         previous = read_catalog_file(acp)
@@ -420,15 +424,19 @@ def supersede_spec_version(catalog_dir, spec_version: str, superseded_by: str, *
         n = 0
         flagged = []
         for a in ac.get("assets", []):
-            if a.get("spec_version") == spec_version and not a.get("superseded"):
+            if a.get("spec_version") == spec_version and not a.get("superseded") \
+                    and (spec_id is None or a.get("spec_id") == spec_id):
                 a = {**a, "superseded": True, "superseded_by": superseded_by}
                 n += 1
             flagged.append(a)
         new = {**ac, "assets": flagged}
+        operation = {"name": "supersede_spec_version", "spec_version": spec_version,
+                     "superseded_by": superseded_by, "assets": n}
+        if spec_id is not None:
+            operation["spec_id"] = spec_id
         write_catalog_document(
             acp, new, previous, registered_by=registered_by_record(registered_by),
-            operation={"name": "supersede_spec_version", "spec_version": spec_version,
-                       "superseded_by": superseded_by, "assets": n})
+            operation=operation)
     return n
 
 

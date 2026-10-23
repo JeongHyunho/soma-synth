@@ -139,6 +139,21 @@ def test_supersede_spec_version(tmp_path: Path) -> None:
     assert all(not a.get("superseded") for a in ac["assets"] if a["spec_version"] == "faithful-v2")
 
 
+def test_supersede_spec_version_of_one_spec_id(tmp_path: Path) -> None:
+    """A spec renamed under the same version: only the old spec's assets are flagged."""
+    ds = make_dataset(tmp_path / "amass_x", n=1)
+    catdir = tmp_path / "catalog"
+    catdir.mkdir()
+    catalog.register_dataset(catdir, ds, source="amass", spec_version="faithful-v2",
+                             spec_id="old_spec", data_root=tmp_path)
+    catalog.register_dataset(catdir, ds, source="amass", spec_version="faithful-v2", data_root=tmp_path)
+    n = catalog.supersede_spec_version(catdir, "faithful-v2", "qmd_unified8", spec_id="old_spec")
+    ac = catalog.load_asset_catalog(catdir)
+    old = [a for a in ac["assets"] if a["spec_id"] == "old_spec"]
+    assert n == len(old) and n > 0 and all(a.get("superseded") for a in old)
+    assert all(not a.get("superseded") for a in ac["assets"] if a["spec_id"] != "old_spec")
+
+
 def test_register_dataset_prism_includes_development(tmp_path: Path) -> None:
     ds = tmp_path / "prism_x"
     ds.mkdir()
